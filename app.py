@@ -163,4 +163,94 @@ if len(historical_data) >= 3:
         
         # 條件：最新日與昨日投信皆為買超
         condition_buy = (merged_df['投信買賣超(張)'] > 0) & (merged_df['昨日投信買超(張)'] > 0)
-        potential_stocks = merged_df[condition_buy].
+        potential_stocks = merged_df[condition_buy].copy()
+        
+        def check_streak(row):
+            if row['前日投信買超(張)'] > 0: return "連買 3 天以上"
+            else: return "剛連買 2 天 (極新鮮⭐)"
+        
+        if not potential_stocks.empty:
+            potential_stocks['建倉狀態'] = potential_stocks.apply(check_streak, axis=1)
+            
+            # 抓取股價與月線距離
+            stock_codes = potential_stocks['股票代號'].tolist()
+            ma_df = get_price_and_levels(stock_codes)
+            
+            if not ma_df.empty:
+                final_df = pd.merge(potential_stocks, ma_df, on='股票代號')
+                
+                # 防追高：只顯示距離月線小於 10% 的股票
+                safe_df = final_df[final_df['乖離率(%)'] < 10].copy()
+                
+                # 重新排列直觀的欄位
+                safe_df = safe_df[['股票代號', '股票名稱', '產業類別', '建倉狀態', 
+                                   '投信買賣超(張)', '昨日投信買超(張)', '外資買賣超(張)', '自營商買賣超(張)', 
+                                   '目前股價', '支撐價(月線20MA)', '乖離率(%)']]
+                
+                safe_df = safe_df.sort_values(by='乖離率(%)', ascending=True)
+                
+                st.success("🎉 報告將軍！以下是投信【剛建倉】且【位階安全】的名單，並附上外資動向供您確認是否有土洋合買！")
+                st.dataframe(
+                    safe_df.style.format({
+                        "投信買賣超(張)": "{:,.0f}", "昨日投信買超(張)": "{:,.0f}", 
+                        "外資買賣超(張)": "{:,.0f}", "自營商買賣超(張)": "{:,.0f}",
+                        "目前股價": "{:.2f}", "支撐價(月線20MA)": "{:.2f}", "乖離率(%)": "{:.2f}%"
+                    }),
+                    height=500, use_container_width=True
+                )
+            else:
+                st.warning("暫時無法取得報價資料。")
+        else:
+            st.info("今日沒有符合「剛剛連買 2 天」的標的。")
+
+    # ---------------- 分頁 2: 單日全覽 ----------------
+    with tab2:
+        st.subheader("🔥 舊版保留：單日三大法人籌碼總覽 (全市場)")
+        st.markdown(f"**日期：** {day1_date} | 單位：張")
+        
+        # 只顯示投信或外資有買賣的，並按照投信買超排序
+        df_all = df_latest.sort_values(by='投信買賣超(張)', ascending=False)
+        st.dataframe(
+            df_all.style.format({
+                "外資買賣超(張)": "{:,.0f}", 
+                "投信買賣超(張)": "{:,.0f}", 
+                "自營商買賣超(張)": "{:,.0f}"
+            }),
+            height=600, use_container_width=True
+        )
+
+    # ---------------- 分頁 3: 觀察名單與三段價位 ----------------
+    with tab3:
+        st.subheader("📈 大將軍專屬：持股與觀察名單戰略版")
+        st.write("輸入您目前持有的股票代號或觀察名單（用逗號隔開，例如：3189, 4958, 2313）")
+        
+        user_input = st.text_input("📝 輸入股票代號：", value="3189, 4958, 2313")
+        
+        if st.button("🚀 執行價位分析"):
+            with st.spinner("正在為您計算三段價位..."):
+                code_list = [c.strip() for c in user_input.split(',')]
+                levels_df = get_price_and_levels(code_list)
+                
+                if not levels_df.empty:
+                    # 補上名稱與產業
+                    levels_df['股票名稱'] = levels_df['股票代號'].apply(lambda x: stock_info_dict.get(x, {}).get('名稱', '未知'))
+                    levels_df['產業類別'] = levels_df['股票代號'].apply(lambda x: stock_info_dict.get(x, {}).get('產業', '未知'))
+                    
+                    # 整理欄位順序：三段價位為 壓力、目前、支撐、底線
+                    levels_df = levels_df[['股票代號', '股票名稱', '產業類別', 
+                                           '壓力價(近20日高)', '目前股價', '支撐價(月線20MA)', '底線價(近20日低)']]
+                    
+                    st.success("📊 報告將軍！這是您的專屬價位參考（突破壓力偏多，跌破支撐需防守）：")
+                    st.dataframe(
+                        levels_df.style.format({
+                            "壓力價(近20日高)": "{:.2f}",
+                            "目前股價": "{:.2f}",
+                            "支撐價(月線20MA)": "{:.2f}",
+                            "底線價(近20日低)": "{:.2f}"
+                        }),
+                        use_container_width=True
+                    )
+                else:
+                    st.error("找不到相關報價，請確認代號是否為上市股票且格式正確。")
+else:
+    st.error("情報截獲失敗，可能是國定假日或證交所連線異常。")
