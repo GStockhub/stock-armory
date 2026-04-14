@@ -27,10 +27,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("⚔️ 游擊隊專屬軍火庫 (v9.0 全面統御版)")
-st.write("大將軍，損益精算引擎與 1-10分綜合風險雷達已上線！所有陣地將由 Google 雲端自動同步！")
+st.title("⚔️ 游擊隊專屬軍火庫 (v10.0 霸王完全體)")
+st.write("大將軍，爆量防割雷達與 AI 推薦已全面回歸！結合 Google 試算表精算引擎，全軍出擊！")
 
-# ================= 戰場情報獲取模組 =================
+# ================= 戰場情報與風險獲取模組 =================
 
 @st.cache_data(ttl=86400)
 def get_twse_industry_map():
@@ -43,52 +43,113 @@ def get_twse_industry_map():
     return ind_map
 official_industry_map = get_twse_industry_map()
 
-# 獲取總經宏觀分數 (每日更新一次)
 @st.cache_data(ttl=3600)
 def get_macro_risk_score():
-    score = 5 # 基礎分數 5
+    score = 5 
     try:
-        # 抓取大盤、費半、恐慌指數
         tickers = yf.Tickers("^TWII ^SOX ^VIX")
         hist_tw = tickers.tickers['^TWII'].history(period="1mo")
         hist_sox = tickers.tickers['^SOX'].history(period="1mo")
         hist_vix = tickers.tickers['^VIX'].history(period="5d")
         
-        # 台股大盤趨勢 (+1 或 -1)
         if hist_tw['Close'].iloc[-1] > hist_tw['Close'].rolling(20).mean().iloc[-1]: score += 1
         else: score -= 1
         
-        # 費半趨勢 (+1 或 -1)
         if hist_sox['Close'].iloc[-1] > hist_sox['Close'].rolling(20).mean().iloc[-1]: score += 1
         else: score -= 1
         
-        # 恐慌指數 VIX (判斷國際新聞/風險)
         vix_latest = hist_vix['Close'].iloc[-1]
-        if vix_latest > 25: score -= 2 # 極度恐慌，大扣分
-        elif vix_latest < 18: score += 1 # 風平浪靜
+        if vix_latest > 25: score -= 2 
+        elif vix_latest < 18: score += 1 
     except: pass
     return score
-
 macro_base_score = get_macro_risk_score()
 
-# 讀取 Google 試算表 (強制將所有欄位讀取為字串，解決 0050 被吃掉 00 的問題)
+def fetch_twse_t86(date_str):
+    url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={date_str}&selectType=ALLBUT0999&response=json"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        res = requests.get(url, headers=headers, timeout=5, verify=False)
+        data = res.json()
+        if data['stat'] == 'OK':
+            df = pd.DataFrame(data['data'], columns=data['fields'])
+            col_code = [c for c in df.columns if '代號' in c][0]
+            col_name = [c for c in df.columns if '名稱' in c][0]
+            foreign_cols = [c for c in df.columns if '外' in c and '買賣超' in c and '不含' in c]
+            col_foreign = foreign_cols[0] if foreign_cols else [c for c in df.columns if '外' in c and '買賣超' in c][0]
+            col_trust = [c for c in df.columns if '投信' in c and '買賣超' in c][0]
+            dealer_cols = [c for c in df.columns if '自營商' in c and '買賣超' in c]
+            col_dealer = min(dealer_cols, key=len) if dealer_cols else [c for c in df.columns if '自營商' in c][0]
+            
+            res_df = df[[col_code, col_name]].copy()
+            res_df.columns = ['代號', '名稱']
+            f_vol = pd.to_numeric(df[col_foreign].str.replace(',', ''), errors='coerce').fillna(0) / 1000
+            t_vol = pd.to_numeric(df[col_trust].str.replace(',', ''), errors='coerce').fillna(0) / 1000
+            d_vol = pd.to_numeric(df[col_dealer].str.replace(',', ''), errors='coerce').fillna(0) / 1000
+            
+            res_df['外資(張)'] = f_vol
+            res_df['投信(張)'] = t_vol
+            res_df['三大法人(張)'] = f_vol + t_vol + d_vol
+            return res_df
+    except: pass
+    return pd.DataFrame()
+
+@st.cache_data(ttl=3600)
+def get_10_trading_days_data():
+    dates_to_try = [(datetime.now() - timedelta(days=i)) for i in range(20)]
+    valid_data = {}
+    for d in dates_to_try:
+        if len(valid_data) >= 10: break
+        if d.weekday() >= 5: continue
+        date_str = d.strftime("%Y%m%d")
+        df = fetch_twse_t86(date_str)
+        if not df.empty:
+            valid_data[date_str] = df
+            time.sleep(0.3) 
+    return valid_data
+
+def get_price_levels_and_industry(stock_list, need_volume=False):
+    results = []
+    for code in stock_list:
+        code = str(code).strip()
+        if not code: continue
+        try:
+            ticker = yf.Ticker(f"{code}.TW")
+            hist = ticker.history(period="3mo")
+            if len(hist) >= 20:
+                current_price = hist['Close'].iloc[-1]
+                ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+                high20 = hist['High'].rolling(window=20).max().iloc[-1]
+                low20 = hist['Low'].rolling(window=20).min().iloc[-1]
+                bias = ((current_price - ma20) / ma20) * 100
+                industry = official_industry_map.get(code, "未知")
+                
+                data_dict = {
+                    '代號': code, '產業': industry,
+                    '股價': current_price, '近20日高': high20,
+                    '月線支撐': ma20, '近20日低': low20, '乖離(%)': bias
+                }
+                
+                if need_volume:
+                    data_dict['成交量(張)'] = hist['Volume'].iloc[-1] / 1000
+                    data_dict['5日均量(張)'] = hist['Volume'].rolling(window=5).mean().iloc[-1] / 1000
+                    
+                results.append(data_dict)
+        except: pass
+    return pd.DataFrame(results)
+
 def load_google_sheet():
     if "http" not in GOOGLE_SHEET_CSV_URL: return pd.DataFrame(), pd.DataFrame()
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL, dtype=str)
-        # 清理欄位空白
         df.columns = df.columns.str.strip()
-        
         df_holdings = df[df['分類'] == '持股'].copy()
         df_watchlist = df[df['分類'] == '觀察'].copy()
-        
         return df_holdings, df_watchlist
     except: return pd.DataFrame(), pd.DataFrame()
 
-# 取得股價與精算風險、損益
 def process_holdings_data(df_holdings):
     if df_holdings.empty: return pd.DataFrame()
-    
     results = []
     for _, row in df_holdings.iterrows():
         code = str(row.get('代號', '')).strip()
@@ -101,120 +162,132 @@ def process_holdings_data(df_holdings):
                 ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
                 bias = ((current_price - ma20) / ma20) * 100
                 
-                # 計算個股風險分數
                 final_score = macro_base_score
                 if current_price > ma20: final_score += 1
                 else: final_score -= 1
                 
-                if bias > 15: final_score -= 2 # 噴太高，高風險
-                elif bias < -5: final_score -= 1 # 弱勢破底
-                else: final_score += 1 # 位階安全
+                if bias > 15: final_score -= 2 
+                elif bias < -5: final_score -= 1 
+                else: final_score += 1 
                 
-                # 限制分數在 1~10 之間
                 final_score = max(1, min(10, final_score))
                 
-                # 計算損益
                 cost = float(row.get('成本價', 0))
                 qty = float(row.get('庫存張數', 0))
                 if cost > 0 and qty > 0:
                     profit_loss = (current_price - cost) * qty * 1000
                     return_rate = ((current_price - cost) / cost) * 100
                 else:
-                    profit_loss = 0
-                    return_rate = 0
+                    profit_loss, return_rate = 0, 0
                 
                 industry = official_industry_map.get(code, "未知")
-                
                 results.append({
                     '代號': code, '產業': industry,
-                    '目前股價': current_price, '成本價': cost, '庫存(張)': qty,
+                    '股價': current_price, '成本價': cost, '庫存(張)': qty,
                     '報酬率(%)': return_rate, '預估損益(元)': profit_loss,
-                    '綜合風險分數': final_score
+                    '綜合風險(1-10分)': final_score
                 })
         except: pass
     return pd.DataFrame(results)
 
-def process_watchlist_data(df_watchlist):
-    if df_watchlist.empty: return pd.DataFrame()
-    results = []
-    for _, row in df_watchlist.iterrows():
-        code = str(row.get('代號', '')).strip()
-        if not code: continue
-        try:
-            ticker = yf.Ticker(f"{code}.TW")
-            hist = ticker.history(period="3mo")
-            if len(hist) >= 20:
-                current_price = hist['Close'].iloc[-1]
-                ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
-                high20 = hist['High'].rolling(window=20).max().iloc[-1]
-                low20 = hist['Low'].rolling(window=20).min().iloc[-1]
-                
-                industry = official_industry_map.get(code, "未知")
-                results.append({
-                    '代號': code, '產業': industry,
-                    '目前股價': current_price, '壓力價(20日高)': high20,
-                    '月線支撐': ma20, '防守底線(20日低)': low20
-                })
-        except: pass
-    return pd.DataFrame(results)
-
-# 顏色格式化功能
 def color_pnl(val):
-    if val > 0: return 'color: #FF4B4B; font-weight: bold;' # 賺錢紅色
-    elif val < 0: return 'color: #00FF00; font-weight: bold;' # 賠錢綠色
+    if val > 0: return 'color: #FF4B4B; font-weight: bold;' 
+    elif val < 0: return 'color: #00FF00; font-weight: bold;' 
     return 'color: #E0E0E0;'
 
 def color_risk(val):
-    if val >= 8: return 'color: #00FF00; font-weight: bold;' # 安全(綠)
-    elif val >= 4: return 'color: #FFD700; font-weight: bold;' # 中等(黃)
-    else: return 'color: #FF4B4B; font-weight: bold;' # 危險(紅)
+    if val >= 8: return 'color: #00FF00; font-weight: bold;' 
+    elif val >= 4: return 'color: #FFD700; font-weight: bold;' 
+    else: return 'color: #FF4B4B; font-weight: bold;' 
 
 # ================= 戰情室介面 =================
 st.divider()
 
-tab1, tab2 = st.tabs(["📊 司令部：持股庫存與觀察名單", "🔥 情報局：請保留原有的單日籌碼功能(選用)"])
+with st.spinner('情報兵正在深度掃描 10 日籌碼與同步 Google 糧草庫...'):
+    historical_data = get_10_trading_days_data()
 
-with tab1:
-    st.markdown("### 🏦 <span class='highlight-gold'>大將軍的雲端兵力佈署圖</span>", unsafe_allow_html=True)
+if len(historical_data) >= 3:
+    sorted_dates = sorted(list(historical_data.keys()), reverse=True)
+    day1_date = sorted_dates[0]
+    base_df = historical_data[day1_date].copy()
     
-    with st.spinner("正在連線 Google 試算表，並啟動風險損益精算引擎..."):
-        df_holdings, df_watchlist = load_google_sheet()
-        
-        if df_holdings.empty and df_watchlist.empty:
-            st.warning("⚠️ 尚未偵測到 Google 試算表資料。請確認 CSV 網址是否正確，且表格標題包含『分類』、『代號』、『成本價』、『庫存張數』。")
-        else:
-            # ---------------- 處理持股區塊 ----------------
-            if not df_holdings.empty:
-                st.markdown("#### 🟢 第一軍團：現有重兵持股與損益")
-                h_result = process_holdings_data(df_holdings)
-                if not h_result.empty:
-                    # 套用顏色
-                    styled_h = h_result.style.set_properties(**{'text-align': 'center'})\
-                        .map(color_pnl, subset=['報酬率(%)', '預估損益(元)'])\
-                        .map(color_risk, subset=['綜合風險分數'])\
-                        .format({
-                            "目前股價": "{:.2f}", "成本價": "{:.2f}", "庫存(張)": "{:,.0f}",
-                            "報酬率(%)": "{:.2f}%", "預估損益(元)": "{:,.0f}"
-                        })
-                    st.dataframe(styled_h, use_container_width=True, hide_index=True)
-                else:
-                    st.info("無法解析持股代號，請檢查 Google 試算表。")
+    trust_cols = []
+    for i, d in enumerate(sorted_dates):
+        col_name = f'Day_{i}'
+        temp = historical_data[d][['代號', '投信(張)']].rename(columns={'投信(張)': col_name})
+        base_df = pd.merge(base_df, temp, on='代號', how='left')
+        trust_cols.append(col_name)
+    base_df.fillna(0, inplace=True)
+    
+    def count_streak(row):
+        streak = 0
+        for col in trust_cols:
+            if row[col] > 0: streak += 1
+            else: break
+        return streak
+    base_df['連買天數'] = base_df.apply(count_streak, axis=1)
+    
+    def label_streak(s):
+        if s == 0: return "無/賣"
+        elif s == 1: return "剛卡位"
+        elif 2 <= s <= 3: return "建倉 ⭐"
+        elif 4 <= s <= 7: return "追高 ⚠️"
+        else: return "危險 💀"
+    base_df['投信狀態'] = base_df['連買天數'].apply(label_streak)
+    
+    tab1, tab2, tab3 = st.tabs(["🛡️ 爆量防割熱區 (AI 推薦)", "📊 司令部：持股庫存與觀察名單", "🔥 單日籌碼全覽"])
+    
+    # ---------------- 分頁 1: 爆量防割熱區 (從 v8.0 完美搬回) ----------------
+    with tab1:
+        potential_stocks = base_df[(base_df['連買天數'] >= 2) & (base_df['連買天數'] <= 3)].copy()
+        if not potential_stocks.empty:
+            stock_codes = potential_stocks['代號'].tolist()
+            ma_df = get_price_levels_and_industry(stock_codes, need_volume=True)
             
-            st.markdown("---")
-            
-            # ---------------- 處理觀察名單區塊 ----------------
-            if not df_watchlist.empty:
-                st.markdown("#### 🔵 第二軍團：雷達觀察狙擊名單 (三段價位)")
-                w_result = process_watchlist_data(df_watchlist)
-                if not w_result.empty:
-                    styled_w = w_result.style.set_properties(**{'text-align': 'center'})\
-                        .format({
-                            "目前股價": "{:.2f}", "壓力價(20日高)": "{:.2f}", 
-                            "月線支撐": "{:.2f}", "防守底線(20日低)": "{:.2f}"
-                        })
-                    st.dataframe(styled_w, use_container_width=True, hide_index=True)
-                else:
-                    st.info("無法解析觀察名單代號，請檢查 Google 試算表。")
+            if not ma_df.empty:
+                final_df = pd.merge(potential_stocks, ma_df, on='代號')
+                safe_df = final_df[(final_df['乖離(%)'] < 10) & 
+                                   (final_df['成交量(張)'] >= 1000) & 
+                                   (final_df['成交量(張)'] > final_df['5日均量(張)'])].copy()
+                
+                if not safe_df.empty:
+                    safe_df['量能倍數'] = safe_df['成交量(張)'] / safe_df['5日均量(張)']
+                    safe_df['戰力分數'] = (safe_df['投信(張)'] * 2) + safe_df['外資(張)'] + (safe_df['量能倍數'] * 500) - (safe_df['乖離(%)'] * 50)
+                    top_3_df = safe_df.sort_values(by='戰力分數', ascending=False).head(3)
+                    
+                    st.markdown("### 👑 <span class='highlight-gold'>大將軍專屬：今日 Top 3 爆量突擊目標</span>", unsafe_allow_html=True)
+                    st.write("精選【連買2-3天】+【突破5日均量(資金點火)】+【位階安全】的最佳標的：")
+                    
+                    cols = st.columns(3)
+                    for idx, (_, row) in enumerate(top_3_df.iterrows()):
+                        with cols[idx]:
+                            st.markdown(f"""
+                            <div style="background-color: #2D2D2D; padding: 15px; border-radius: 10px; border-left: 5px solid #FF4B4B; height: 100%;">
+                                <h4 style="margin:0; color:#FFD700;">{row['名稱']} ({row['代號']})</h4>
+                                <p style="margin:5px 0; color:#00FFFF; font-size: 14px;">{row['產業']}</p>
+                                <span style="font-size: 14px;">
+                                <b>狀態：</b>{row['投信狀態']}<br>
+                                <b>股價：</b>{row['股價']:.2f} (支撐 {row['月線支撐']:.2f})<br>
+                                <b>土洋合力：</b>投信 {row['投信(張)']:.0f} / 外資 {row['外資(張)']:.0f}<br>
+                                <b>🔥 攻擊量能：</b>今日 <span style='color:#FF4B4B; font-weight:bold;'>{row['成交量(張)']:.0f}</span> 張<br>
+                                </span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    st.markdown("---")
+                    
+                    st.markdown("### 🎯 <span class='highlight-cyan'>熱門放量建倉名單 (保證流動性與熱度)</span>", unsafe_allow_html=True)
+                    safe_df_display = safe_df[['代號', '名稱', '產業', '投信狀態', '外資(張)', '投信(張)', '三大法人(張)', '股價', '成交量(張)', '乖離(%)']]
+                    safe_df_display = safe_df_display.sort_values(by='乖離(%)', ascending=True)
+                    st.dataframe(
+                        safe_df_display.style.set_properties(**{'text-align': 'center'}).format({
+                            "外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "三大法人(張)": "{:,.0f}", 
+                            "股價": "{:.2f}", "成交量(張)": "{:,.0f}", "乖離(%)": "{:.2f}%"
+                        }), use_container_width=True, hide_index=True
+                    )
+                else: st.info("今日無符合『放量突破+位階安全』的飆股，切勿勉強進場。")
+            else: st.warning("技術面報價資料讀取中斷，請稍後重試。")
+        else: st.info("今日沒有符合『連買 2-3 天』的極品標的。")
 
-with tab2:
-    st.write("大將軍，此分頁可整合前一版本的『防割韭菜與大戶籌碼』程式碼，維持您的全方位情報網。為聚焦您的持股需求，此處暫作預留空間。")
+    # ---------------- 分頁 2: 司令部：持股與觀察名單 (從 v9.0 完美繼承) ----------------
+    with tab2:
+        st.markdown("### 🏦 <span class='highlight-gold'>大將軍的雲端兵力佈署圖</span>", unsafe_allow_html
