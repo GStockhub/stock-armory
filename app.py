@@ -290,4 +290,48 @@ if len(historical_data) >= 3:
 
     # ---------------- 分頁 2: 司令部：持股與觀察名單 (從 v9.0 完美繼承) ----------------
     with tab2:
-        st.markdown("### 🏦 <span class='highlight-gold'>大將軍的雲端兵力佈署圖</span>", unsafe_allow_html
+        st.markdown("### 🏦 <span class='highlight-gold'>大將軍的雲端兵力佈署圖</span>", unsafe_allow_html=True)
+        
+        df_holdings, df_watchlist = load_google_sheet()
+        
+        if df_holdings.empty and df_watchlist.empty:
+            st.warning("⚠️ 尚未偵測到 Google 試算表資料。請確認第 14 行 CSV 網址是否正確，且試算表第一排標題包含『分類』、『代號』、『成本價』、『庫存張數』。")
+        else:
+            if not df_holdings.empty:
+                st.markdown("#### 🟢 第一軍團：現有重兵持股與損益")
+                h_result = process_holdings_data(df_holdings)
+                if not h_result.empty:
+                    styled_h = h_result.style.set_properties(**{'text-align': 'center'})\
+                        .map(color_pnl, subset=['報酬率(%)', '預估損益(元)'])\
+                        .map(color_risk, subset=['綜合風險(1-10分)'])\
+                        .format({
+                            "股價": "{:.2f}", "成本價": "{:.2f}", "庫存(張)": "{:,.0f}",
+                            "報酬率(%)": "{:.2f}%", "預估損益(元)": "{:,.0f}"
+                        })
+                    st.dataframe(styled_h, use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            
+            if not df_watchlist.empty:
+                st.markdown("#### 🔵 第二軍團：雷達觀察狙擊名單")
+                w_list = df_watchlist['代號'].dropna().tolist()
+                w_result = get_price_levels_and_industry(w_list, need_volume=False)
+                if not w_result.empty:
+                    w_result = pd.merge(w_result, base_df[['代號', '名稱']], on='代號', how='left').fillna('未知')
+                    w_result = w_result[['代號', '名稱', '產業', '近20日高', '股價', '月線支撐', '近20日低']]
+                    styled_w = w_result.style.set_properties(**{'text-align': 'center'})\
+                        .format({"近20日高": "{:.2f}", "股價": "{:.2f}", "月線支撐": "{:.2f}", "近20日低": "{:.2f}"})
+                    st.dataframe(styled_w, use_container_width=True, hide_index=True)
+
+    # ---------------- 分頁 3: 單日籌碼全覽 ----------------
+    with tab3:
+        st.markdown("### 🔥 <span class='highlight-cyan'>單日三大法人籌碼總覽 (全市場)</span>", unsafe_allow_html=True)
+        df_all = base_df[['代號', '名稱', '投信狀態', '外資(張)', '投信(張)', '三大法人(張)']]
+        df_all = df_all.sort_values(by='投信(張)', ascending=False)
+        st.dataframe(
+            df_all.style.set_properties(**{'text-align': 'center'}).format({
+                "外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "三大法人(張)": "{:,.0f}"
+            }), height=600, use_container_width=True, hide_index=True
+        )
+else:
+    st.error("情報截獲失敗，可能是國定假日或證交所連線異常。")
