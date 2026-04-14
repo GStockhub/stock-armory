@@ -1,11 +1,15 @@
 import streamlit as st
 import pandas as pd
 import requests
+import urllib3
+
+# 關閉安全警告，避免破門時引發警報器大響
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="游擊隊專屬軍火庫", page_icon="⚔️", layout="wide")
 
-st.title("⚔️ 游擊隊專屬軍火庫 - 籌碼雷達 (v2.0 官方直連版)")
-st.write("大將軍，您的情報網太強大了！我們現在直接使用證交所的官方主線路。")
+st.title("⚔️ 游擊隊專屬軍火庫 - 籌碼雷達 (v2.1 終極破門版)")
+st.write("大將軍，官方大門依然有憑證盤查，我們直接上破甲彈強攻！")
 
 @st.cache_data(ttl=3600)
 def load_twse_data():
@@ -15,8 +19,8 @@ def load_twse_data():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
     try:
-        # 直接大方走正門，不需要加 verify=False 破甲彈了
-        res = requests.get(url, headers=headers, timeout=10)
+        # 【裝填破甲彈】：加回 verify=False，無視官方大門的 SSL 憑證盤查！
+        res = requests.get(url, headers=headers, timeout=10, verify=False)
         res.raise_for_status() 
         data = res.json()
         
@@ -34,7 +38,7 @@ def load_twse_data():
 st.divider()
 st.subheader("🕵️‍♂️ 戰報：最新台股三大法人籌碼動向 (上市)")
 
-with st.spinner('正在透過大將軍的專線，直連證交所主機...'):
+with st.spinner('裝填破甲彈，強行突破證交所主機大門中...'):
     df = load_twse_data()
 
 if not df.empty:
