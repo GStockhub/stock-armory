@@ -14,7 +14,7 @@ import yfinance as yf
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="游擊隊終極軍火庫 v17.2",
+    page_title="游擊隊終極軍火庫 v17.3",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -63,7 +63,7 @@ with st.sidebar:
     risk_amount = total_capital * (risk_tolerance_pct / 100)
     
     st.info(f"""🛡️ **保命底線：{risk_amount:,.0f} 元**
-    💡 **將軍須知**：這代表您買進一檔股票，若不幸跌破 10MA 停損出場，最多只會賠這個數字。系統會根據這個容忍度，自動幫您反推「最多能買幾張」。""")
+    💡 系統會根據此金額，反推您最多能買幾張。""")
     
     st.markdown("---")
     st.markdown("#### 🔄 戰場快取管理")
@@ -71,7 +71,7 @@ with st.sidebar:
         st.cache_data.clear()
         st.success("快取已清除！請重新載入頁面。")
 
-st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v17.2</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v17.3</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 整合 Level 2 資金精算與戰術雷達 ——</p>", unsafe_allow_html=True)
 
 # ==============================================================================
@@ -90,8 +90,9 @@ SECTOR_MAP = {
 @st.cache_data(ttl=86400)
 def fetch_official_twse_industry():
     mapping = {}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
-        res = requests.get("https://openapi.twse.com.tw/v1/opendata/t187ap03_L", verify=False, timeout=5)
+        res = requests.get("https://openapi.twse.com.tw/v1/opendata/t187ap03_L", headers=headers, verify=False, timeout=10)
         if res.status_code == 200:
             for item in res.json():
                 mapping[str(item['公司代號']).strip()] = item['產業類別']
@@ -124,7 +125,7 @@ def get_macro_dashboard():
                 if last_p > ma20: score += 1
                 else: score -= 1
                 
-            macro_data.append({"戰區": name, "現值": round(last_p, 2), "月線": round(ma20, 2), "狀態": status})
+            macro_data.append({"戰區": name, "現值": f"{last_p:.2f}", "月線": f"{ma20:.2f}", "狀態": status})
     except:
         st.sidebar.warning("⚠️ 國際行情抓取延遲。")
         
@@ -165,24 +166,33 @@ def fetch_chips_data():
     return chip_dict
 
 def format_lots(shares):
-    """ 將股數轉為張數，並去掉多餘的 0 """
+    """ 將股數精準轉換為張數，去除不必要的 0 """
+    shares = int(shares) # 確保沒有零碎股數 (如 128.6 股)
     lots = shares / 1000
     if lots <= 0: return "0"
-    # 使用 g 格式自動處理小數點與零
-    return f"{lots:g}"
+    return f"{lots:.3f}".rstrip('0').rstrip('.')
 
 def level2_quant_engine(id_list):
-    """ 量化引擎：回測半年勝率，計算停損利與建議張數 """
     intel_results = []
-    tickers_str = " ".join([f"{sid}.TW" for sid in id_list])
-    try:
-        bulk_data = yf.download(tickers_str, period="6mo", group_by="ticker", threads=True, progress=False)
-    except: return pd.DataFrame() 
+    
+    # 解決單一股票與多股票 yfinance 回傳結構不同的 Bug
+    if len(id_list) == 1:
+        try:
+            tk = yf.Ticker(f"{id_list[0]}.TW")
+            bulk_data = tk.history(period="6mo")
+        except: bulk_data = pd.DataFrame()
+    else:
+        tickers_str = " ".join([f"{sid}.TW" for sid in id_list])
+        try:
+            bulk_data = yf.download(tickers_str, period="6mo", group_by="ticker", threads=True, progress=False)
+        except: bulk_data = pd.DataFrame() 
     
     for sid in id_list:
         try:
-            if len(id_list) == 1: df_stock = bulk_data
-            else: df_stock = bulk_data[f"{sid}.TW"]
+            if len(id_list) == 1:
+                df_stock = bulk_data
+            else:
+                df_stock = bulk_data[f"{sid}.TW"]
             
             if df_stock.empty or len(df_stock) < 30: continue
             
@@ -194,10 +204,11 @@ def level2_quant_engine(id_list):
             m10 = float(close_s.rolling(10).mean().iloc[-1])
             m20 = float(close_s.rolling(20).mean().iloc[-1])
             vol_now = float(vol_s.iloc[-1]) / 1000
+            vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1]) / 1000
             
             bias = ((p_now - m20) / m20) * 100
             
-            # --- 回測模組 (半年期) ---
+            # --- 向量化回測 ---
             df_bt = pd.DataFrame({'Close': close_s})
             df_bt['MA5'] = df_bt['Close'].rolling(5).mean()
             df_bt['MA20'] = df_bt['Close'].rolling(20).mean()
@@ -211,6 +222,7 @@ def level2_quant_engine(id_list):
             else:
                 win_rate, avg_ret = 50.0, 0.0
 
+            # 產業辨識
             ind = TWSE_IND_MAP.get(sid, "未知")
             if ind == "未知":
                 try:
@@ -220,6 +232,7 @@ def level2_quant_engine(id_list):
                 except: pass
             if sid.startswith('00'): ind = "ETF"
 
+            # 🌟 安全指數計算 (1-10分，10分最安全)
             s_score = MACRO_SCORE
             if p_now > m5: s_score += 1
             if p_now > m20: s_score += 1
@@ -227,22 +240,25 @@ def level2_quant_engine(id_list):
             if bias > 10: s_score -= 2
             elif 0 <= bias <= 5: s_score += 2
 
+            # 動能爆發係數 (結合熱度/趨勢)
+            momentum_bonus = 0
+            if vol_now > vol_ma5 * 1.5: momentum_bonus = 50 # 爆量給予額外排名分數
+
             stop_loss = m10
             take_profit = p_now * 1.05 
             
-            # 精算建議張數
             risk_per_share = p_now - stop_loss
             if risk_per_share > 0:
                 max_shares = risk_amount / risk_per_share
-                capital_limit_shares = (total_capital * 0.2) / p_now # 單檔不超過總資金20%
+                capital_limit_shares = (total_capital * 0.2) / p_now
                 suggested_shares = min(max_shares, capital_limit_shares)
             else:
                 suggested_shares = 0
 
             intel_results.append({
-                '代號': sid, '產業': ind, '現價': p_now, '成交量': vol_now,
+                '代號': sid, '產業': ind, '現價': p_now, '成交量': vol_now, '動能加權': momentum_bonus,
                 'M5': m5, 'M10': m10, 'M20': m20, '乖離(%)': bias, 
-                '風險': max(1, min(10, s_score)),
+                '安全指數': max(1, min(10, int(s_score))),
                 '勝率(%)': win_rate, '均報(%)': avg_ret,
                 '停損價': stop_loss, '停利價': take_profit, 
                 '建議買量(張)': format_lots(suggested_shares)
@@ -273,13 +289,12 @@ if len(chip_db) >= 3:
         return s
     today_df['連買'] = today_df.apply(get_streak, axis=1)
 
-    # 依將軍指示重新排列 Tab
     t_rank, t_chip, t_radar, t_cmd, t_book, t_hist = st.tabs([
         "🎯 S/A/B 防割推薦", "🔥 全市場法人籌碼", "📡 遺珠與即時雷達", "🏦 司令部資金精算", "📖 實戰與名詞教範", "📜 系統演進史"
     ])
 
     # --------------------------------------------------------------------------
-    # Tab 1: AI 推薦 (新增排名、產業、顏色判定)
+    # Tab 1: AI 推薦
     # --------------------------------------------------------------------------
     with t_rank:
         st.markdown("### 👑 <span class='highlight-gold'>今日 AI 戰神決策清單</span>", unsafe_allow_html=True)
@@ -294,9 +309,11 @@ if len(chip_db) >= 3:
             if not intel_df.empty:
                 final_rank = pd.merge(pool, intel_df, on='代號')
                 final_rank = final_rank[final_rank['成交量'] >= 1000].copy()
-                final_rank['Score'] = (final_rank['風險'] * 1000) + (final_rank['勝率(%)'] * 10) - (final_rank['乖離(%)'] * 20)
+                
+                # ★ 排名公式加入動能熱度加權 ★
+                final_rank['Score'] = (final_rank['安全指數'] * 1000) + (final_rank['勝率(%)'] * 10) - (final_rank['乖離(%)'] * 20) + final_rank['動能加權']
                 rank_sorted = final_rank.sort_values('Score', ascending=False).reset_index(drop=True)
-                rank_sorted['名次'] = rank_sorted.index + 1 # 加入名次
+                rank_sorted['名次'] = rank_sorted.index + 1
                 
                 top10 = rank_sorted.head(10)
                 
@@ -314,27 +331,26 @@ if len(chip_db) >= 3:
                                 勝率：<span class="highlight-green">{r['勝率(%)']:.1f}%</span> | 均報：<span class="highlight-cyan">+{r['均報(%)']:.1f}%</span>
                             </div>
                             <div style="font-size: 15px; line-height: 1.6;">
+                                🛡️ <b>安全指數：</b> {r['安全指數']} 分 (滿分10)<br>
                                 💰 <b>進場現價：</b> <span class="highlight-gold">{r['現價']:.2f}</span> (乖離 {r['乖離(%)']:.1f}%)<br>
-                                🎯 <b>短線停利：</b> {r['停利價']:.2f}<br>
                                 🚨 <b>10MA停損：</b> <span class="highlight-red">{r['停損價']:.2f}</span><br>
                                 ⚖️ <b>AI 建議買量：</b> <span class="highlight-cyan">{r['建議買量(張)']}</span> 張
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
                 
+                def risk_color(val):
+                    if val >= 8: return 'color: #10B981; font-weight: bold;'
+                    elif val <= 3: return 'color: #EF4444; font-weight: bold;'
+                    return 'color: #F59E0B; font-weight: bold;'
+
                 if len(top10) > 3:
                     st.markdown("#### ⚔️ 【A/B級】穩健與伏擊清單 (Top 4~10)")
-                    other_disp = top10.iloc[3:10][['名次','代號','名稱','產業','風險','勝率(%)','現價','停損價','建議買量(張)','連買']].copy()
+                    other_disp = top10.iloc[3:10][['名次','代號','名稱','產業','安全指數','勝率(%)','現價','停損價','建議買量(張)','連買']].copy()
                     
-                    # 顏色套用邏輯：風險 >=8 綠, <=3 紅, 其餘不變
-                    def risk_color(val):
-                        if val >= 8: return 'color: #10B981; font-weight: bold;'
-                        elif val <= 3: return 'color: #EF4444; font-weight: bold;'
-                        return 'color: #F59E0B; font-weight: bold;'
-                        
                     styled_other = (other_disp.style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '停損價':'{:.2f}', '勝率(%)':'{:.1f}%'})
-                                    .map(risk_color, subset=['風險'])
+                                    .map(risk_color, subset=['安全指數'])
                                     .map(lambda x: 'color: #10B981; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
                     st.dataframe(styled_other, use_container_width=True, hide_index=True)
 
@@ -344,17 +360,23 @@ if len(chip_db) >= 3:
     with t_chip:
         st.markdown("### 🔥 全市場投信籌碼流向")
         
-        # 突擊部隊：連買=0 但今日大買前三名
-        surprise_atk = today_df[today_df['連買'] == 0].sort_values('投信(張)', ascending=False).head(3)
+        # ★ 修正過濾邏輯：必須是今日買超的才算突擊部隊 ★
+        surprise_atk = today_df[(today_df['連買'] == 0) & (today_df['投信(張)'] > 0)].sort_values('投信(張)', ascending=False).head(3)
         if not surprise_atk.empty:
-            st.markdown("#### 🚨 投信首日突擊部隊 (觀察指標)")
-            st.write("連買 0 天但今日異常大買，可能是主力剛建倉的第一槍：")
+            st.markdown("#### 🚨 投信首日突擊部隊 (連買 0 天但今日異常大買)")
             st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)']].style.format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}'}), use_container_width=True, hide_index=True)
             st.markdown("---")
             
         st.markdown("#### 穩健建倉部隊 (連買 >= 1 天)")
         main_chips = today_df[today_df['連買'] > 0].sort_values('投信(張)', ascending=False)
-        st.dataframe(main_chips[['代號','名稱','連買','外資(張)','投信(張)']].style.format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}'}), height=500, use_container_width=True, hide_index=True)
+        
+        # 巧妙地將已計算好的安全指數融合進全市場名單，避免抓取全部 1800 檔當機
+        if 'final_rank' in locals():
+            main_chips = pd.merge(main_chips, final_rank[['代號', '安全指數']], on='代號', how='left').fillna('-')
+        else:
+            main_chips['安全指數'] = '-'
+            
+        st.dataframe(main_chips[['代號','名稱','連買','安全指數','外資(張)','投信(張)']].style.format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}'}), height=500, use_container_width=True, hide_index=True)
 
     # --------------------------------------------------------------------------
     # Tab 3: 全軍索敵觀察哨 & 即時雷達
@@ -370,13 +392,13 @@ if len(chip_db) >= 3:
                     st.markdown(f"""
                     <div style="background-color:#1F2937; padding:15px; border-radius:10px; border-left:5px solid #38BDF8;">
                         <h4>{custom_ticker} ({r['產業']}) - 即時戰略回報</h4>
-                        <b>現價：</b>{r['現價']:.2f} | <b>乖離率：</b>{r['乖離(%)']:.2f}% | <b>安全風險：</b>{r['風險']}分<br>
+                        <b>現價：</b>{r['現價']:.2f} | <b>乖離率：</b>{r['乖離(%)']:.2f}% | <b>安全指數：</b>{r['安全指數']} 分 (滿分10)<br>
                         <b>短線停利：</b>{r['停利價']:.2f} | <b>10MA停損：</b><span style="color:#EF4444;">{r['停損價']:.2f}</span><br>
                         <b>💡 AI建議買進極限：</b><span style="color:#38BDF8; font-weight:bold;">{r['建議買量(張)']} 張</span> (依據側邊欄資金設定)
                     </div>
                     """, unsafe_allow_html=True)
                 else:
-                    st.warning("查無此代號技術資料，請確認是否輸入正確 (目前僅支援台股上市櫃)。")
+                    st.warning("⚠️ 查無此代號技術資料。請確認是否輸入正確 (目前僅支援台股上市櫃股票)。")
         
         st.markdown("---")
         st.markdown("### 📡 隱藏版投信建倉遺珠 (Top 11~30)")
@@ -384,7 +406,13 @@ if len(chip_db) >= 3:
             scout = rank_sorted.iloc[10:30].copy()
             if not scout.empty:
                 scout['戰術'] = scout.apply(lambda r: "💎 低檔潛伏" if r['乖離(%)'] < 3 else ("🚀 突破點火" if r['現價'] > r['M5'] else "⏳ 盤整"), axis=1)
-                st.dataframe(scout[['代號','名稱','產業','風險','勝率(%)','現價','乖離(%)','連買','戰術']].style.format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%'}), use_container_width=True, hide_index=True)
+                
+                styled_scout = (scout[['名次','代號','名稱','產業','安全指數','勝率(%)','現價','乖離(%)','連買','戰術']]
+                                .style.set_properties(**{'text-align': 'center'})
+                                .format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%'})
+                                .map(risk_color, subset=['安全指數'])
+                                .map(lambda x: 'color: #10B981; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
+                st.dataframe(styled_scout, use_container_width=True, hide_index=True)
 
     # --------------------------------------------------------------------------
     # Tab 4: 司令部：資產精算 
@@ -420,7 +448,7 @@ if len(chip_db) >= 3:
                                 if p_now < r['M10']: act = "💀 破10MA停損"
                                 elif p_now < r['M5']: act = "⚠️ 減碼50%"
                                 
-                                res_h.append({'代號': r['代號'], '名稱': r['名稱'], '現價': p_now, '成本': p_cost, '張數': f"{qty:g}", '報酬(%)': ret, '損益(元)': pnl, '作戰指示': act})
+                                res_h.append({'代號': r['代號'], '名稱': r['名稱'], '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '報酬(%)': ret, '損益(元)': pnl, '作戰指示': act})
                             except: continue
                         
                         df_res = pd.DataFrame(res_h)
@@ -442,18 +470,18 @@ if len(chip_db) >= 3:
         
         st.markdown("""
         #### 🏫 基礎名詞與參數解釋
-        * **恐慌指數 (VIX)**：美股選擇權的隱含波動率。
+        * **恐慌指數 (VIX)**：用來衡量美股選擇權的隱含波動率，被稱為市場的恐慌儀表板。
           - `< 18`：市場安定，適合大膽進攻。
           - `> 25`：進入恐慌，隨時有大跌風險，游擊隊應提高現金水位。
-        * **費城半導體 (SOX)**：台灣是科技島，台股走勢與費半連動極高。費半站穩月線，台股科技股才有底氣。
+        * **費城半導體 (SOX)**：台灣是科技島，台股走勢與美股費半連動極高。費半若站穩月線，台股科技股才有底氣。
         * **乖離率 (Bias %)**：股價偏離 20 日均線(月線)的百分比。
           - `0% ~ 5%`：**黃金建倉區**。股價剛站上月線，下檔風險極低。
           - `> 10%`：**過熱區**。追高容易買在山頂，主力隨時會倒貨結帳。
           - `< 0%`：**空頭區**。股價在月線之下，游擊隊絕對不碰。
-        * **安全風險分數 (1~10)**：綜合大盤 VIX、個股均線與乖離算出的綜合評分。
+        * **安全指數 (1~10)**：**10 分代表最安全、風險最低。** 這是綜合了大盤 VIX、個股均線與乖離算出的綜合評分。
           - `8~10 (綠色)`：極度安全，大盤順風且個股位階漂亮。
           - `1~3 (紅色)`：危險，可能乖離過大或大盤正在恐慌。
-        * **5MA (攻擊線) / 10MA (防守線)**：5 日與 10 日平均成交價。
+        * **5MA (攻擊線) / 10MA (防守線)**：5 日與 10 日平均成交價。短線操作的命脈。
 
         ---
 
@@ -469,8 +497,6 @@ if len(chip_db) >= 3:
         * **選股**：鎖定 Tab 1 中「投信剛連買 2 天」且「乖離率 < 5%」的標的。
         * **進場**：尾盤 13:20 確認 5MA 不破，進場卡位。
         * **出場 (隔日)**：隔天開盤 15 分鐘內，若無法爆量突破，或帳上獲利達標，**直接市價停利**。絕不留倉變存股。
-        
-        *(關於 ChatGPT 建議的移動停利法：帳上獲利若 > 8% 且持續創高，可緊抱直到高點回落 3% 才停利出場)*
 
         #### 🛡️ 兵種操典二：短波段操作 (主力部隊)
         * **進場**：依據 S 級卡片上的「AI 建議買量(張)」投入資金。
@@ -485,7 +511,8 @@ if len(chip_db) >= 3:
     with t_hist:
         st.markdown("### 📜 <span class='highlight-cyan'>游擊兵工廠：開發史 (Chronicles)</span>", unsafe_allow_html=True)
         st.markdown("""
-        * **v17.2 (量化完全體)**：重排分頁順序、張數單位去零優化 (0.128張)、籌碼淨化突擊部隊、雷達區加入**「即時單兵輸入框」**、大幅擴充實戰與名詞教範。
+        * **v17.3 (實戰無死角版)**：解決外資倒賣顯示異常、張數單位去零優化 (0.128張)、雷達區加入**「即時單兵輸入框」**、大幅擴充實戰與名詞教範、修復單股查詢崩潰Bug、Top 10 排名加入「爆量動能」加權參數。
+        * **v17.2 (量化完全體)**：重排分頁順序、籌碼淨化突擊部隊。
         * **v17.1 (熱修復版)**：全面升級 Pandas 相容性，解決 `AttributeError: applymap` 崩潰問題。
         * **v17.0 (戰神量化版)**：實裝**自動換行雙排 Tab 標籤** (解決手機排版)；導入 **Level 2 回測引擎**算勝率；新增側邊欄資金控管。
         * **v16.0 (全裝甲旗艦版)**：確立全球市場戰略桌 (Macro Scan) 機制。整合 VIX 指標、美費半、那斯達克權重計算。
@@ -501,4 +528,4 @@ else:
     st.error("⚠️ 證交所資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v17.2 戰神量化完全體</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v17.3 實戰大政翼贊版</p>", unsafe_allow_html=True)
