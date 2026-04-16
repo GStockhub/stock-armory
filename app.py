@@ -55,7 +55,6 @@ with st.sidebar:
     
     st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**\n\n*(依此反推單筆最多買進張數)*")
     
-    # ★ v23 核心：40% 戰略預備金防線
     st.markdown("#### 🛡️ 總曝險與戰略預備金")
     MAX_EXPOSURE_RATE = 0.60
     max_market_cap = total_capital * MAX_EXPOSURE_RATE
@@ -67,7 +66,7 @@ with st.sidebar:
         st.success("快取已清除！請重新載入。")
 
 st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v23</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極紀律版 ✕ 40%預備金防線 ✕ EOD 實戰決策系統 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極紀律版 ✕ 稅費扣血真實精算 ✕ EOD 實戰決策系統 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -91,7 +90,7 @@ def load_industry_map():
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
-# 第二道防線：本地權值股補丁 (防止 TWSE API 死掉時全滅)
+# 第二道防線：本地權值股補丁
 LOCAL_PATCH = {
     "2330": "電子與半導體", "2317": "電腦及週邊", "2454": "半導體", "2308": "電子零組件",
     "2382": "電腦及週邊", "2881": "金融保險", "2882": "金融保險", "2891": "金融保險",
@@ -99,14 +98,13 @@ LOCAL_PATCH = {
     "3711": "半導體", "2886": "金融保險", "2884": "金融保險", "2002": "鋼鐵工業"
 }
 
+# ★ v23 熱修復：棄用容易崩潰的 yf.download，改用更穩定的 Ticker.history()
 def safe_download(sym, retries=3):
     for _ in range(retries):
         try:
-            # 期間縮短為 3mo，加快速度
-            df = yf.download(sym, period="3mo", progress=False, repair=True)
-            if not df.empty: return df
+            df = yf.Ticker(sym).history(period="3mo")
+            if not df.empty and len(df) > 5: return df
         except:
-            # 隨機延遲防鎖
             time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
@@ -115,7 +113,6 @@ def get_macro_dashboard():
     score = 5.0
     macro_data = []
     
-    # 格式：主代號 : (顯示名稱, 備援ETF代號)
     indices = {
         "^TWII": ("台股加權", "2330.TW"),
         "^PHLX_SO": ("美費半導體", "SOXX"),
@@ -124,27 +121,22 @@ def get_macro_dashboard():
     }
     
     for main_sym, (base_name, fallback_sym) in indices.items():
-        is_fallback = False
         display_name = base_name
         hist = safe_download(main_sym)
         
+        # 啟動備援機制
         if hist.empty:
             hist = safe_download(fallback_sym)
             if not hist.empty:
                 display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
-                is_fallback = True
         
         if hist.empty:
             macro_data.append({"戰區": display_name, "現值": "抓取失敗", "月線": "-", "狀態": "⚪ 斷線"})
             continue
             
         try:
-            target_sym = fallback_sym if is_fallback else main_sym
-            if isinstance(hist.columns, pd.MultiIndex):
-                close_s = hist['Close'][target_sym]
-            else:
-                close_s = hist['Close']
-            
+            # history() 回傳的不會有 MultiIndex 結構，直接取 Close 即可
+            close_s = hist['Close']
             last_p = float(close_s.iloc[-1])
             ma20 = float(close_s.rolling(20).mean().iloc[-1])
             status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
@@ -158,7 +150,9 @@ def get_macro_dashboard():
                 else: score -= 1
                 
             macro_data.append({"戰區": display_name, "現值": f"{last_p:.2f}", "月線": f"{ma20:.2f}", "狀態": status})
-        except: continue
+        except: 
+            macro_data.append({"戰區": display_name, "現值": "計算失敗", "月線": "-", "狀態": "⚪ 斷線"})
+            continue
         
     return max(1, min(10, int(score))), pd.DataFrame(macro_data)
 
@@ -209,11 +203,11 @@ def format_lots(shares):
     if lots <= 0: return "0"
     return f"{lots:.3f}".rstrip('0').rstrip('.')
 
+# ★ v23 熱修復：個股也改用 Ticker.history 確保穩定
 def fetch_single_stock(sid):
     try:
-        # ★ 降載防鎖：抓 3 個月足以計算 20MA 與回測
-        df = yf.download(f"{sid}.TW", period="3mo", progress=False)
-        if not df.empty and len(df) >= 30:
+        df = yf.Ticker(f"{sid}.TW").history(period="3mo")
+        if not df.empty and len(df) >= 20:
             return sid, df
     except: pass
     return sid, None
@@ -225,7 +219,6 @@ def level2_quant_engine(id_tuple):
     if not id_list: return pd.DataFrame()
     
     bulk_data = {}
-    # ★ 降頻：max_workers=3 保護 API 不被鎖
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = {executor.submit(fetch_single_stock, sid): sid for sid in id_list}
         for future in concurrent.futures.as_completed(futures):
@@ -235,25 +228,21 @@ def level2_quant_engine(id_tuple):
             
     for sid in id_list:
         try:
-            # 產業三層判定防斷線
             ind = TWSE_IND_MAP.get(sid) or LOCAL_PATCH.get(sid) or "其他"
             if sid.startswith('00'): ind = "ETF"
-            
-            # ★ 實戰過濾：排除金融股
             if ind == "金融保險": continue
             
             df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
             
-            if isinstance(df_stock.columns, pd.MultiIndex):
-                close_s, open_s, vol_s = df_stock['Close'].squeeze(), df_stock['Open'].squeeze(), df_stock['Volume'].squeeze()
-            else:
-                close_s, open_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['Volume']
+            # 使用 history() 回傳的不會有 MultiIndex
+            close_s = df_stock['Close']
+            open_s = df_stock['Open']
+            vol_s = df_stock['Volume']
             
             p_now = float(close_s.iloc[-1])
             vol_now = float(vol_s.iloc[-1]) / 1000
             
-            # ★ 實戰過濾：排除低價妖股 (<20) 與低流動性 (<1500張)
             if p_now < 20 or vol_now < 1.5: continue
             
             m5 = float(close_s.rolling(5).mean().iloc[-1])
@@ -293,7 +282,6 @@ def level2_quant_engine(id_tuple):
                 entry_p = df_bt.iloc[loc_idx + 1]['Open']
                 prev_close = df_bt.iloc[loc_idx]['Close']
                 
-                # ★ v23 實戰校正：跳空超過 2% 直接放棄進場 (原 3%)
                 if entry_p > prev_close * 1.02: continue
                 
                 future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 11] 
@@ -388,7 +376,6 @@ if len(chip_db) >= 3:
     with t_rank:
         st.markdown("### 👑 <span class='highlight-gold'>今日 AI 戰神決策清單 (EOD 輸出版)</span>", unsafe_allow_html=True)
         
-        # ★ v23 盤中執行紀律 (防彈衣)
         st.markdown("""
         <div class="discipline-box">
             <h4 style="color: #EF4444; margin-top: 0;">🛑 盤前/盤中執行鐵律 (不符合嚴禁買進)</h4>
@@ -426,7 +413,6 @@ if len(chip_db) >= 3:
                 intel_df['建議買量(張)'] = intel_df.apply(calc_suggested_lots, axis=1)
                 final_rank = pd.merge(today_df, intel_df, on='代號')
 
-                # ★ v23 狼性評分公式：大幅加權均報與勝率，降低防守比重
                 final_rank['Score'] = (
                     final_rank['均報(%)'] * 150 +  
                     final_rank['勝率(%)'] * 15 +   
@@ -459,7 +445,6 @@ if len(chip_db) >= 3:
                 display_list = pd.concat([s_tier, ab_tier]).reset_index(drop=True)
                 display_list['名次'] = display_list.index + 1
                 
-                # ★ v23 匯出功能 (EOD 決策系統核心)
                 if not display_list.empty:
                     csv_data = display_list[['名次', '代號', '名稱_x', '產業', '勝率(%)', '均報(%)', '現價', '停損價', '建議買量(張)']].rename(columns={'名稱_x':'名稱'}).to_csv(index=False).encode('utf-8-sig')
                     st.download_button(
@@ -560,7 +545,7 @@ if len(chip_db) >= 3:
                      .map(risk_color, subset=['安全指數']), height=500, use_container_width=True, hide_index=True)
 
     with t_cmd:
-        st.markdown("### 🏦 <span class='highlight-gold'>司令部：帳戶風控與強制紀律</span>", unsafe_allow_html=True)
+        st.markdown("### 🏦 <span class='highlight-gold'>司令部：帳戶風控與真實稅費精算</span>", unsafe_allow_html=True)
         if not sheet_url:
             st.info("💡 **行動指南**：請在左側邊欄輸入您的 Google Sheets CSV 網址以啟用風控檢查。")
         else:
@@ -581,12 +566,24 @@ if len(chip_db) >= 3:
                                 p_now = float(r['現價'])
                                 p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
                                 qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
-                                pnl = (p_now - p_cost) * qty * 1000
+                                
+                                # ★ v23 稅費真實計算 (手續費預設 5 折，買賣皆收 + 賣出收千分之3證交稅)
+                                fee_rate = 0.001425 * 0.5
+                                tax_rate = 0.003
+                                
+                                buy_fee = (p_cost * qty * 1000) * fee_rate
+                                sell_fee = (p_now * qty * 1000) * fee_rate
+                                sell_tax = (p_now * qty * 1000) * tax_rate
+                                
+                                buy_cost_total = (p_cost * qty * 1000) + buy_fee
+                                sell_revenue_net = (p_now * qty * 1000) - sell_fee - sell_tax
+                                
+                                pnl = sell_revenue_net - buy_cost_total
+                                ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0
+                                
                                 current_exposure += (p_now * qty * 1000)
-                                ret = ((p_now - p_cost) / p_cost) * 100 if p_cost > 0 else 0
                                 total_pnl += pnl
                                 
-                                # ★ v23 紀律強制鎖定與時間出場機制
                                 act = "✅ 抱緊處理 (未達+6%)"
                                 if ret >= 10: act = "💰 +10% 達標 (強制全出)"
                                 elif ret >= 6: act = "🛡️ +6% 達標 (賣出一半鎖利)"
@@ -599,14 +596,14 @@ if len(chip_db) >= 3:
                                             act = "⏳ 資金卡死 (≥10天強制換股)"
                                     except: pass
                                 
-                                res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '報酬(%)': ret, '損益(元)': pnl, '作戰指示': act})
+                                res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作戰指示': act})
                             except: continue
                             
                         df_res = pd.DataFrame(res_h)
                         p_color = "#EF4444" if total_pnl > 0 else "#10B981"
-                        st.markdown(f"#### 💰 目前總損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+                        st.markdown(f"#### 💰 目前總淨損益 (已扣稅費)：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+                        st.caption("ℹ️ *系統已自動內扣千分之3證交稅與5折買賣手續費，此數字即為您實際可放進口袋的真金白銀。*")
                         
-                        # ★ v23 司令部警報系統
                         if current_exposure > max_market_cap:
                             st.error(f"🚨 **【一級警報】總市場曝險 ({current_exposure:,.0f} 元) 已超過 60% 戰備上限！嚴禁開立任何新單，請優先保護 40% 戰略預備金！**", icon="🛑")
                         else:
@@ -616,8 +613,8 @@ if len(chip_db) >= 3:
                             st.error("🚨 **【單日虧損斷路器】今日帳面虧損已達總本金 2%！系統判定情緒不穩，今日強制收手，請關閉看盤軟體！**", icon="🛑")
                             
                         styled_h = (df_res.style.set_properties(**{'text-align': 'center'})
-                                    .format({'現價':'{:.2f}', '成本':'{:.2f}', '報酬(%)':'{:.2f}%', '損益(元)':'{:,.0f}'})
-                                    .map(lambda x: 'color: #EF4444; font-weight: bold;' if x > 0 else ('color: #10B981; font-weight: bold;' if x < 0 else ''), subset=['報酬(%)', '損益(元)']))
+                                    .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
+                                    .map(lambda x: 'color: #EF4444; font-weight: bold;' if x > 0 else ('color: #10B981; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
                         st.dataframe(styled_h, use_container_width=True, hide_index=True)
             except Exception as e:
                 st.error(f"❌ 讀取 Google Sheets 失敗：{e}")
@@ -642,7 +639,7 @@ if len(chip_db) >= 3:
         * 🚀 **突破點火**：今日成交量大於 5日均量 1.2 倍，動能爆發。
         * 💎 **低檔潛伏**：乖離率 < 3% 的未爆發股，風險極低。
         * ⏳ **盤整**：籌碼雖好，但股價還在均線糾結處睡覺。
-        * 🏦 **司令部資金精算**：個人持股盈虧計算機。
+        * 🏦 **司令部資金精算**：個人持股盈虧計算機 (已內扣真實稅費)。
         * 🔥 **三大法人籌碼流向**：當日全台股外資、投信、自營商買賣超 Top 200。
         * 📡 **隱藏版投信建倉遺珠**：放寬條件後的後備觀察名單。
 
@@ -655,7 +652,7 @@ if len(chip_db) >= 3:
 
         #### 🕵️ 系統選股考量與避開陷阱 (將軍必讀)
         * **終極進場條件 (強勢回檔再攻)**：系統嚴格要求 `M5 > M10 > M20` (多頭排列)，且近 10 天曾創過 20 日新高，但現在價格稍微拉回、靠近 M5 才買進。**絕對不追高！**
-        * **大盤備援機制**：若大盤加權指數 API 抓取失敗，系統將自動以「台積電 (2330.TW)」作為大盤多空判斷的替身。
+        * **大盤備援機制**：若大盤加權指數 API 抓取失敗，系統將自動以「台積電 (2330.TW)」或 ETF 替身作為大盤多空判斷基準。
         * **排除妖股與牛皮股**：本系統已自動為您過濾掉「股價小於 20 元」、「成交量低於 1500 張」以及「金融保險業」，專注狙擊具備波動度與流動性的主戰場標的。
         * **大盤宏觀切換 (風控核心)**：
           - 大盤分數 `<= 3`：系統亮紅燈，**停止任何新交易**。
@@ -680,7 +677,8 @@ if len(chip_db) >= 3:
     with t_hist:
         st.markdown("### 📜 <span class='highlight-cyan'>游擊兵工廠：開發史 (Chronicles)</span>", unsafe_allow_html=True)
         st.markdown("""
-        * **v23.0 (終極紀律版)**：**從選股工具躍升為 EOD 決策系統。導入盤前作戰清單一鍵匯出 (CSV)。新增 40% 戰略預備金風控鎖、總曝險警報器、單日虧損斷路器。實裝「+6%半出/+10%全出」與「10天資金卡死」強制出場指示。回測跳空過濾嚴格化至 2%。**
+        * **v23.1 (稅費校正熱修復)**：**解決 yfinance API MultiIndex 崩潰問題，全面改用更穩定的 Ticker.history() 提升大盤與個股下載妥善率。司令部實裝「稅費扣血真實精算 (內扣千分之3證交稅與5折手續費)」，讓未實現損益 100% 貼合券商真實淨利。**
+        * **v23.0 (終極紀律版)**：從選股工具躍升為 EOD 決策系統。導入盤前作戰清單一鍵匯出 (CSV)。新增 40% 戰略預備金風控鎖、總曝險警報器、單日虧損斷路器。實裝「+6%半出/+10%全出」與「10天資金卡死」強制出場指示。回測跳空過濾嚴格化至 2%。
         * **v22.0 (機構級完全體)**：導入三層資料防護網（TWSE快取+本地權值股+不依賴yfinance）。大盤加入具名備援 ETF 替身。下載引擎降頻至 3 線程防鎖，期間縮短為 3 個月極速版。導入狼性攻擊評分公式，並徹底過濾低價股、低量股與金融股。
         * **v21.5 (機構級戰略版)**：結合頂級戰略思維，寫入 `safe_download` 3 次 Retry 防護裝甲。新增大盤失聯時自動切換「台積電 (2330.TW)」的精準備援機制。實裝 S 級嚴格鐵血防線與 S- 級 (次級伏擊) 自動備援切換，兼顧本金保護與戰術彈性。
         * **v21.1 (極速修復版)**：導入 `concurrent.futures` 多執行緒引擎。
@@ -712,4 +710,4 @@ else:
     st.error("⚠️ 證交所資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v23 終極紀律版 (EOD 實戰系統)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v23.1 終極紀律版 (EOD 實戰系統)</p>", unsafe_allow_html=True)
