@@ -6,7 +6,7 @@ import urllib3
 from datetime import datetime, timedelta
 import time
 import yfinance as yf
-import concurrent.futures  # ★ 新增：多執行緒加速模組
+import concurrent.futures  # ★ 多執行緒加速模組
 
 # ==============================================================================
 # 【第一區塊：系統底層與現代化防禦配置】
@@ -15,7 +15,7 @@ import concurrent.futures  # ★ 新增：多執行緒加速模組
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="游擊隊終極軍火庫 v21.1",
+    page_title="游擊隊終極軍火庫 v21.5",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -58,8 +58,8 @@ with st.sidebar:
         st.cache_data.clear()
         st.success("快取已清除！請重新載入。")
 
-st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v21.1</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 實戰定檔版 ✕ 職業波段狙擊 ✕ 多執行緒極速引擎 ——</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v21.5</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 機構級戰略版 ✕ S-級備援 ✕ 穩固大盤 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -96,19 +96,50 @@ def get_yfinance_industry(sid):
         return '其他'
     except: return '未知產業'
 
+# --- ★ v21.5 核心升級：3 次 Retry 安全下載 ---
+def safe_download(sym, retries=3):
+    for _ in range(retries):
+        try:
+            df = yf.download(sym, period="1mo", progress=False, repair=True)
+            if not df.empty:
+                return df
+        except:
+            time.sleep(1)
+    return pd.DataFrame()
+
+# --- ★ v21.5 核心升級：最新代號與台積電備援 ---
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_macro_dashboard():
     score = 5.0
     macro_data = []
-    indices = {"^TWII": "台股加權", "^SOX": "美費半導體", "^IXIC": "那斯達克", "^VIX": "恐慌指數(VIX)"}
+    # 更新費半代號為 ^PHLX_SO
+    indices = {"^TWII": "台股加權", "^PHLX_SO": "美費半導體", "^IXIC": "那斯達克", "^VIX": "恐慌指數(VIX)"}
     
     for sym, name in indices.items():
-        try:
-            hist = yf.download(sym, period="1mo", progress=False) 
-            if hist.empty: continue
+        is_fallback = False
+        hist = safe_download(sym)
+        
+        # 啟動台積電備援機制
+        if hist.empty and sym == "^TWII":
+            hist = safe_download("2330.TW")
+            if not hist.empty:
+                name = "台股加權 (台積電備援)"
+                is_fallback = True
+        
+        if hist.empty:
+            macro_data.append({"戰區": name, "現值": "抓取失敗", "月線": "-", "狀態": "⚪ 斷線"})
+            continue
             
-            last_p = float(hist['Close'].iloc[-1])
-            ma20 = float(hist['Close'].rolling(20).mean().iloc[-1])
+        try:
+            # 兼容 yfinance 回傳結構 (備援時要抓對應的符號)
+            target_sym = "2330.TW" if is_fallback else sym
+            if isinstance(hist.columns, pd.MultiIndex):
+                close_s = hist['Close'][target_sym]
+            else:
+                close_s = hist['Close']
+            
+            last_p = float(close_s.iloc[-1])
+            ma20 = float(close_s.rolling(20).mean().iloc[-1])
             status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
             
             if sym == "^VIX":
@@ -176,7 +207,6 @@ def format_lots(shares):
     if lots <= 0: return "0"
     return f"{lots:.3f}".rstrip('0').rstrip('.')
 
-# ★ v21.1 核心加速：單檔下載函式
 def fetch_single_stock(sid):
     try:
         df = yf.download(f"{sid}.TW", period="6mo", progress=False)
@@ -192,7 +222,6 @@ def level2_quant_engine(id_tuple):
     intel_results = []
     if not id_list: return pd.DataFrame()
     
-    # --- ★ v21.1 終極修復 ①：多執行緒並發抓取 (打破龜速) ---
     bulk_data = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(fetch_single_stock, sid): sid for sid in id_list}
@@ -207,9 +236,14 @@ def level2_quant_engine(id_tuple):
             if df_stock is None or df_stock.empty:
                 continue
             
-            close_s = df_stock['Close'].squeeze()
-            open_s = df_stock['Open'].squeeze()
-            vol_s = df_stock['Volume'].squeeze()
+            if isinstance(df_stock.columns, pd.MultiIndex):
+                close_s = df_stock['Close'].squeeze()
+                open_s = df_stock['Open'].squeeze()
+                vol_s = df_stock['Volume'].squeeze()
+            else:
+                close_s = df_stock['Close']
+                open_s = df_stock['Open']
+                vol_s = df_stock['Volume']
             
             p_now = float(close_s.iloc[-1])
             m5 = float(close_s.rolling(5).mean().iloc[-1])
@@ -220,7 +254,6 @@ def level2_quant_engine(id_tuple):
             
             bias = ((p_now - m20) / m20) * 100
             
-            # 強勢回檔再攻判定
             trend_strength = (m5 > m10) and (m10 > m20)
             last_10_max = close_s.iloc[-10:].max()
             last_20_max = close_s.iloc[-20:].max()
@@ -230,14 +263,12 @@ def level2_quant_engine(id_tuple):
             is_candidate = trend_strength and recent_high and pullback_stand
             is_volume_breakout = (vol_now > 1) and (vol_now > vol_ma5 * 1.2) 
             
-            # 回測引擎設定
             df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s})
             df_bt['MA5'] = df_bt['Close'].rolling(5).mean()
             df_bt['MA10'] = df_bt['Close'].rolling(10).mean()
             df_bt['MA20'] = df_bt['Close'].rolling(20).mean()
             df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
             
-            # --- ★ v21 終極修復 ②：嚴格過濾回測假訊號 (接近突破才算) ---
             sig_mask = (
                 (df_bt['MA5'] > df_bt['MA10']) &
                 (df_bt['MA10'] > df_bt['MA20']) &
@@ -252,11 +283,9 @@ def level2_quant_engine(id_tuple):
                 loc_idx = df_bt.index.get_loc(idx)
                 if loc_idx + 1 >= len(df_bt): continue 
                 
-                # 隔天開盤進場
                 entry_p = df_bt.iloc[loc_idx + 1]['Open']
                 prev_close = df_bt.iloc[loc_idx]['Close']
                 
-                # 跳空 > +3% 放棄交易
                 if entry_p > prev_close * 1.03: continue
                 
                 future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 11] 
@@ -268,7 +297,7 @@ def level2_quant_engine(id_tuple):
                 
                 for f_idx, row in future_data.iterrows():
                     curr_p = row['Close']
-                    if curr_p > entry_p * 1.05: stop_loss = max(stop_loss, entry_p) # 保本
+                    if curr_p > entry_p * 1.05: stop_loss = max(stop_loss, entry_p) 
                     
                     if curr_p < stop_loss:
                         if sold_half: ret = 0.5 * 0.06 + 0.5 * ((stop_loss - entry_p) / entry_p)
@@ -361,11 +390,13 @@ if len(chip_db) >= 3:
     # Tab 1: AI 推薦 & 階梯式遺珠
     # --------------------------------------------------------------------------
     with t_rank:
-        st.markdown("### 👑 <span class='highlight-gold'>今日 AI 戰神決策清單 (實戰定檔版)</span>", unsafe_allow_html=True)
+        st.markdown("### 👑 <span class='highlight-gold'>今日 AI 戰神決策清單 (機構級戰略版)</span>", unsafe_allow_html=True)
         
         with st.expander("🌍 查看全球大盤診斷表 (Level 1)"):
             if not MACRO_DF.empty:
                 st.dataframe(MACRO_DF.style.set_properties(**{'text-align': 'center'}).map(lambda x: 'color: #10B981;' if '多頭' in str(x) or '安定' in str(x) else ('color: #EF4444;' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
+                if "抓取失敗" in MACRO_DF['現值'].values:
+                    st.warning("⚠️ 部分大盤數據 API 阻擋，已忽略該指數算分。")
             else:
                 st.warning("⚠️ 大盤數據抓取異常。")
 
@@ -389,7 +420,6 @@ if len(chip_db) >= 3:
                 intel_df['建議買量(張)'] = intel_df.apply(calc_suggested_lots, axis=1)
                 final_rank = pd.merge(today_df, intel_df, on='代號')
 
-                # --- ★ v21 終極修復 ③：重均報的狼性排名公式 ---
                 final_rank['Score'] = (
                     final_rank['均報(%)'] * 120 +
                     final_rank['勝率(%)'] * 10 +
@@ -400,32 +430,52 @@ if len(chip_db) >= 3:
                 
                 rank_sorted = final_rank.sort_values('Score', ascending=False).reset_index(drop=True)
                 
-                strict_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] > 55) & (rank_sorted['均報(%)'] > 1.5) & (rank_sorted['今日放量'] == True) & (rank_sorted['連買'] >= 2)
-                med_mask = (~strict_mask) & (rank_sorted['勝率(%)'] > 50) & (rank_sorted['成交量'] >= 1) & (rank_sorted['連買'] >= 1) & (rank_sorted['乖離(%)'] < 10)
-                scout_mask = (~strict_mask) & (~med_mask) & (rank_sorted['成交量'] >= 1) & (rank_sorted['連買'] >= 1)
+                # --- ★ v21.5 升級：嚴格 S 級防線與 S- 級備援 ---
+                strict_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 55) & (rank_sorted['均報(%)'] >= 1.5) & (rank_sorted['今日放量'] == True) & (rank_sorted['連買'] >= 2)
+                s_minus_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 50) & (rank_sorted['均報(%)'] >= 1.0) & (rank_sorted['連買'] >= 1)
+                
+                med_mask = (~strict_mask) & (~s_minus_mask) & (rank_sorted['勝率(%)'] > 50) & (rank_sorted['成交量'] >= 1) & (rank_sorted['連買'] >= 1) & (rank_sorted['乖離(%)'] < 10)
+                scout_mask = (~strict_mask) & (~s_minus_mask) & (~med_mask) & (rank_sorted['成交量'] >= 1) & (rank_sorted['連買'] >= 1)
 
                 if MACRO_SCORE <= 5:
                     strict_mask = strict_mask & (rank_sorted['乖離(%)'] < 3)
+                    s_minus_mask = s_minus_mask & (rank_sorted['乖離(%)'] < 3)
                     med_mask = med_mask & (rank_sorted['乖離(%)'] < 3)
 
                 s_tier = rank_sorted[strict_mask].head(3)
+                
+                # 自動備援啟動邏輯
+                using_s_minus = False
+                if s_tier.empty:
+                    using_s_minus = True
+                    s_tier = rank_sorted[s_minus_mask].head(3)
+                
                 ab_tier = rank_sorted[med_mask].head(7)
                 scout_tier = rank_sorted[scout_mask].head(20)
                 
                 display_list = pd.concat([s_tier, ab_tier]).reset_index(drop=True)
                 display_list['名次'] = display_list.index + 1
                 
-                st.markdown("#### 🥇 【S級】強勢回檔狙擊核心 (符合極嚴格職業濾網)")
+                if using_s_minus:
+                    st.warning("⚠️ **系統判定：今日無完美 S 級標的（保持紀律）。自動啟動【S-級】次級伏擊備援名單！**", icon="🛡️")
+                    st.markdown("#### 🥈 【S-級】次級伏擊備援 (勝率>50, 均報>1.0)")
+                    border_color = "#38BDF8" 
+                    title_color = "#38BDF8"
+                else:
+                    st.markdown("#### 🥇 【S級】強勢回檔狙擊核心 (符合極嚴格職業濾網)")
+                    border_color = "#F59E0B" 
+                    title_color = "#F59E0B"
+
                 if s_tier.empty:
-                    st.info("💡 今日無標的完美符合「勝率>55%、均報>1.5%、爆量回檔」之頂級條件。寧缺勿濫！")
+                    st.info("💡 今日連 S- 級備援都無標的符合。市場極難操作，請空手觀望！")
                 else:
                     cols_s = st.columns(3)
                     for i in range(len(s_tier)):
                         r = display_list.iloc[i]
                         with cols_s[i]:
                             st.markdown(f"""
-                            <div class="tier-card" style="border-top: 5px solid #F59E0B;">
-                                <h3 style="margin:0; color:#F59E0B;">{r['名次']}. {r['名稱_x']} ({r['代號']})</h3>
+                            <div class="tier-card" style="border-top: 5px solid {border_color};">
+                                <h3 style="margin:0; color:{title_color};">{r['名次']}. {r['名稱_x']} ({r['代號']})</h3>
                                 <p style="color:#9CA3AF; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
                                 <div style="background-color: #111827; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
                                     📊 <b>職業回測 (隔日進場/-3%損):</b><br>
@@ -558,12 +608,13 @@ if len(chip_db) >= 3:
     # Tab 4: 教戰手冊 (100% 完整無遺漏版)
     # --------------------------------------------------------------------------
     with t_book:
-        st.markdown("### 📖 <span class='highlight-gold'>游擊兵工廠：名詞、圖示與實戰教範大全 (v21 最終定檔版)</span>", unsafe_allow_html=True)
+        st.markdown("### 📖 <span class='highlight-gold'>游擊兵工廠：名詞、圖示與實戰教範大全 (機構級戰略版)</span>", unsafe_allow_html=True)
         
         st.markdown("""
         #### 🔣 系統圖示 (Icons) 權威指南
         * 👑 **今日 AI 戰神決策清單**：系統精算後的最高殿堂。
         * 🥇 **【S級】強勢回檔狙擊核心**：綜合排名前 3 名。符合「多頭排列、創高拉回、高勝率、高均報」的完美標的。
+        * 🥈 **【S-級】次級伏擊備援**：當 S 級因大盤惡劣選不出股票時，系統自動啟動的替代名單，以青藍色顯示。
         * ⚔️ **【A/B級】次級波段與伏擊清單**：排名 4~10 名，勝率 > 50% 的穩健標的。
         * 🚨 **警報 / 停損 / 突擊部隊**：代表危險的停損線，或是主力同步暴買的「土洋合擊」。
         * 💀 **破線硬停損 (無情砍倉)**：持股若跌破 10MA 或虧損達 3%，必須無情砍倉。
@@ -576,8 +627,6 @@ if len(chip_db) >= 3:
         * 🏦 **司令部資金精算**：個人持股盈虧計算機。
         * 🔥 **三大法人籌碼流向**：當日全台股外資、投信、自營商買賣超 Top 200。
         * 📡 **隱藏版投信建倉遺珠**：放寬條件後的後備觀察名單。
-        * 📖 **實戰與名詞教範**：即本說明書。
-        * 📜 **系統演進史**：紀錄本軍火庫的版本沿革。
 
         #### 🏫 核心名詞與數據指標解釋
         * **實戰回測 (隔日進場/-3%損/+10%利)**：這是系統最核心的引擎。它模擬在歷史上出現相同訊號時，**「隔天開盤價買進（若跳空>3%則不買）」**。買進後，若達 +6% 先賣一半，達 +10% 賣剩下一半；若跌破 10MA 或虧損 3% 則強制停損。
@@ -585,19 +634,18 @@ if len(chip_db) >= 3:
         * **勝率 (%)**：在上述模擬下，能成功獲利出場的機率。
         * **安全指數 (1~10 分)**：大盤 VIX 狀態、個股均線強弱與乖離率的綜合防禦分數。滿分 10 分。
         * **乖離率 (Bias %)**：股價偏離 20 日均線(月線)的百分比。`0% ~ 5%` 為黃金建倉區，`> 10%` 屬於過熱，系統會給予嚴格扣分懲罰。
-        * **M5 / M10 / M20**：分別代表 5日(攻擊線)、10日(防守線)、20日(生命線) 移動平均價。
 
         #### 🕵️ 系統選股考量與避開陷阱 (將軍必讀)
         * **終極進場條件 (強勢回檔再攻)**：系統嚴格要求 `M5 > M10 > M20` (多頭排列)，且近 10 天曾創過 20 日新高，但現在價格稍微拉回、靠近 M5 才買進。**絕對不追高！**
+        * **大盤備援機制**：若大盤加權指數 API 抓取失敗，系統將自動以「台積電 (2330.TW)」作為大盤多空判斷的替身。
         * **大盤宏觀切換 (風控核心)**：
           - 大盤分數 `<= 3`：系統亮紅燈，**停止任何新交易**。
           - 大盤分數 `<= 5`：系統亮黃燈，**只買乖離 < 3% 的股票，且建議資金減半**。
-        * **階梯式名單過濾**：如果大盤偏弱，S 級名單可能完全空蕩蕩（選不出股票），這不是 Bug，這是系統在保護您的本金。此時請往下看 A/B 級或遺珠名單。
+        * **階梯式名單過濾**：如果大盤偏弱，S 級名單可能完全空蕩蕩（選不出股票），這不是 Bug，這是系統在保護您的本金。此時請往下看 S-級 或 A/B 級名單。
 
         #### 💰 核心金律：職業級波段風控
         * **單股資金限制**：單一檔股票投入資金，絕對不超過總本金的 **15%**。
         * **連續停損保護**：實戰中若遭遇**「連續 3 筆交易虧損停損」**，請強制自己**停止交易 2 天**！
-        * **分批停利法**：帳上獲利 +6% 時賣出 50% 鎖住利潤，剩下的放到 +10% 或直到跌破 5MA 再出，讓獲利極大化。
         """)
 
     # --------------------------------------------------------------------------
@@ -606,13 +654,14 @@ if len(chip_db) >= 3:
     with t_hist:
         st.markdown("### 📜 <span class='highlight-cyan'>游擊兵工廠：開發史 (Chronicles)</span>", unsafe_allow_html=True)
         st.markdown("""
-        * **v21.1 (極速修復版)**：**導入 `concurrent.futures` 多執行緒引擎。在保留「單檔穩定抓取」的基礎上，派發多工人並發下載，將 100+ 檔股票的處理時間從 90 秒壓縮至 5 秒內，徹底解決「讀取不動」的效能瓶頸。**
-        * **v21.0 (實戰定檔版)**：【停止功能貪婪，回歸穩定】。廢除不穩定的 bulk_download，改用穩定版迴圈防封鎖機制。嚴格過濾回測假訊號，確保只在「接近突破或剛創高」才判定。套用狼性評分公式（均報權重最高），直接作為實戰封測版本。
-        * **v20.0 (職業波段狙擊版)**：進場改為「強勢回檔再攻」；回測改為「隔日開盤價進場且過濾跳空」；停利改為「6%半出/10%全出」；加入「大盤 <=3 停下交易」風控；名單改為階梯式過濾。徹底修復大盤與產業抓取異常。
-        * **v19.0 (攻擊爆發版)**：停利波段拉長至 10%，回測週期延長至 10 天。加入「20日新高突破」動能加權。籌碼表擴充三大法人。大幅限制渲染行數 (Top 200) 解決網頁卡頓問題。
-        * **v18.0 (實戰真劍勝負版)**：重寫回測引擎，導入真實模擬 (-3%硬停損)。加入「5MA>10MA>20MA」嚴格趨勢濾網。加入大盤保護機制。
-        * **v17.8 (極致純粹無閹割版)**：為追求極速，無情拔除單兵雷達。為籌碼套用顏色判定。
-        * **v17.7 (閃電記憶體版)**：導入 `@st.cache_data` 全面包覆 Level 2 量化引擎，解決重新整理時重複下載數據的痛點。
+        * **v21.5 (機構級戰略版)**：**結合頂級戰略思維，寫入 `safe_download` 3 次 Retry 防護裝甲。新增大盤失聯時自動切換「台積電 (2330.TW)」的精準備援機制。實裝 S 級嚴格鐵血防線與 S- 級 (次級伏擊) 自動備援切換，兼顧本金保護與戰術彈性。**
+        * **v21.1 (極速修復版)**：導入 `concurrent.futures` 多執行緒引擎。
+        * **v21.0 (實戰定檔版)**：【停止功能貪婪，回歸穩定】。廢除不穩定的 bulk_download，改用穩定版迴圈防封鎖機制。
+        * **v20.0 (職業波段狙擊版)**：進場改為「強勢回檔再攻」；回測改為「隔日開盤價進場且過濾跳空」；停利改為「6%半出/10%全出」；加入「大盤 <=3 停下交易」風控。
+        * **v19.0 (攻擊爆發版)**：停利波段拉長至 10%，回測週期延長至 10 天。
+        * **v18.0 (實戰真劍勝負版)**：重寫回測引擎，導入真實模擬 (-3%硬停損)。加入「5MA>10MA>20MA」嚴格趨勢濾網。
+        * **v17.8 (極致純粹無閹割版)**：為追求極速，無情拔除單兵雷達。
+        * **v17.7 (閃電記憶體版)**：導入 `@st.cache_data` 全面包覆 Level 2 量化引擎。
         * **v17.6 (閃電極速版)**：徹底拔除 YFinance `info` 延遲毒瘤，改用靜態 API 字典秒讀產業與名稱。
         * **v17.5 (專注主戰場版)**：拔除上櫃 (.TWO) 掃描邏輯，專注上市市場運算。
         * **v17.4 (洞悉戰場版)**：修剪小數點至兩位以內、排除金融股霸榜疑慮。
@@ -635,4 +684,4 @@ else:
     st.error("⚠️ 證交所資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v21.1 極速修復版</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v21.5 機構級戰略版</p>", unsafe_allow_html=True)
