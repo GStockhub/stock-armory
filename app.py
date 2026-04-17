@@ -18,7 +18,7 @@ from manual import MANUAL_TEXT, HISTORY_TEXT
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="游擊隊終極軍火庫 v24",
+    page_title="游擊隊終極軍火庫 v24.1",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -69,8 +69,8 @@ with st.sidebar:
         st.cache_data.clear()
         st.success("快取已清除！請重新載入。")
 
-st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極紀律 ✕ 真實精算 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.1</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 真實精算 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -90,7 +90,7 @@ def load_industry_map():
             ind_map[cid] = str(row['產業']).strip()
             name_map[cid] = str(row['名稱']).strip()
     except Exception as e:
-        pass # 找不到檔案時靜默處理，交給下方補丁
+        pass 
         
     return ind_map, name_map
 
@@ -344,7 +344,7 @@ def level2_quant_engine(id_tuple):
     return pd.DataFrame(intel_results)
 
 # ==============================================================================
-# 【第五區塊：分頁渲染與系統顯示】
+# 【第五區塊：軍事化分頁渲染與系統顯示】
 # ==============================================================================
 
 if MACRO_SCORE <= 3:
@@ -372,26 +372,17 @@ if len(chip_db) >= 3:
 
     top_80_chips = today_df.sort_values('投信(張)', ascending=False).head(80)['代號'].tolist()
     
-    # 五大分頁架構，風格字眼統一
+    # 👑 五大戰區分頁，徹底軍事化
     t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs([
-        "🎯 職業波段 S/A/B 推薦", "🔥 三大法人籌碼流向", "🏦 司令部與戰術覆盤", "📖 實戰與名詞教範", "📜 系統演進史"
+        "🎯 戰術指揮所 (S/A/B/C)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"
     ])
 
     # --------------------------------------------------------------------------
-    # Tab 1: 決策清單
+    # Tab 1: 🎯 戰術指揮所
     # --------------------------------------------------------------------------
     with t_rank:
-        st.markdown("### 👑 <span class='highlight-gold'>今日 AI 戰神決策清單</span>", unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div class="discipline-box">
-            <h4 style="color: #EF4444; margin-top: 0;">🛑 盤前/盤中執行鐵律 (不符合嚴禁買進)</h4>
-            1. <b>過濾跳空</b>：開盤價若比昨收 <b>高出 2% 以上</b>，直接放棄不買。<br>
-            2. <b>開盤五分鐘法則</b>：9:00~9:05 嚴禁下單。9:05 後若股價 <b>跌破今日開盤價</b> 或 <b>跌破 5MA</b>，當日放棄。<br>
-            3. <b>單日交易上限</b>：每天 <b>最多只開 3 筆新單</b>，挑名單最上面的買。<br>
-            4. <b>死抱鐵律</b>：進場後，沒到 <b>+6%</b> 絕對不准賣！沒跌破 <b>-3% (或10MA)</b> 絕對不准砍！
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("### 🎯 <span class='highlight-gold'>前線狙擊目標清單</span>", unsafe_allow_html=True)
+        st.caption("💡 **盤前鐵律**：跳空>2%不買、9:05前不下單、單日限3筆、未達+6%不賣。詳細規範請見兵工廠教範。")
 
         with st.expander("🌍 查看全球大盤診斷表"):
             if not MACRO_DF.empty:
@@ -428,30 +419,41 @@ if len(chip_db) >= 3:
                 
                 rank_sorted = final_rank.sort_values('Score', ascending=False).reset_index(drop=True)
                 
-                strict_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 55) & (rank_sorted['均報(%)'] >= 1.5) & (rank_sorted['今日放量'] == True) & (rank_sorted['連買'] >= 2)
-                s_minus_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 50) & (rank_sorted['均報(%)'] >= 1.0) & (rank_sorted['連買'] >= 1)
-                med_mask = (~strict_mask) & (~s_minus_mask) & (rank_sorted['勝率(%)'] > 50) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1) & (rank_sorted['乖離(%)'] < 10)
-                scout_mask = (~strict_mask) & (~s_minus_mask) & (~med_mask) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1)
+                # 👑 S, A, B, C 全局軍事化編制
+                s_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 55) & (rank_sorted['均報(%)'] >= 1.5) & (rank_sorted['今日放量'] == True) & (rank_sorted['連買'] >= 2)
+                a_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 50) & (rank_sorted['均報(%)'] >= 1.0) & (rank_sorted['連買'] >= 1)
+                b_mask = (~s_mask) & (~a_mask) & (rank_sorted['勝率(%)'] > 50) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1) & (rank_sorted['乖離(%)'] < 10)
+                c_mask = (~s_mask) & (~a_mask) & (~b_mask) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1)
 
                 if MACRO_SCORE <= 5:
-                    strict_mask = strict_mask & (rank_sorted['乖離(%)'] < 3)
-                    s_minus_mask = s_minus_mask & (rank_sorted['乖離(%)'] < 3)
-                    med_mask = med_mask & (rank_sorted['乖離(%)'] < 3)
+                    s_mask = s_mask & (rank_sorted['乖離(%)'] < 3)
+                    a_mask = a_mask & (rank_sorted['乖離(%)'] < 3)
+                    b_mask = b_mask & (rank_sorted['乖離(%)'] < 3)
 
-                s_tier = rank_sorted[strict_mask].head(3)
-                using_s_minus = False
+                s_tier = rank_sorted[s_mask].head(3).copy()
+                a_tier = rank_sorted[a_mask].head(3).copy()
+                b_tier = rank_sorted[b_mask].head(7).copy()
+                c_tier = rank_sorted[c_mask].copy()
+
+                using_a_tier = False
                 if s_tier.empty:
-                    using_s_minus = True
-                    s_tier = rank_sorted[s_minus_mask].head(3)
+                    using_a_tier = True
+                    top_tier = a_tier
+                    top_tier['評級'] = 'A'
+                else:
+                    top_tier = s_tier
+                    top_tier['評級'] = 'S'
                 
-                ab_tier = rank_sorted[med_mask].head(7)
-                scout_tier = rank_sorted[scout_mask].head(20)
+                b_tier['評級'] = 'B'
+                c_tier['評級'] = 'C'
+
+                # 👑 嚴格總量控管：S, A, B, C 全部合併後，只取前 20 名！
+                master_list = pd.concat([top_tier, b_tier, c_tier]).reset_index(drop=True).head(20)
+                master_list['名次'] = master_list.index + 1
                 
-                display_list = pd.concat([s_tier, ab_tier]).reset_index(drop=True)
-                display_list['名次'] = display_list.index + 1
-                
-                if not display_list.empty:
-                    export_df = display_list[['名次', '代號', '名稱_x', '產業', '勝率(%)', '均報(%)', '現價', '停損價', '建議買量(張)']].rename(columns={'名稱_x':'名稱'}).copy()
+                if not master_list.empty:
+                    # CSV 匯出：加入「評級」欄位
+                    export_df = master_list[['名次', '評級', '代號', '名稱_x', '產業', '勝率(%)', '均報(%)', '現價', '停損價', '建議買量(張)']].rename(columns={'名稱_x':'名稱'}).copy()
                     export_df['勝率(%)'] = export_df['勝率(%)'].round(1)
                     export_df['均報(%)'] = export_df['均報(%)'].round(2)
                     export_df['現價'] = export_df['現價'].round(2)
@@ -459,26 +461,31 @@ if len(chip_db) >= 3:
                     
                     csv_data = export_df.to_csv(index=False).encode('utf-8-sig')
                     st.download_button(
-                        label="💾 一鍵下載今日作戰清單",
+                        label="💾 一鍵下載今日作戰清單 (Top 20 菁英)",
                         data=csv_data,
                         file_name=f"Tactical_List_{datetime.now().strftime('%Y%m%d')}.csv",
                         mime="text/csv",
                     )
                 
-                if using_s_minus:
-                    st.warning("⚠️ **系統判定：今日無完美 S 級標的。自動啟動【S-級】次級伏擊備援名單！**", icon="🛡️")
-                    st.markdown("#### 🥈 <span class='highlight-cyan'>【S-級】次級伏擊備援 (勝率>50, 均報>1.0)</span>", unsafe_allow_html=True)
+                # 分割 UI 顯示用 DataFrame
+                ui_top = master_list[master_list['評級'].isin(['S', 'A'])]
+                ui_b = master_list[master_list['評級'] == 'B']
+                ui_c = master_list[master_list['評級'] == 'C']
+
+                if using_a_tier:
+                    st.warning("⚠️ **系統判定：今日無完美 S 級標的。自動啟動【A 級】伏擊備援名單！**", icon="🛡️")
+                    st.markdown("#### 🥈 <span class='highlight-cyan'>【A級】伏擊備援</span>", unsafe_allow_html=True)
                     border_color, title_color = "#38BDF8", "#38BDF8"
                 else:
-                    st.markdown("#### 🥇 <span class='highlight-gold'>【S級】強勢回檔狙擊核心 (符合極嚴格職業濾網)</span>", unsafe_allow_html=True)
+                    st.markdown("#### 🥇 <span class='highlight-gold'>【S級】完美狙擊</span>", unsafe_allow_html=True)
                     border_color, title_color = "#F59E0B", "#F59E0B"
 
-                if s_tier.empty:
-                    st.info("💡 今日無標的符合。市場極難操作，請空手觀望！")
+                if ui_top.empty:
+                    st.info("💡 今日無主戰力標的符合。市場極難操作，請空手觀望！")
                 else:
                     cols_s = st.columns(3)
-                    for i in range(len(s_tier)):
-                        r = display_list.iloc[i]
+                    for i in range(len(ui_top)):
+                        r = ui_top.iloc[i]
                         with cols_s[i]:
                             st.markdown(f"""
                             <div class="tier-card" style="border-top: 5px solid {border_color};">
@@ -505,43 +512,39 @@ if len(chip_db) >= 3:
                         return 'color: #F59E0B; font-weight: bold;'
                     except: return ''
 
-                st.markdown("#### ⚔️ <span class='highlight-cyan'>【A/B級】次級波段與伏擊清單 (勝率 > 50%)</span>", unsafe_allow_html=True)
-                if ab_tier.empty:
-                    st.info("💡 今日無次級符合標的。")
+                st.markdown("#### ⚔️ <span class='highlight-cyan'>【B級】穩健波段 (勝率 > 50%)</span>", unsafe_allow_html=True)
+                if ui_b.empty:
+                    st.info("💡 今日無 B 級符合標的。")
                 else:
-                    ab_disp = display_list.iloc[len(s_tier):][['名次','代號','名稱_x','產業','安全指數','勝率(%)','均報(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱'})
-                    styled_ab = (ab_disp.style.set_properties(**{'text-align': 'center'})
+                    b_disp = ui_b[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','均報(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱'})
+                    styled_b = (b_disp.style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '停損價':'{:.2f}', '勝率(%)':'{:.1f}%', '均報(%)':'{:.2f}%'})
                                     .map(risk_color, subset=['安全指數'])
                                     .map(lambda x: 'color: #10B981; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
-                    st.dataframe(styled_ab, use_container_width=True, hide_index=True)
+                    st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
                 st.markdown("---")
-                st.markdown(f"### 📡 <span class='highlight-gold'>隱藏版投信建倉遺珠 (共 {len(scout_tier)} 檔)</span>", unsafe_allow_html=True)
-                # 將軍指定的功能提示安置處：
-                st.caption("💡 **隱藏版投信建倉遺珠**：放寬條件後的後備觀察名單。")
+                st.markdown("### 📡 <span class='highlight-gold'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
                 
-                if scout_tier.empty:
-                    st.info("💡 今日全市場無任何法人連買觀察標的。")
+                if ui_c.empty:
+                    st.info("💡 今日無 C 級潛伏標的。")
                 else:
-                    scout_tier['名次'] = range(len(display_list)+1, len(display_list)+1+len(scout_tier))
-                    scout_tier['戰術'] = scout_tier.apply(lambda r: "💎 低檔潛伏" if r['乖離(%)'] < 3 else ("🚀 突破點火" if r['今日放量'] else "⏳ 盤整"), axis=1)
-                    styled_scout = (scout_tier[['名次','代號','名稱_x','產業','安全指數','勝率(%)','現價','乖離(%)','連買','戰術']].rename(columns={'名稱_x':'名稱'})
+                    ui_c['戰術'] = ui_c.apply(lambda r: "💎 低檔潛伏" if r['乖離(%)'] < 3 else ("🚀 突破點火" if r['今日放量'] else "⏳ 盤整"), axis=1)
+                    styled_c = (ui_c[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','現價','乖離(%)','連買','戰術']].rename(columns={'名稱_x':'名稱'})
                                     .style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%'})
                                     .map(risk_color, subset=['安全指數']))
-                    st.dataframe(styled_scout, use_container_width=True, hide_index=True)
+                    st.dataframe(styled_c, use_container_width=True, hide_index=True)
         else:
             if MACRO_SCORE > 3:
                 st.warning("⚔️ 今日無標的符合條件。")
 
     # --------------------------------------------------------------------------
-    # Tab 2: 籌碼流向
+    # Tab 2: 📡 情報局
     # --------------------------------------------------------------------------
     with t_chip:
-        st.markdown("### 🔥 <span class='highlight-gold'>全市場三大法人籌碼流向</span>", unsafe_allow_html=True)
-        # 將軍指定的功能提示安置處：
-        st.caption("💡 **三大法人籌碼流向**：當日全台股外資、投信、自營商買賣超 Top 200。")
+        st.markdown("### 📡 <span class='highlight-gold'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
+        st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超部署 Top 200。")
         
         surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
         if not surprise_atk.empty:
@@ -565,12 +568,11 @@ if len(chip_db) >= 3:
                      .map(risk_color, subset=['安全指數']), height=500, use_container_width=True, hide_index=True)
 
     # --------------------------------------------------------------------------
-    # Tab 3: 司令部 (持股風控 + AAR)
+    # Tab 3: 🏦 總司令部
     # --------------------------------------------------------------------------
     with t_cmd:
-        st.markdown("### 🏦 <span class='highlight-gold'>司令部：帳戶風控與戰術覆盤</span>", unsafe_allow_html=True)
-        # 將軍指定的功能提示安置處：
-        st.caption("💡 **司令部資金精算**：個人持股盈虧計算機 (已內扣真實稅費)。")
+        st.markdown("### 🏦 <span class='highlight-gold'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
+        st.caption("💡 **資金風控**：個人現役持股盈虧計算機 (已內扣真實稅費)。")
         
         if not sheet_url:
             st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
@@ -645,8 +647,9 @@ if len(chip_db) >= 3:
 
         st.markdown("---")
         
-        # 👑 將軍指定的 AAR 戰術覆盤室，完美整合於司令部之下
         st.markdown("### 📊 <span class='highlight-cyan'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
+        st.caption("💡 **戰術覆盤**：解析歷史戰役與心理盲點，由 AI 精算錯失利潤以精進戰術。")
+        
         if not aar_sheet_url:
             st.info("請在左側邊欄輸入您的【交易日誌】CSV 網址，喚醒 AI 覆盤引擎。")
         else:
@@ -736,21 +739,23 @@ if len(chip_db) >= 3:
                 st.error(f"❌ 讀取交易日誌失敗：{e}")
 
     # --------------------------------------------------------------------------
-    # Tab 4: 實戰教範 (直接讀取 manual.py)
+    # Tab 4: 📖 游擊兵工廠
     # --------------------------------------------------------------------------
     with t_book:
-        st.markdown("### 📖 <span class='highlight-gold'>游擊兵工廠：名詞、圖示與實戰教範大全</span>", unsafe_allow_html=True)
+        st.markdown("### 📖 <span class='highlight-gold'>實戰準則與系統圖示教範</span>", unsafe_allow_html=True)
+        st.caption("💡 **兵工廠教範**：系統所有名詞定義、篩網嚴格定義與圖示意義。")
         st.markdown(MANUAL_TEXT, unsafe_allow_html=True)
 
     # --------------------------------------------------------------------------
-    # Tab 5: 系統演進史 (直接讀取 manual.py)
+    # Tab 5: 🏛️ 軍史館
     # --------------------------------------------------------------------------
     with t_hist:
-        st.markdown("### 📜 <span class='highlight-cyan'>游擊兵工廠：系統演進史</span>", unsafe_allow_html=True)
+        st.markdown("### 🏛️ <span class='highlight-cyan'>皇家軍史館：兵器開發檔案</span>", unsafe_allow_html=True)
+        st.caption("💡 **開發檔案**：歷代軍火庫升級、戰略轉型與重大修復之機密卷宗。")
         st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.0</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.1</p>", unsafe_allow_html=True)
