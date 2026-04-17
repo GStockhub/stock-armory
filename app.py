@@ -9,17 +9,13 @@ import yfinance as yf
 import concurrent.futures
 import ssl
 
-# 👑 解決 SSL 憑證錯誤
+# 👑 解決 SSL 憑證錯誤 (保留給 TWSE 爬蟲使用)
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
     pass
 else:
     ssl._create_default_https_context = _create_unverified_https_context
-
-# 👑 專為 yfinance 打造的「強制破甲通行證」
-yf_session = requests.Session()
-yf_session.verify = False
 
 # 👑 導入外部軍火庫
 from manual import MANUAL_TEXT, HISTORY_TEXT
@@ -31,7 +27,7 @@ from manual import MANUAL_TEXT, HISTORY_TEXT
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="游擊隊終極軍火庫 v25.0",
+    page_title="游擊隊終極軍火庫 v25.1",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -91,7 +87,6 @@ with st.sidebar:
     aar_sheet_url = st.text_input("輸入【交易日誌】CSV 網址：", value="", placeholder="貼上日誌分頁網址(供AAR使用)")
     
     st.markdown("---")
-    # 👑 V25.0 核心：強制紀律鎖
     st.markdown("#### 🎯 職業分級出手紀律")
     daily_trade_limit = st.selectbox("今日剩餘開倉名額 (上限3檔)", [3, 2, 1, 0], index=0)
     sector_limit = st.number_input("單族群兵力上限", value=2, min_value=1, max_value=5)
@@ -119,7 +114,6 @@ with st.sidebar:
         st.cache_data.clear()
         st.success("快取已清除！")
 
-# 👑 V25.0 核心：提早解析持股產業集中度
 holding_industries = {}
 if sheet_url:
     try:
@@ -133,23 +127,22 @@ if sheet_url:
                 holding_industries[ind] = holding_industries.get(ind, 0) + 1
     except: pass
 
-st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v25.0</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v25.1</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 職業級風控 ✕ 動態資金分級 ✕ 毒舌診斷 ——</p>", unsafe_allow_html=True)
 
-# 👑 觸發連虧熔斷警告
 if consecutive_loss >= 2:
     st.error(f"🛑 **【最高熔斷警報】您今日已連續停損 {consecutive_loss} 筆！系統判定操作節奏錯誤或盤勢惡劣，強制要求【今日立即停手，關閉看盤軟體】！**", icon="🚨")
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
 
-
+# 👑 拔除 session=yf_session，讓 yfinance 自己處理連線
 def safe_download(sid, retries=2):
     for suffix in [".TW", ".TWO"]:
         for _ in range(retries):
             try:
                 sym = f"{sid}{suffix}"
-                df = yf.Ticker(sym, session=yf_session).history(period="3mo")
+                df = yf.Ticker(sym).history(period="3mo")
                 if not df.empty and len(df) > 5: return df
             except:
                 time.sleep(0.5 + np.random.rand())
@@ -170,7 +163,7 @@ def get_macro_dashboard():
         display_name = base_name
         hist = safe_download(main_sym.replace('^','')) 
         if hist.empty:
-            hist = yf.Ticker(fallback_sym, session=yf_session).history(period="3mo")
+            hist = yf.Ticker(fallback_sym).history(period="3mo")
             if not hist.empty:
                 display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
         
@@ -412,7 +405,6 @@ if len(chip_db) >= 3:
         st.markdown("### 🎯 <span class='highlight-gold'>前線狙擊目標清單</span>", unsafe_allow_html=True)
         st.caption(f"💡 **盤前鐵律**：跳空>2%不買、9:05前不下單。今日剩餘開倉名額：**{daily_trade_limit} 檔**。")
         
-        # 👑 V25.0 產業警報雷達
         overloaded_sectors = [ind for ind, count in holding_industries.items() if count >= sector_limit]
         if overloaded_sectors:
             st.warning(f"⚠️ **【族群曝險過高】** 您目前持有的 `{', '.join(overloaded_sectors)}` 已達 {sector_limit} 檔上限！今日**嚴禁**再建倉該族群。", icon="🛑")
@@ -471,12 +463,11 @@ if len(chip_db) >= 3:
                 master_list['名次'] = master_list.index + 1
                 
                 if not master_list.empty:
-                    # 👑 V25.0 核心：動態分級配資公式 (S:15%, A:10%, B:5%, C:0%)
                     def recalculate_dynamic_lots(row):
                         if row['評級'] == 'S': max_pct = 0.15
                         elif row['評級'] == 'A': max_pct = 0.10
                         elif row['評級'] == 'B': max_pct = 0.05
-                        else: return "0" # C級不給建議買量
+                        else: return "0" 
                         
                         if row['原始風險差額'] > 0:
                             risk_shares = risk_amount / row['原始風險差額']
@@ -566,7 +557,6 @@ if len(chip_db) >= 3:
                     st.info("💡 今日無 C 級潛伏標的。")
                 else:
                     ui_c['戰術'] = ui_c.apply(lambda r: "💎 低檔潛伏" if r['乖離(%)'] < 3 else ("🚀 突破點火" if r['今日放量'] else "⏳ 盤整"), axis=1)
-                    # C級不顯示建議買量
                     styled_c = (ui_c[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','現價','乖離(%)','連買','戰術']].rename(columns={'名稱_x':'名稱'})
                                     .style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%'})
@@ -719,7 +709,8 @@ if len(chip_db) >= 3:
                                 hist_current = pd.DataFrame()
                                 for suffix in [".TW", ".TWO"]:
                                     try:
-                                        hist_current = yf.Ticker(f"{sid}{suffix}", session=yf_session).history(period="5d")
+                                        # 👑 拔除 session
+                                        hist_current = yf.Ticker(f"{sid}{suffix}").history(period="5d")
                                         if not hist_current.empty: break
                                     except Exception: pass
                                 
@@ -738,7 +729,8 @@ if len(chip_db) >= 3:
                                 
                                 try:
                                     for suffix in [".TW", ".TWO"]:
-                                        temp_hist = yf.Ticker(f"{sid}{suffix}", session=yf_session).history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
+                                        # 👑 拔除 session
+                                        temp_hist = yf.Ticker(f"{sid}{suffix}").history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
                                         if not temp_hist.empty:
                                             hist = temp_hist
                                             break
@@ -823,4 +815,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v25.0</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v25.1</p>", unsafe_allow_html=True)
