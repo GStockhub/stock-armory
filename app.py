@@ -9,7 +9,7 @@ import yfinance as yf
 import concurrent.futures
 import ssl
 
-# 👑 解決大將軍環境的 SSL 憑證錯誤 (CERTIFICATE_VERIFY_FAILED)
+# 👑 解決 SSL 憑證錯誤
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -17,7 +17,11 @@ except AttributeError:
 else:
     ssl._create_default_https_context = _create_unverified_https_context
 
-# 👑 導入您專屬的外部軍火庫 (教戰手冊與開發史)
+# 👑 專為 yfinance 打造的「強制破甲通行證」
+yf_session = requests.Session()
+yf_session.verify = False
+
+# 👑 導入外部軍火庫
 from manual import MANUAL_TEXT, HISTORY_TEXT
 
 # ==============================================================================
@@ -27,7 +31,7 @@ from manual import MANUAL_TEXT, HISTORY_TEXT
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="游擊隊終極軍火庫 v24.2",
+    page_title="游擊隊終極軍火庫 v25.0",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -52,46 +56,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 【第二區塊：側邊欄 (Sidebar) & 總部紀律風控】
-# ==============================================================================
-
-with st.sidebar:
-    st.markdown("### ⚙️ 總部紀律設定")
-    st.markdown("---")
-    sheet_url = st.text_input("輸入【持股部位】CSV 網址：", value="", placeholder="貼上持股分頁網址")
-    aar_sheet_url = st.text_input("輸入【交易日誌】CSV 網址：", value="", placeholder="貼上日誌分頁網址(供AAR使用)")
-    
-    st.markdown("---")
-    st.markdown("#### 💰 機構級資金控管")
-    total_capital = st.number_input("作戰本金 (元)", value=200000, step=10000)
-    risk_tolerance_pct = st.slider("單筆最大虧損容忍 (%)", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
-    risk_amount = total_capital * (risk_tolerance_pct / 100)
-    st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**\n\n*(依此反推單筆最多買進張數)*")
-    
-    st.markdown("---")
-    st.markdown("#### ⚖️ 真實稅費參數")
-    # 👑 新增：將軍專屬手續費折數拉桿！(預設1.0無折扣)
-    fee_discount = st.slider("券商手續費折數 (無折扣=1.0, 五折=0.5)", min_value=0.1, max_value=1.0, value=1.0, step=0.05)
-    
-    st.markdown("---")
-    st.markdown("#### 🛡️ 總曝險與戰略預備金")
-    MAX_EXPOSURE_RATE = 0.60
-    max_market_cap = total_capital * MAX_EXPOSURE_RATE
-    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**\n*(雷打不動，極端避險與股災專用)*")
-
-    st.markdown("---")
-    if st.button("🔄 一鍵清空情報快取"):
-        st.cache_data.clear()
-        st.success("快取已清除！請重新載入。")
-
-st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.2</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 自訂稅費精算 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
-
-current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
-st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
-
-# ==============================================================================
-# 【第三區塊：強效大盤診斷與本地產業字典】
+# 【第三區塊：強效大盤診斷與本地產業字典】 (提早載入供風控使用)
 # ==============================================================================
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -116,12 +81,75 @@ LOCAL_PATCH = {
     "3711": "半導體業", "2886": "金融保險業", "2884": "金融保險業", "2002": "鋼鐵工業"
 }
 
+# ==============================================================================
+# 【第二區塊：側邊欄 (Sidebar) & 總部紀律風控】
+# ==============================================================================
+
+with st.sidebar:
+    st.markdown("### ⚙️ 總部系統掛載")
+    sheet_url = st.text_input("輸入【持股部位】CSV 網址：", value="", placeholder="貼上持股分頁網址")
+    aar_sheet_url = st.text_input("輸入【交易日誌】CSV 網址：", value="", placeholder="貼上日誌分頁網址(供AAR使用)")
+    
+    st.markdown("---")
+    # 👑 V25.0 核心：強制紀律鎖
+    st.markdown("#### 🎯 職業分級出手紀律")
+    daily_trade_limit = st.selectbox("今日剩餘開倉名額 (上限3檔)", [3, 2, 1, 0], index=0)
+    sector_limit = st.number_input("單族群兵力上限", value=2, min_value=1, max_value=5)
+    consecutive_loss = st.number_input("今日已連續停損次數", value=0, min_value=0, max_value=5)
+    
+    st.markdown("---")
+    st.markdown("#### 💰 機構級資金控管")
+    total_capital = st.number_input("作戰本金 (元)", value=200000, step=10000)
+    risk_tolerance_pct = st.slider("單筆最大虧損容忍 (%)", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
+    risk_amount = total_capital * (risk_tolerance_pct / 100)
+    st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**")
+    
+    st.markdown("---")
+    st.markdown("#### ⚖️ 真實稅費參數")
+    fee_discount = st.slider("券商手續費折數 (無折扣=1.0, 五折=0.5)", min_value=0.1, max_value=1.0, value=1.0, step=0.05)
+    
+    st.markdown("---")
+    st.markdown("#### 🛡️ 總曝險與戰略預備金")
+    MAX_EXPOSURE_RATE = 0.60
+    max_market_cap = total_capital * MAX_EXPOSURE_RATE
+    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**")
+
+    st.markdown("---")
+    if st.button("🔄 一鍵清空情報快取"):
+        st.cache_data.clear()
+        st.success("快取已清除！")
+
+# 👑 V25.0 核心：提早解析持股產業集中度
+holding_industries = {}
+if sheet_url:
+    try:
+        temp_df = pd.read_csv(sheet_url, dtype=str)
+        temp_df.columns = temp_df.columns.str.strip()
+        h_temp = temp_df[temp_df['分類'] == '持股'].copy()
+        if not h_temp.empty:
+            for sid in h_temp['代號']:
+                ind = TWSE_IND_MAP.get(sid) or LOCAL_PATCH.get(sid, "其他")
+                if sid.startswith('00'): ind = "ETF"
+                holding_industries[ind] = holding_industries.get(ind, 0) + 1
+    except: pass
+
+st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v25.0</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 職業級風控 ✕ 動態資金分級 ✕ 毒舌診斷 ——</p>", unsafe_allow_html=True)
+
+# 👑 觸發連虧熔斷警告
+if consecutive_loss >= 2:
+    st.error(f"🛑 **【最高熔斷警報】您今日已連續停損 {consecutive_loss} 筆！系統判定操作節奏錯誤或盤勢惡劣，強制要求【今日立即停手，關閉看盤軟體】！**", icon="🚨")
+
+current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
+
+
 def safe_download(sid, retries=2):
     for suffix in [".TW", ".TWO"]:
         for _ in range(retries):
             try:
                 sym = f"{sid}{suffix}"
-                df = yf.Ticker(sym).history(period="3mo")
+                df = yf.Ticker(sym, session=yf_session).history(period="3mo")
                 if not df.empty and len(df) > 5: return df
             except:
                 time.sleep(0.5 + np.random.rand())
@@ -142,7 +170,7 @@ def get_macro_dashboard():
         display_name = base_name
         hist = safe_download(main_sym.replace('^','')) 
         if hist.empty:
-            hist = yf.Ticker(fallback_sym).history(period="3mo")
+            hist = yf.Ticker(fallback_sym, session=yf_session).history(period="3mo")
             if not hist.empty:
                 display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
         
@@ -238,8 +266,7 @@ def level2_quant_engine(id_tuple):
             
     for sid in id_list:
         try:
-            if not sid.startswith('00') and not sid.isdigit():
-                continue
+            if not sid.startswith('00') and not sid.isdigit(): continue
 
             ind = TWSE_IND_MAP.get(sid) or LOCAL_PATCH.get(sid) or "其他"
             if sid.startswith('00'): ind = "ETF"
@@ -329,7 +356,6 @@ def level2_quant_engine(id_tuple):
                 
             win_rate, avg_ret = ((np.array(sim_returns) > 0).mean() * 100, np.array(sim_returns).mean() * 100) if sim_returns else (50.0, 0.0)
 
-            name = TWSE_NAME_MAP.get(sid, sid)
             s_score = MACRO_SCORE
             if p_now > m5: s_score += 1
             if p_now > m20: s_score += 1
@@ -337,19 +363,13 @@ def level2_quant_engine(id_tuple):
             if bias > 10: s_score -= 2
             elif 0 <= bias <= 5: s_score += 2
 
-            stop_loss = max(m10, p_now * 0.97) 
-            take_profit = p_now * 1.10 
-            
             intel_results.append({
-                '代號': sid, '名稱': name, '產業': ind, '現價': p_now, '成交量': vol_now, '今日放量': is_volume_breakout,
+                '代號': sid, '名稱': TWSE_NAME_MAP.get(sid, sid), '產業': ind, '現價': p_now, '成交量': vol_now, '今日放量': is_volume_breakout,
                 'M5': m5, 'M10': m10, 'M20': m20, '乖離(%)': bias, '基本達標': is_candidate,
-                '安全指數': max(1, min(10, int(s_score))),
-                '勝率(%)': win_rate, '均報(%)': avg_ret,
-                '停損價': stop_loss, '停利價': take_profit, 
-                '原始風險差額': p_now - stop_loss
+                '安全指數': max(1, min(10, int(s_score))), '勝率(%)': win_rate, '均報(%)': avg_ret,
+                '停損價': max(m10, p_now * 0.97), '停利價': p_now * 1.10, '原始風險差額': p_now - max(m10, p_now * 0.97)
             })
         except: continue
-            
     return pd.DataFrame(intel_results)
 
 # ==============================================================================
@@ -390,7 +410,12 @@ if len(chip_db) >= 3:
     # --------------------------------------------------------------------------
     with t_rank:
         st.markdown("### 🎯 <span class='highlight-gold'>前線狙擊目標清單</span>", unsafe_allow_html=True)
-        st.caption("💡 **盤前鐵律**：跳空>2%不買、9:05前不下單、單日限3筆、未達+6%不賣。詳細規範請見兵工廠教範。")
+        st.caption(f"💡 **盤前鐵律**：跳空>2%不買、9:05前不下單。今日剩餘開倉名額：**{daily_trade_limit} 檔**。")
+        
+        # 👑 V25.0 產業警報雷達
+        overloaded_sectors = [ind for ind, count in holding_industries.items() if count >= sector_limit]
+        if overloaded_sectors:
+            st.warning(f"⚠️ **【族群曝險過高】** 您目前持有的 `{', '.join(overloaded_sectors)}` 已達 {sector_limit} 檔上限！今日**嚴禁**再建倉該族群。", icon="🛑")
 
         with st.expander("🌍 查看全球大盤診斷表"):
             if not MACRO_DF.empty:
@@ -399,20 +424,10 @@ if len(chip_db) >= 3:
         pool_ids = today_df[today_df['連買'] >= 1]['代號'].tolist() 
         calc_list = tuple(set(pool_ids + top_80_chips))
         
-        if calc_list and MACRO_SCORE > 3: 
+        if calc_list and MACRO_SCORE > 3 and consecutive_loss < 2: 
             intel_df = level2_quant_engine(calc_list).copy() 
             
             if not intel_df.empty:
-                def calc_suggested_lots(row):
-                    if row['原始風險差額'] > 0:
-                        max_shares = risk_amount / row['原始風險差額']
-                        capital_limit_shares = (total_capital * 0.15) / row['現價'] 
-                        suggested_shares = min(max_shares, capital_limit_shares)
-                    else: suggested_shares = 0
-                    if MACRO_SCORE <= 5: suggested_shares *= 0.5
-                    return format_lots(suggested_shares)
-                    
-                intel_df['建議買量(張)'] = intel_df.apply(calc_suggested_lots, axis=1)
                 final_rank = pd.merge(today_df, intel_df, on='代號')
 
                 final_rank['Score'] = (
@@ -456,6 +471,25 @@ if len(chip_db) >= 3:
                 master_list['名次'] = master_list.index + 1
                 
                 if not master_list.empty:
+                    # 👑 V25.0 核心：動態分級配資公式 (S:15%, A:10%, B:5%, C:0%)
+                    def recalculate_dynamic_lots(row):
+                        if row['評級'] == 'S': max_pct = 0.15
+                        elif row['評級'] == 'A': max_pct = 0.10
+                        elif row['評級'] == 'B': max_pct = 0.05
+                        else: return "0" # C級不給建議買量
+                        
+                        if row['原始風險差額'] > 0:
+                            risk_shares = risk_amount / row['原始風險差額']
+                            capital_shares = (total_capital * max_pct) / row['現價'] 
+                            suggested = min(risk_shares, capital_shares)
+                        else:
+                            suggested = 0
+                            
+                        if MACRO_SCORE <= 5: suggested *= 0.5
+                        return format_lots(suggested)
+
+                    master_list['建議買量(張)'] = master_list.apply(recalculate_dynamic_lots, axis=1)
+
                     export_df = master_list[['名次', '評級', '代號', '名稱_x', '產業', '勝率(%)', '均報(%)', '現價', '停損價', '建議買量(張)']].rename(columns={'名稱_x':'名稱'}).copy()
                     export_df['勝率(%)'] = export_df['勝率(%)'].round(1)
                     export_df['均報(%)'] = export_df['均報(%)'].round(2)
@@ -476,10 +510,10 @@ if len(chip_db) >= 3:
 
                 if using_a_tier:
                     st.warning("⚠️ **系統判定：今日無完美 S 級標的。自動啟動【A 級】伏擊備援名單！**", icon="🛡️")
-                    st.markdown("#### 🥈 <span class='highlight-cyan'>【A級】伏擊備援</span>", unsafe_allow_html=True)
+                    st.markdown("#### 🥈 <span class='highlight-cyan'>【A級】伏擊備援 (資金上限 10%)</span>", unsafe_allow_html=True)
                     border_color, title_color = "#38BDF8", "#38BDF8"
                 else:
-                    st.markdown("#### 🥇 <span class='highlight-gold'>【S級】完美狙擊</span>", unsafe_allow_html=True)
+                    st.markdown("#### 🥇 <span class='highlight-gold'>【S級】完美狙擊 (資金上限 15%)</span>", unsafe_allow_html=True)
                     border_color, title_color = "#F59E0B", "#F59E0B"
 
                 if ui_top.empty:
@@ -514,7 +548,7 @@ if len(chip_db) >= 3:
                         return 'color: #F59E0B; font-weight: bold;'
                     except: return ''
 
-                st.markdown("#### ⚔️ <span class='highlight-cyan'>【B級】穩健波段 (勝率 > 50%)</span>", unsafe_allow_html=True)
+                st.markdown("#### ⚔️ <span class='highlight-cyan'>【B級】穩健波段 (勝率 > 50% / 資金上限 5%)</span>", unsafe_allow_html=True)
                 if ui_b.empty:
                     st.info("💡 今日無 B 級符合標的。")
                 else:
@@ -526,17 +560,23 @@ if len(chip_db) >= 3:
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
                 st.markdown("---")
-                st.markdown("### 📡 <span class='highlight-gold'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
+                st.markdown("### 📡 <span class='highlight-gold'>【C級】潛伏遺珠 (Top 20 觀察名單 / 不建議建倉)</span>", unsafe_allow_html=True)
                 
                 if ui_c.empty:
                     st.info("💡 今日無 C 級潛伏標的。")
                 else:
                     ui_c['戰術'] = ui_c.apply(lambda r: "💎 低檔潛伏" if r['乖離(%)'] < 3 else ("🚀 突破點火" if r['今日放量'] else "⏳ 盤整"), axis=1)
+                    # C級不顯示建議買量
                     styled_c = (ui_c[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','現價','乖離(%)','連買','戰術']].rename(columns={'名稱_x':'名稱'})
                                     .style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%'})
                                     .map(risk_color, subset=['安全指數']))
                     st.dataframe(styled_c, use_container_width=True, hide_index=True)
+        else:
+            if consecutive_loss >= 2:
+                st.error("🛑 系統已進入強制熔斷狀態，今日不再提供任何戰術指導。")
+            elif MACRO_SCORE <= 3:
+                st.warning("⚔️ 今日大盤惡劣，無標的符合條件。")
 
     # --------------------------------------------------------------------------
     # Tab 2: 📡 情報局
@@ -587,19 +627,20 @@ if len(chip_db) >= 3:
                         m_df = pd.merge(m_df, today_df[['代號', '名稱']], on='代號', how='left').fillna('未知')
                         res_h, total_pnl, current_exposure = [], 0, 0
                         
-                        # 👑 依據將軍側邊欄設定的折數來算稅費
                         active_fee_rate = 0.001425 * fee_discount
                         
                         for _, r in m_df.iterrows():
                             try:
+                                sid = str(r['代號']).strip()
                                 p_now = float(r['現價'])
                                 p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
                                 qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
                                 
-                                # 使用標準整數化(truncation)最接近台灣券商算法
+                                tax_rate = 0.001 if sid.startswith('00') else 0.003
+                                
                                 buy_fee = int((p_cost * qty * 1000) * active_fee_rate)
                                 sell_fee = int((p_now * qty * 1000) * active_fee_rate)
-                                sell_tax = int((p_now * qty * 1000) * 0.003)
+                                sell_tax = int((p_now * qty * 1000) * tax_rate)
                                 
                                 buy_cost_total = (p_cost * qty * 1000) + buy_fee
                                 sell_revenue_net = (p_now * qty * 1000) - sell_fee - sell_tax
@@ -622,6 +663,11 @@ if len(chip_db) >= 3:
                         p_color = "#EF4444" if total_pnl > 0 else "#10B981"
                         st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
                         
+                        if current_exposure > max_market_cap:
+                            st.error(f"🚨 **【一級警報】總市場曝險 ({current_exposure:,.0f} 元) 已超過戰備上限！**", icon="🛑")
+                        else:
+                            st.success(f"✅ 總資金健康。(目前市場曝險佔比：{(current_exposure/total_capital)*100:.1f}%)")
+                            
                         styled_h = (df_res.style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
                                     .map(lambda x: 'color: #EF4444; font-weight: bold;' if x > 0 else ('color: #10B981; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
@@ -659,7 +705,7 @@ if len(chip_db) >= 3:
                                 tag = str(row['心理標籤'])
                                 if pd.isna(tag) or tag.lower() == "nan": tag = ""
                                 
-                                # 👑 運用無條件捨去的券商標準算法
+                                tax_rate = 0.001 if sid.startswith('00') else 0.003
                                 buy_fee = int((b_price * shares * 1000) * active_fee_rate)
                                 cost = (b_price * shares * 1000) + buy_fee
                             except Exception:
@@ -673,7 +719,7 @@ if len(chip_db) >= 3:
                                 hist_current = pd.DataFrame()
                                 for suffix in [".TW", ".TWO"]:
                                     try:
-                                        hist_current = yf.Ticker(f"{sid}{suffix}").history(period="5d")
+                                        hist_current = yf.Ticker(f"{sid}{suffix}", session=yf_session).history(period="5d")
                                         if not hist_current.empty: break
                                     except Exception: pass
                                 
@@ -687,12 +733,12 @@ if len(chip_db) >= 3:
                                 s_date = pd.to_datetime(row['賣出日期'])
                                 s_price = float(row['賣出價'])
                                 
-                                future_end = s_date + timedelta(days=15)
+                                future_end = min(s_date + timedelta(days=15), datetime.now() + timedelta(days=1))
                                 hist = pd.DataFrame() 
                                 
                                 try:
                                     for suffix in [".TW", ".TWO"]:
-                                        temp_hist = yf.Ticker(f"{sid}{suffix}").history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
+                                        temp_hist = yf.Ticker(f"{sid}{suffix}", session=yf_session).history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
                                         if not temp_hist.empty:
                                             hist = temp_hist
                                             break
@@ -701,16 +747,18 @@ if len(chip_db) >= 3:
                                 
                                 if hist.empty:
                                     diagnosis = "⚠️ API 阻擋或無數據，無法診斷"
-                                elif len(hist) > 1:
-                                    future_hist = hist.iloc[1:]
-                                    if not future_hist.empty:
+                                else:
+                                    future_hist = hist.loc[hist.index > s_date.strftime('%Y-%m-%d')]
+                                    if future_hist.empty:
+                                        diagnosis = "⏳ 今日剛賣出，尚無後續數據可供診斷，嚴守紀律即是勝利！"
+                                    else:
                                         max_future_price = future_hist['High'].max()
                                         if '恐高早退' in tag or '失去耐心' in tag:
                                             if max_future_price > s_price * 1.02:
                                                 missed_profit = (max_future_price - s_price) * shares * 1000
                                                 diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed_profit:,.0f}元。"
                                             else:
-                                                diagnosis = "✅ 賣出後未見創高，此撤退時機精準！"
+                                                diagnosis = f"✅ 賣出後最高僅達 {max_future_price:.1f}，撤退時機精準！"
                                         elif '恐慌砍倉' in tag:
                                             if max_future_price > b_price:
                                                 diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
@@ -720,12 +768,9 @@ if len(chip_db) >= 3:
                                             diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌！"
                                         else:
                                             diagnosis = "✅ 已結案"
-                                else:
-                                    diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
 
-                            # 👑 同樣使用捨去法精算賣出稅費
                             sell_fee = int((s_price * shares * 1000) * active_fee_rate)
-                            sell_tax = int((s_price * shares * 1000) * 0.003)
+                            sell_tax = int((s_price * shares * 1000) * tax_rate)
                             
                             revenue = (s_price * shares * 1000) - sell_fee - sell_tax
                             net_profit = revenue - cost
@@ -778,4 +823,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.2</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v25.0</p>", unsafe_allow_html=True)
