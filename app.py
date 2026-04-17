@@ -17,10 +17,6 @@ except AttributeError:
 else:
     ssl._create_default_https_context = _create_unverified_https_context
 
-# 👑 專為 yfinance 打造的「強制破甲通行證」(解決 requests 的 SSL 阻擋)
-yf_session = requests.Session()
-yf_session.verify = False
-
 # 👑 導入您專屬的外部軍火庫 (教戰手冊與開發史)
 from manual import MANUAL_TEXT, HISTORY_TEXT
 
@@ -31,7 +27,7 @@ from manual import MANUAL_TEXT, HISTORY_TEXT
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="游擊隊終極軍火庫 v24.3",
+    page_title="游擊隊終極軍火庫 v24.2",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -70,25 +66,26 @@ with st.sidebar:
     total_capital = st.number_input("作戰本金 (元)", value=200000, step=10000)
     risk_tolerance_pct = st.slider("單筆最大虧損容忍 (%)", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
     risk_amount = total_capital * (risk_tolerance_pct / 100)
-    st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**")
+    st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**\n\n*(依此反推單筆最多買進張數)*")
     
     st.markdown("---")
     st.markdown("#### ⚖️ 真實稅費參數")
+    # 👑 新增：將軍專屬手續費折數拉桿！(預設1.0無折扣)
     fee_discount = st.slider("券商手續費折數 (無折扣=1.0, 五折=0.5)", min_value=0.1, max_value=1.0, value=1.0, step=0.05)
     
     st.markdown("---")
     st.markdown("#### 🛡️ 總曝險與戰略預備金")
     MAX_EXPOSURE_RATE = 0.60
     max_market_cap = total_capital * MAX_EXPOSURE_RATE
-    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**")
+    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**\n*(雷打不動，極端避險與股災專用)*")
 
     st.markdown("---")
     if st.button("🔄 一鍵清空情報快取"):
         st.cache_data.clear()
         st.success("快取已清除！請重新載入。")
 
-st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.3</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 自訂稅費精算 ✕ 毒舌診斷修復 ——</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.2</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 自訂稅費精算 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -124,8 +121,7 @@ def safe_download(sid, retries=2):
         for _ in range(retries):
             try:
                 sym = f"{sid}{suffix}"
-                # 👑 掛載專屬破甲通行證
-                df = yf.Ticker(sym, session=yf_session).history(period="3mo")
+                df = yf.Ticker(sym).history(period="3mo")
                 if not df.empty and len(df) > 5: return df
             except:
                 time.sleep(0.5 + np.random.rand())
@@ -146,7 +142,7 @@ def get_macro_dashboard():
         display_name = base_name
         hist = safe_download(main_sym.replace('^','')) 
         if hist.empty:
-            hist = yf.Ticker(fallback_sym, session=yf_session).history(period="3mo")
+            hist = yf.Ticker(fallback_sym).history(period="3mo")
             if not hist.empty:
                 display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
         
@@ -242,7 +238,8 @@ def level2_quant_engine(id_tuple):
             
     for sid in id_list:
         try:
-            if not sid.startswith('00') and not sid.isdigit(): continue
+            if not sid.startswith('00') and not sid.isdigit():
+                continue
 
             ind = TWSE_IND_MAP.get(sid) or LOCAL_PATCH.get(sid) or "其他"
             if sid.startswith('00'): ind = "ETF"
@@ -332,6 +329,7 @@ def level2_quant_engine(id_tuple):
                 
             win_rate, avg_ret = ((np.array(sim_returns) > 0).mean() * 100, np.array(sim_returns).mean() * 100) if sim_returns else (50.0, 0.0)
 
+            name = TWSE_NAME_MAP.get(sid, sid)
             s_score = MACRO_SCORE
             if p_now > m5: s_score += 1
             if p_now > m20: s_score += 1
@@ -339,13 +337,19 @@ def level2_quant_engine(id_tuple):
             if bias > 10: s_score -= 2
             elif 0 <= bias <= 5: s_score += 2
 
+            stop_loss = max(m10, p_now * 0.97) 
+            take_profit = p_now * 1.10 
+            
             intel_results.append({
-                '代號': sid, '名稱': TWSE_NAME_MAP.get(sid, sid), '產業': ind, '現價': p_now, '成交量': vol_now, '今日放量': is_volume_breakout,
+                '代號': sid, '名稱': name, '產業': ind, '現價': p_now, '成交量': vol_now, '今日放量': is_volume_breakout,
                 'M5': m5, 'M10': m10, 'M20': m20, '乖離(%)': bias, '基本達標': is_candidate,
-                '安全指數': max(1, min(10, int(s_score))), '勝率(%)': win_rate, '均報(%)': avg_ret,
-                '停損價': max(m10, p_now * 0.97), '停利價': p_now * 1.10, '原始風險差額': p_now - max(m10, p_now * 0.97)
+                '安全指數': max(1, min(10, int(s_score))),
+                '勝率(%)': win_rate, '均報(%)': avg_ret,
+                '停損價': stop_loss, '停利價': take_profit, 
+                '原始風險差額': p_now - stop_loss
             })
         except: continue
+            
     return pd.DataFrame(intel_results)
 
 # ==============================================================================
@@ -583,21 +587,19 @@ if len(chip_db) >= 3:
                         m_df = pd.merge(m_df, today_df[['代號', '名稱']], on='代號', how='left').fillna('未知')
                         res_h, total_pnl, current_exposure = [], 0, 0
                         
+                        # 👑 依據將軍側邊欄設定的折數來算稅費
                         active_fee_rate = 0.001425 * fee_discount
                         
                         for _, r in m_df.iterrows():
                             try:
-                                sid = str(r['代號']).strip()
                                 p_now = float(r['現價'])
                                 p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
                                 qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
                                 
-                                # 👑 自動辨識 ETF (00開頭) 減免交易稅至 0.1%
-                                tax_rate = 0.001 if sid.startswith('00') else 0.003
-                                
+                                # 使用標準整數化(truncation)最接近台灣券商算法
                                 buy_fee = int((p_cost * qty * 1000) * active_fee_rate)
                                 sell_fee = int((p_now * qty * 1000) * active_fee_rate)
-                                sell_tax = int((p_now * qty * 1000) * tax_rate)
+                                sell_tax = int((p_now * qty * 1000) * 0.003)
                                 
                                 buy_cost_total = (p_cost * qty * 1000) + buy_fee
                                 sell_revenue_net = (p_now * qty * 1000) - sell_fee - sell_tax
@@ -620,14 +622,6 @@ if len(chip_db) >= 3:
                         p_color = "#EF4444" if total_pnl > 0 else "#10B981"
                         st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
                         
-                        if current_exposure > max_market_cap:
-                            st.error(f"🚨 **【一級警報】總市場曝險 ({current_exposure:,.0f} 元) 已超過戰備上限！**", icon="🛑")
-                        else:
-                            st.success(f"✅ 總資金健康。(目前市場曝險佔比：{(current_exposure/total_capital)*100:.1f}%)")
-                            
-                        if total_pnl < -total_capital * 0.02:
-                            st.error("🚨 **【單日虧損斷路器】今日虧損已達總本金 2%！系統判定情緒不穩，今日強制收手！**", icon="🛑")
-                            
                         styled_h = (df_res.style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
                                     .map(lambda x: 'color: #EF4444; font-weight: bold;' if x > 0 else ('color: #10B981; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
@@ -665,9 +659,7 @@ if len(chip_db) >= 3:
                                 tag = str(row['心理標籤'])
                                 if pd.isna(tag) or tag.lower() == "nan": tag = ""
                                 
-                                # 👑 辨識 ETF 稅率減免
-                                tax_rate = 0.001 if sid.startswith('00') else 0.003
-                                
+                                # 👑 運用無條件捨去的券商標準算法
                                 buy_fee = int((b_price * shares * 1000) * active_fee_rate)
                                 cost = (b_price * shares * 1000) + buy_fee
                             except Exception:
@@ -681,7 +673,7 @@ if len(chip_db) >= 3:
                                 hist_current = pd.DataFrame()
                                 for suffix in [".TW", ".TWO"]:
                                     try:
-                                        hist_current = yf.Ticker(f"{sid}{suffix}", session=yf_session).history(period="5d")
+                                        hist_current = yf.Ticker(f"{sid}{suffix}").history(period="5d")
                                         if not hist_current.empty: break
                                     except Exception: pass
                                 
@@ -695,14 +687,12 @@ if len(chip_db) >= 3:
                                 s_date = pd.to_datetime(row['賣出日期'])
                                 s_price = float(row['賣出價'])
                                 
-                                # 👑 修復：用現在日期或賣出15天後取較小者，確保剛賣出的也能診斷
-                                future_end = min(s_date + timedelta(days=15), datetime.now() + timedelta(days=1))
+                                future_end = s_date + timedelta(days=15)
                                 hist = pd.DataFrame() 
                                 
                                 try:
                                     for suffix in [".TW", ".TWO"]:
-                                        # 強制掛載破甲通行證
-                                        temp_hist = yf.Ticker(f"{sid}{suffix}", session=yf_session).history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
+                                        temp_hist = yf.Ticker(f"{sid}{suffix}").history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
                                         if not temp_hist.empty:
                                             hist = temp_hist
                                             break
@@ -711,19 +701,16 @@ if len(chip_db) >= 3:
                                 
                                 if hist.empty:
                                     diagnosis = "⚠️ API 阻擋或無數據，無法診斷"
-                                else:
-                                    # 嚴格過濾出「賣出日之後」的未來數據
-                                    future_hist = hist.loc[hist.index > s_date.strftime('%Y-%m-%d')]
-                                    if future_hist.empty:
-                                        diagnosis = "⏳ 今日剛賣出，尚無後續數據可供診斷，嚴守紀律即是勝利！"
-                                    else:
+                                elif len(hist) > 1:
+                                    future_hist = hist.iloc[1:]
+                                    if not future_hist.empty:
                                         max_future_price = future_hist['High'].max()
                                         if '恐高早退' in tag or '失去耐心' in tag:
                                             if max_future_price > s_price * 1.02:
                                                 missed_profit = (max_future_price - s_price) * shares * 1000
                                                 diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed_profit:,.0f}元。"
                                             else:
-                                                diagnosis = f"✅ 賣出後最高僅達 {max_future_price:.1f}，撤退時機精準！"
+                                                diagnosis = "✅ 賣出後未見創高，此撤退時機精準！"
                                         elif '恐慌砍倉' in tag:
                                             if max_future_price > b_price:
                                                 diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
@@ -733,9 +720,12 @@ if len(chip_db) >= 3:
                                             diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌！"
                                         else:
                                             diagnosis = "✅ 已結案"
+                                else:
+                                    diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
 
+                            # 👑 同樣使用捨去法精算賣出稅費
                             sell_fee = int((s_price * shares * 1000) * active_fee_rate)
-                            sell_tax = int((s_price * shares * 1000) * tax_rate)
+                            sell_tax = int((s_price * shares * 1000) * 0.003)
                             
                             revenue = (s_price * shares * 1000) - sell_fee - sell_tax
                             net_profit = revenue - cost
@@ -788,4 +778,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.3</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.2</p>", unsafe_allow_html=True)
