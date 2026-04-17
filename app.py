@@ -7,6 +7,15 @@ from datetime import datetime, timedelta
 import time
 import yfinance as yf
 import concurrent.futures
+import ssl
+
+# 👑 解決大將軍環境的 SSL 憑證錯誤 (CERTIFICATE_VERIFY_FAILED)
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 
 # 👑 導入您專屬的外部軍火庫 (教戰手冊與開發史)
 from manual import MANUAL_TEXT, HISTORY_TEXT
@@ -103,13 +112,16 @@ LOCAL_PATCH = {
     "3711": "半導體業", "2886": "金融保險業", "2884": "金融保險業", "2002": "鋼鐵工業"
 }
 
-def safe_download(sym, retries=3):
-    for _ in range(retries):
-        try:
-            df = yf.Ticker(sym).history(period="3mo")
-            if not df.empty and len(df) > 5: return df
-        except:
-            time.sleep(0.5 + np.random.rand())
+# 👑 強化版下載引擎：自動切換 .TW 與 .TWO，解決上市櫃辨識問題
+def safe_download(sid, retries=2):
+    for suffix in [".TW", ".TWO"]:
+        for _ in range(retries):
+            try:
+                sym = f"{sid}{suffix}"
+                df = yf.Ticker(sym).history(period="3mo")
+                if not df.empty and len(df) > 5: return df
+            except:
+                time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -126,10 +138,10 @@ def get_macro_dashboard():
     
     for main_sym, (base_name, fallback_sym) in indices.items():
         display_name = base_name
-        hist = safe_download(main_sym)
+        hist = safe_download(main_sym.replace('^','')) # 簡單處理
         
         if hist.empty:
-            hist = safe_download(fallback_sym)
+            hist = yf.Ticker(fallback_sym).history(period="3mo")
             if not hist.empty:
                 display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
         
@@ -205,12 +217,9 @@ def format_lots(shares):
     if lots <= 0: return "0"
     return f"{lots:.3f}".rstrip('0').rstrip('.')
 
-def fetch_single_stock(sid):
-    try:
-        df = yf.Ticker(f"{sid}.TW").history(period="3mo")
-        if not df.empty and len(df) >= 20:
-            return sid, df
-    except: pass
+def fetch_single_stock_batch(sid):
+    df = safe_download(sid)
+    if not df.empty: return sid, df
     return sid, None
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -221,7 +230,7 @@ def level2_quant_engine(id_tuple):
     
     bulk_data = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(fetch_single_stock, sid): sid for sid in id_list}
+        futures = {executor.submit(fetch_single_stock_batch, sid): sid for sid in id_list}
         for future in concurrent.futures.as_completed(futures):
             sid, df = future.result()
             if df is not None:
@@ -670,47 +679,64 @@ if len(chip_db) >= 3:
                                 if pd.isna(row['代號']): continue
                                 sid = str(row['代號']).strip()
                                 b_date = pd.to_datetime(row['買進日期'])
-                                s_date = pd.to_datetime(row['賣出日期'])
                                 b_price = float(row['買進價'])
-                                s_price = float(row['賣出價'])
                                 shares = float(row['張數'])
                                 tag = str(row['心理標籤'])
                                 
                                 fee_rate = 0.001425 * 0.5
                                 tax_rate = 0.003
                                 cost = (b_price * shares * 1000) * (1 + fee_rate)
+                                
+                                # 👑 寬容處理機制：沒有填賣出日期或價格，自動轉為「未平倉/存股」模式
+                                if pd.isna(row['賣出日期']) or pd.isna(row['賣出價']) or str(row['賣出價']).strip() == "":
+                                    hist = safe_download(sid, retries=1)
+                                    if not hist.empty:
+                                        s_price = float(hist['Close'].iloc[-1]) # 抓取最新收盤價
+                                        s_date = datetime.now()
+                                        diagnosis = "⚪ 尚未平倉 (顯示目前帳面損益)"
+                                    else:
+                                        continue # 連現價都抓不到才跳過
+                                else:
+                                    s_date = pd.to_datetime(row['賣出日期'])
+                                    s_price = float(row['賣出價'])
+                                    diagnosis = ""
+                                    
+                                    # 只有已賣出的才去抓未來 15 天判斷是否少賺
+                                    future_end = s_date + timedelta(days=15)
+                                    
+                                    # 解決 SSL 與上市櫃自動判斷
+                                    for suffix in [".TW", ".TWO"]:
+                                        try:
+                                            hist = yf.Ticker(f"{sid}{suffix}").history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
+                                            if not hist.empty: break
+                                        except: pass
+                                    
+                                    if not hist.empty and len(hist) > 1:
+                                        future_hist = hist.iloc[1:]
+                                        if not future_hist.empty:
+                                            max_future_price = future_hist['High'].max()
+                                            
+                                            if '恐高早退' in tag or '失去耐心' in tag:
+                                                if max_future_price > s_price * 1.02:
+                                                    missed_roi = ((max_future_price - s_price) / s_price) * 100
+                                                    missed_profit = (max_future_price - s_price) * shares * 1000
+                                                    diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed_profit:,.0f}元。"
+                                                else:
+                                                    diagnosis = "✅ 賣出後未見創高，此撤退時機精準！"
+                                            elif '恐慌砍倉' in tag:
+                                                if max_future_price > b_price:
+                                                    diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
+                                                else:
+                                                    diagnosis = "🛡️ 後續股價未反彈，提早砍倉算是不幸中大幸。"
+                                            elif '紀律' in tag:
+                                                diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌！"
+                                            else:
+                                                diagnosis = "✅ 已結案"
+
                                 revenue = (s_price * shares * 1000) * (1 - fee_rate - tax_rate)
                                 net_profit = revenue - cost
                                 roi = (net_profit / cost) * 100
                                 total_realized_pnl += net_profit
-                                
-                                future_end = s_date + timedelta(days=15)
-                                hist = yf.Ticker(f"{sid}.TW").history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
-                                
-                                diagnosis = ""
-                                if not hist.empty and len(hist) > 1:
-                                    future_hist = hist.iloc[1:]
-                                    if not future_hist.empty:
-                                        max_future_price = future_hist['High'].max()
-                                        
-                                        if '恐高早退' in tag or '失去耐心' in tag:
-                                            if max_future_price > s_price * 1.02:
-                                                missed_roi = ((max_future_price - s_price) / s_price) * 100
-                                                missed_profit = (max_future_price - s_price) * shares * 1000
-                                                diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed_profit:,.0f}元。"
-                                            else:
-                                                diagnosis = "✅ 賣出後未見創高，此撤退時機精準！"
-                                                
-                                        elif '恐慌砍倉' in tag:
-                                            if max_future_price > b_price:
-                                                diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
-                                            else:
-                                                diagnosis = "🛡️ 後續股價未反彈，提早砍倉算是不幸中大幸。"
-                                        
-                                        elif '紀律' in tag:
-                                            diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌！"
-                                        else:
-                                            diagnosis = "待觀察"
 
                                 review_results.append({
                                     '代號': sid,
