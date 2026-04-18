@@ -3,11 +3,29 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 import time
+import yfinance as yf
+import numpy as np
+
+def robust_yf_download(sid, period="2y"):
+    """YF 備援引擎：附帶抖動延遲與重試機制"""
+    suffixes = [".TW", ".TWO"]
+    for attempt in range(2):
+        for suffix in suffixes:
+            try:
+                sym = f"{sid}{suffix}"
+                df = yf.Ticker(sym).history(period=period)
+                if not df.empty and len(df) > 5:
+                    if df.index.tz is not None:
+                        df.index = pd.to_datetime(df.index).tz_localize(None)
+                    return df
+            except:
+                pass
+        time.sleep(1.0 + np.random.rand())
+    return pd.DataFrame()
 
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
     """
-    獨立的 AAR 戰術覆盤引擎：
-    吃 FinMind 皇家金鑰，自帶情報快取，絕不干擾主雷達。
+    獨立的 AAR 戰術覆盤引擎：雙引擎備援 (FinMind主攻 -> YFinance備援)
     """
     if not aar_sheet_url:
         st.info("請在左側邊欄輸入您的【交易日誌】CSV 網址，喚醒 AI 覆盤引擎。")
@@ -26,9 +44,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         total_realized_pnl = 0
         active_fee_rate = 0.001425 * fee_discount
         
-        with st.spinner('🕵️ 情報兵正在調閱歷史戰報，啟動 FinMind 皇家快取引擎...'):
+        with st.spinner('🕵️ 情報兵正在調閱歷史戰報，啟動雙引擎快取庫...'):
             
-            # 👑 核心快取字典：同檔股票不管幾筆，只向 FinMind 請求一次
+            # 👑 核心快取字典：同檔股票不管幾筆，只請求一次！
             aar_cache = {} 
             
             for idx, row in aar_df.iterrows():
@@ -50,40 +68,45 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 diagnosis = "✅ 戰報已收錄" 
                 s_price = 0.0
                 s_date = None
+                api_debug_msg = "" # 紀錄出錯原因
                 
                 # ===================================================
-                # 👑 裝載將軍專屬金鑰，向 FinMind 請求 1 年的歷史數據
+                # 👑 雙引擎抓取邏輯 (FinMind -> YF)
                 # ===================================================
                 if sid not in aar_cache:
                     hist_full = pd.DataFrame()
+                    
+                    # 1. 主攻：FinMind API (強制參數餵食金鑰)
                     try:
                         fm_url = "https://api.finmindtrade.com/api/v4/data"
-                        # 直接往前抓 365 天，確保不管多早以前的交易都能覆蓋
                         fm_start = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
-                        
                         fm_params = {
                             "dataset": "TaiwanStockPrice",
                             "data_id": sid,
-                            "start_date": fm_start
+                            "start_date": fm_start,
+                            "token": fm_token  # 👑 破案關鍵：直接把金鑰塞在參數裡強迫讀取！
                         }
                         
-                        # 👑 破案關鍵：將金鑰放入 Headers 中 (Bearer Token)
-                        fm_headers = {
-                            "Authorization": f"Bearer {fm_token}"
-                        }
-                        
-                        fm_res = requests.get(fm_url, params=fm_params, headers=fm_headers, timeout=10, verify=False).json()
+                        fm_res = requests.get(fm_url, params=fm_params, timeout=10, verify=False).json()
                         
                         if fm_res.get("msg") == "success" and len(fm_res.get("data", [])) > 0:
                             hist_full = pd.DataFrame(fm_res["data"])
                             hist_full['date'] = pd.to_datetime(hist_full['date'])
                             hist_full.set_index('date', inplace=True)
                             hist_full.rename(columns={'max': 'High', 'close': 'Close'}, inplace=True)
-                    except Exception:
-                        pass
+                        else:
+                            # 拔除消音器：紀錄 FinMind 給的拒絕原因
+                            api_debug_msg = fm_res.get("msg", "空資料")
+                    except Exception as e:
+                        api_debug_msg = str(e)[:20]
+                    
+                    # 2. 備援：如果 FinMind 失敗或沒這檔股票，用 YF 救火
+                    if hist_full.empty:
+                        hist_full = robust_yf_download(sid, period="2y")
+                        if hist_full.empty:
+                            api_debug_msg += " | YF亦無資料"
                     
                     aar_cache[sid] = hist_full
-                    # 有金鑰的合法連線，稍微停頓 0.1 秒即可
                     time.sleep(0.1) 
                     
                 hist_current = aar_cache[sid].copy()
@@ -94,26 +117,24 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         diagnosis = "⚪ 尚未平倉 (計算目前帳面損益)"
                     else:
                         s_price = b_price
-                        diagnosis = "⚪ 尚未平倉 (查無該股，無法取得現價)"
+                        diagnosis = f"⚪ 尚未平倉 (查無現價: {api_debug_msg})"
                 else:
                     s_date = pd.to_datetime(row['賣出日期'])
                     s_price = float(row['賣出價'])
                     
-                    # 放寬到 20 天包容假日
                     future_end = s_date + timedelta(days=20)
                     future_hist = pd.DataFrame() 
                     
                     if not hist_current.empty:
-                        # 切割賣出後 20 天內的資料
                         mask = (hist_current.index > s_date) & (hist_current.index <= future_end)
                         future_hist = hist_current.loc[mask]
                     
-                    # GPT 防禦：若無資料或資料過少(<3天)，避免誤判
                     if future_hist.empty or len(future_hist) < 3:
                         if (datetime.now() - s_date).days <= 3:
                             diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
                         else:
-                            diagnosis = "⚠️ 查無該區間足夠數據，無法診斷"
+                            # 印出真正的死因，不再死得不明不白
+                            diagnosis = f"⚠️ 無法診斷 (錯誤代碼: {api_debug_msg})" if api_debug_msg else "⚠️ 查無該區間足夠數據"
                     else:
                         max_future_price = future_hist['High'].max()
                         if '恐高早退' in tag or '失去耐心' in tag:
