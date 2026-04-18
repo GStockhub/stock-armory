@@ -760,7 +760,7 @@ if len(chip_db) >= 3:
                                 '心魔檢定': tag.split('(')[0].strip() if '(' in tag else tag, 
                                 'AI 毒舌診斷': diagnosis
                             })
-                            time.sleep(0.1) 
+                            time.sleep(1.5) 
 
                     if review_results:
                         res_df = pd.DataFrame(review_results)
