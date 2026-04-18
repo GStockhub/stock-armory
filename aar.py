@@ -14,8 +14,8 @@ def robust_yf_download(sid, start_date):
             sym = f"{sid}{suffix}"
             df = yf.Ticker(sym).history(start=start_date)
             if not df.empty:
-                # 強制移除時區，避免與 CSV 日期衝突
-                df.index = pd.to_datetime(df.index).tz_localize(None)
+                # 👑 終極日期清理：只保留 YYYY-MM-DD
+                df.index = pd.to_datetime(df.index.strftime('%Y-%m-%d'))
                 if 'High' not in df.columns and 'high' in df.columns: df['High'] = df['high']
                 if 'Close' not in df.columns and 'close' in df.columns: df['Close'] = df['close']
                 return df
@@ -45,8 +45,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             for idx, row in aar_df.iterrows():
                 try:
                     sid = str(row['代號']).strip()
-                    # 強制轉換日期格式，不帶時區
-                    b_date = pd.to_datetime(row['買進日期']).replace(tzinfo=None)
+                    # 👑 終極日期清理：確保只剩下乾淨的 YYYY-MM-DD
+                    b_date_str = pd.to_datetime(row['買進日期']).strftime('%Y-%m-%d')
+                    b_date = pd.to_datetime(b_date_str)
                     b_price = float(row['買進價'])
                     shares = float(row['張數'])
                     tag = str(row['心理標籤']) if not pd.isna(row['心理標籤']) else ""
@@ -70,8 +71,10 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         fm_res = requests.get(fm_url, params=fm_params, timeout=10, verify=False).json()
                         if fm_res.get("msg") == "success" and len(fm_res.get("data", [])) > 0:
                             hist_full = pd.DataFrame(fm_res["data"])
-                            hist_full['date'] = pd.to_datetime(hist_full['date']).dt.tz_localize(None)
+                            # 👑 終極日期清理：只保留 YYYY-MM-DD
+                            hist_full['date'] = pd.to_datetime(pd.to_datetime(hist_full['date']).dt.strftime('%Y-%m-%d'))
                             hist_full.set_index('date', inplace=True)
+                            
                             # 欄位對齊
                             if 'max' in hist_full.columns: hist_full['High'] = hist_full['max']
                             elif 'high' in hist_full.columns: hist_full['High'] = hist_full['high']
@@ -89,7 +92,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     
                 hist_current = aar_cache[sid].copy()
 
-                # --- 核心邏輯修正：改用布林遮罩過濾，不使用 .loc 切片 ---
                 if pd.isna(row['賣出日期']) or str(row['賣出價']).strip() == "":
                     if not hist_current.empty:
                         s_price = float(hist_current['Close'].iloc[-1])
@@ -98,32 +100,49 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         s_price = b_price
                         diagnosis = "⚪ 查無目前現價"
                 else:
-                    s_date = pd.to_datetime(row['賣出日期']).replace(tzinfo=None)
+                    # 👑 終極日期清理：確保 s_date 是最乾淨的午夜 00:00:00
+                    s_date_str = pd.to_datetime(row['賣出日期']).strftime('%Y-%m-%d')
+                    s_date = pd.to_datetime(s_date_str)
                     s_price = float(row['賣出價'])
                     
                     if not hist_current.empty:
                         future_end = s_date + timedelta(days=20)
-                        # 👑 暴力過濾法：管你什麼時區或格式，只要落在這範圍都算！
-                        future_hist = hist_current[(hist_current.index > s_date) & (hist_current.index <= future_end)]
                         
-                        if future_hist.empty:
-                            if (datetime.now() - s_date).days <= 3:
-                                diagnosis = "⏳ 剛賣出不久"
+                        # 👑 GPT 建議的 loc 區間抓取 (搭配我們已清理乾淨的日期)
+                        try:
+                            future_hist = hist_current.loc[s_date:future_end].copy()
+                            
+                            # 防止誤殺，有超過1天才移除當天
+                            if len(future_hist) > 1:
+                                future_hist = future_hist.iloc[1:]
+                                
+                            if future_hist.empty:
+                                if (datetime.now() - s_date).days <= 3:
+                                    diagnosis = "⏳ 剛賣出不久"
+                                else:
+                                    diagnosis = f"⚠️ 無未來數據 (區間空值)"
                             else:
-                                # 這裡會顯示最後的 Debug 訊息幫助判斷
-                                diagnosis = f"⚠️ 無未來數據 (區間:{s_date.strftime('%m/%d')}後20天)"
-                        else:
-                            max_future_price = future_hist['High'].max()
-                            if '恐高早退' in tag or '失去耐心' in tag:
-                                if max_future_price > s_price * 1.02:
-                                    missed = (max_future_price - s_price) * shares * 1000
-                                    diagnosis = f"⚠️ 錯失飆漲！後續高達 {max_future_price:.1f}，少賺 +{missed:,.0f}"
-                                else: diagnosis = "✅ 賣出後未見創高，撤退精準！"
-                            elif '恐慌砍倉' in tag:
-                                if max_future_price > b_price: diagnosis = "🩸 賣出後反彈解套，被洗出局。"
-                                else: diagnosis = "🛡️ 後續未反彈，提早砍倉正確。"
-                            else:
-                                diagnosis = f"✅ 已結案 | 撤退後最高 {max_future_price:.1f}"
+                                # 👑 GPT 建議：保底修復 High 欄位
+                                if 'High' not in future_hist.columns or future_hist['High'].isna().all():
+                                    future_hist['High'] = future_hist['Close']
+                                
+                                max_future_price = future_hist['High'].max()
+                                
+                                if pd.isna(max_future_price):
+                                    diagnosis = f"⚠️ 價格資料異常 ({api_debug_msg})"
+                                else:
+                                    if '恐高早退' in tag or '失去耐心' in tag:
+                                        if max_future_price > s_price * 1.02:
+                                            missed = (max_future_price - s_price) * shares * 1000
+                                            diagnosis = f"⚠️ 錯失飆漲！後續高達 {max_future_price:.1f}，少賺 +{missed:,.0f}"
+                                        else: diagnosis = "✅ 賣出後未見創高，撤退精準！"
+                                    elif '恐慌砍倉' in tag:
+                                        if max_future_price > b_price: diagnosis = "🩸 賣出後反彈解套，被洗出局。"
+                                        else: diagnosis = "🛡️ 後續未反彈，提早砍倉正確。"
+                                    else:
+                                        diagnosis = f"✅ 已結案 | 撤退後最高 {max_future_price:.1f}"
+                        except Exception as e:
+                            diagnosis = f"⚠️ 區間解析失敗"
                     else:
                         diagnosis = f"⚠️ 查無 K 線資料 ({api_debug_msg})"
 
