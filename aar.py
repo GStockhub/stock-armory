@@ -38,11 +38,15 @@ def get_finmind_data(sid, start_date, fm_token):
         }
         res = requests.get(url, params=params, timeout=10, verify=False).json()
 
+        # 👑 防禦升級：擋掉「幽靈空資料」與被限流的狀況
+        if res.get("msg") != "success":
+            return pd.DataFrame()
+
         if res.get("data") and len(res["data"]) > 0:
             df = pd.DataFrame(res["data"])
-            df['date'] = pd.to_datetime(df['date']).dt.date
+            df['date'] = pd.to_datetime(df['date']).dt.date # 強制轉為純日期
             df.set_index('date', inplace=True)
-
+            
             df['High'] = pd.to_numeric(df.get('max', df.get('high', df['close'])), errors='coerce')
             df['Close'] = pd.to_numeric(df['close'], errors='coerce')
 
@@ -52,7 +56,6 @@ def get_finmind_data(sid, start_date, fm_token):
     except:
         pass
     return pd.DataFrame()
-
 
 # =========================
 # YF 備援引擎 
@@ -74,7 +77,6 @@ def get_yf_data(sid, start_date):
             continue
     return pd.DataFrame()
 
-
 # =========================
 # 主函數 (V2 系統升級)
 # =========================
@@ -94,7 +96,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         results = []
         total_pnl = 0
 
-        with st.spinner("🧠 交易行為分析 AI v2 正在為您萃取高階戰情..."):
+        with st.spinner("🧠 交易行為分析 AI v2 正在萃取雙視角戰情..."):
 
             for _, row in df.iterrows():
                 try:
@@ -142,7 +144,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     else:
                         diagnosis = "⚪ 未平倉 | 無報價"
 
-                # ========= 已平倉 (AI 診斷核心) =========
+                # ========= 已平倉 (雙視角 AI 診斷核心) =========
                 else:
                     s_date = parse_tw_date(row['賣出日期'])
                     s_price = float(row['賣出價'])
@@ -154,41 +156,59 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         hist = hist.sort_index()
 
                         s_date_obj = s_date.date()
-                        future_end_obj = (s_date + timedelta(days=10)).date()
                         
-                        future_data = hist[(hist.index > s_date_obj) & (hist.index <= future_end_obj)]
+                        # 👑 雙視角：定義 7 天短線與 20 天波段
+                        future_7d_obj = (s_date + timedelta(days=7)).date()
+                        future_20d_obj = (s_date + timedelta(days=20)).date()
+                        
+                        future_data_7d = hist[(hist.index > s_date_obj) & (hist.index <= future_7d_obj)]
+                        future_data_20d = hist[(hist.index > s_date_obj) & (hist.index <= future_20d_obj)]
 
-                        if future_data.empty:
+                        if future_data_20d.empty:
                             if (datetime.now().date() - s_date_obj).days <= 3:
                                 diagnosis = "⏳ 剛賣出"
                             else:
                                 diagnosis = f"⚠️ 無後續"
                         else:
-                            max_high = future_data['High'].max()
-                            max_date = future_data['High'].idxmax()
-                            days_to_high = (max_date - s_date_obj).days
+                            # 抓取雙視角最高點
+                            max_20d = future_data_20d['High'].max()
+                            max_7d = future_data_7d['High'].max() if not future_data_7d.empty else s_price
 
-                            if pd.isna(max_high):
+                            if pd.isna(max_20d):
                                 diagnosis = "⚠️ 價格異常"
                             else:
                                 if '恐高' in tag or '耐心' in tag:
-                                    if max_high > s_price * 1.04:
-                                        missed_profit_val = (max_high - s_price) * shares * 1000
-                                        diagnosis = f"🚨 賣飛！(🩸 {days_to_high}天後見高點 {max_high:.1f}，少賺 {missed_profit_val:,.0f} 元)"
+                                    # 🟢 視角一：短線判斷
+                                    if max_7d > s_price * 1.02:
+                                        short_term = "📉 短線即賣飛"
                                     else:
-                                        diagnosis = "✅ 賣點漂亮，入袋為安"
+                                        short_term = "✅ 短線躲過震盪"
+
+                                    # 🔴 視角二：波段潛力判斷
+                                    if max_20d > s_price * 1.05:
+                                        max_date = future_data_20d['High'].idxmax()
+                                        days_to_high = (max_date - s_date_obj).days
+                                        missed_profit_val = (max_20d - s_price) * shares * 1000
+                                        long_term = f"🩸 卻錯失主升段 ({days_to_high}天後高點 {max_20d:.1f}，少賺 {missed_profit_val:,.0f}元)"
+                                    else:
+                                        long_term = "且無錯失大波段，精準撤退！"
+
+                                    # 組合雙視角診斷
+                                    diagnosis = f"{short_term} ｜ {long_term}"
 
                                 elif '恐慌' in tag:
-                                    if max_high > b_price:
-                                        diagnosis = f"🩸 洗盤被騙！({days_to_high}天後即反彈至 {max_high:.1f})"
+                                    if max_20d > b_price:
+                                        max_date = future_data_20d['High'].idxmax()
+                                        days_to_high = (max_date - s_date_obj).days
+                                        diagnosis = f"🩸 洗盤被騙！({days_to_high}天後反彈至 {max_20d:.1f} 解套)"
                                     else:
-                                        diagnosis = "🛡️ 停損正確！"
+                                        diagnosis = "🛡️ 停損正確！後續未見大反彈。"
 
                                 elif '紀律' in tag:
-                                    diagnosis = "👑 嚴格執行紀律"
+                                    diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌"
 
                                 else:
-                                    diagnosis = f"📊 {days_to_high}天後見高點 {max_high:.1f}"
+                                    diagnosis = f"📊 7天高點 {max_7d:.1f} ｜ 20天高點 {max_20d:.1f}"
 
                 # ========= 損益計算 =========
                 buy_fee = int((b_price * shares * 1000) * fee_rate)
@@ -221,7 +241,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 })
 
         # =========================================================
-        # 👑 交易行為分析 AI v2 (全新高階教練看板 - UI 完美修復版)
+        # 👑 交易行為分析 AI v2 (全新高階教練看板)
         # =========================================================
         if results:
             res = pd.DataFrame(results)
@@ -288,6 +308,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
             display_df = res.drop(columns=['_少賺', '時長分類', '操作類型'], errors='ignore')
 
+            # 👑 修正了欄位打字錯誤 "AI診斷"
             st.dataframe(
                 display_df.style.format({
                     "淨利": "{:,.0f}",
@@ -306,7 +327,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     "淨利": st.column_config.NumberColumn("淨利", width="small"),
                     "報酬%": st.column_config.TextColumn("報酬%", width="small"),
                     "心魔": st.column_config.TextColumn("心魔", width="small"),
-                    "AI診力量": st.column_config.TextColumn("AI毒舌診斷", width="large"),
+                    "AI診斷": st.column_config.TextColumn("AI毒舌診斷", width="large"),
                 }
             )
         else:
