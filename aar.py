@@ -43,7 +43,6 @@ def get_finmind_data(sid, start_date, fm_token):
             df['date'] = pd.to_datetime(df['date']).dt.date # 強制轉為純日期
             df.set_index('date', inplace=True)
             
-            # 強制轉為數值
             df['High'] = pd.to_numeric(df.get('max', df.get('high', df['close'])), errors='coerce')
             df['Close'] = pd.to_numeric(df['close'], errors='coerce')
 
@@ -63,7 +62,7 @@ def get_yf_data(sid, start_date):
         try:
             df = yf.Ticker(f"{sid}{suf}").history(start=start_date, auto_adjust=False)
             if not df.empty:
-                df.index = pd.to_datetime(df.index).dt.date # 強制轉為純日期
+                df.index = pd.to_datetime(df.index).dt.date
                 df['High'] = pd.to_numeric(df.get('High', df['Close']), errors='coerce')
                 df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
                 
@@ -75,12 +74,12 @@ def get_yf_data(sid, start_date):
     return pd.DataFrame()
 
 # =========================
-# 主函數
+# 主函數 (V2 系統升級)
 # =========================
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
     if not aar_sheet_url:
-        st.info("請輸入交易日誌 CSV")
+        st.info("請在左側邊欄輸入交易日誌 CSV 網址，喚醒 AI 覆盤引擎。")
         return
 
     try:
@@ -93,9 +92,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         results = []
         total_pnl = 0
 
-        fm_ok, yf_ok, fail = 0, 0, 0
-
-        with st.spinner("AI 覆盤分析中... (正在修復索引對齊)"):
+        with st.spinner("🧠 交易行為分析 AI v2 正在萃取您的作戰數據..."):
 
             for _, row in df.iterrows():
                 try:
@@ -119,14 +116,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 # ========= 抓資料（快取） =========
                 if sid not in cache:
                     hist = get_finmind_data(sid, global_start, fm_token)
-                    if not hist.empty:
-                        fm_ok += 1
-                    else:
+                    if hist.empty:
                         hist = get_yf_data(sid, global_start)
-                        if not hist.empty:
-                            yf_ok += 1
-                        else:
-                            fail += 1
 
                     cache[sid] = hist
                     time.sleep(0.1)
@@ -136,6 +127,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 diagnosis = "⚠️ 無資料"
                 s_price = b_price
                 s_date = None
+                missed_profit_val = 0  # 紀錄少賺金額供 V2 分析使用
                 
                 b_date_str = b_date.strftime('%m/%d') if pd.notnull(b_date) else "-"
                 s_date_str = "-"
@@ -162,30 +154,33 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         s_date_obj = s_date.date()
                         future_end_obj = (s_date + timedelta(days=10)).date()
                         
-                        # 👑 核心修復：直接拿 hist.index 去比較，不再建立會導致對齊錯誤的新 Series！
                         future_data = hist[(hist.index > s_date_obj) & (hist.index <= future_end_obj)]
 
                         if future_data.empty:
                             if (datetime.now().date() - s_date_obj).days <= 3:
                                 diagnosis = "⏳ 剛賣出"
                             else:
-                                diagnosis = f"⚠️ 無後續 ({s_date_obj.strftime('%Y-%m-%d')}後10天)"
+                                diagnosis = f"⚠️ 無後續"
                         else:
+                            # 找出最高點與發生日期
                             max_high = future_data['High'].max()
+                            max_date = future_data['High'].idxmax()
+                            days_to_high = (max_date - s_date_obj).days
 
                             if pd.isna(max_high):
                                 diagnosis = "⚠️ 價格異常"
                             else:
                                 if '恐高' in tag or '耐心' in tag:
                                     if max_high > s_price * 1.04:
-                                        missed = (max_high - s_price) * shares * 1000
-                                        diagnosis = f"⚠️ 賣飛！後高{max_high:.1f} 少賺 {missed:,.0f}"
+                                        missed_profit_val = (max_high - s_price) * shares * 1000
+                                        # 👑 升級版毒舌診斷：精準指出幾天後發生，用圖示強調血虧
+                                        diagnosis = f"🚨 賣飛！(🩸 {days_to_high}天後見高點 {max_high:.1f}，少賺 {missed_profit_val:,.0f} 元)"
                                     else:
                                         diagnosis = "✅ 賣點漂亮，入袋為安"
 
                                 elif '恐慌' in tag:
                                     if max_high > b_price:
-                                        diagnosis = "🩸 洗盤被騙出場，後續反彈"
+                                        diagnosis = f"🩸 洗盤被騙！({days_to_high}天後即反彈至 {max_high:.1f})"
                                     else:
                                         diagnosis = "🛡️ 停損正確！"
 
@@ -193,7 +188,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                                     diagnosis = "👑 嚴格執行紀律"
 
                                 else:
-                                    diagnosis = f"📊 後續高點 {max_high:.1f}"
+                                    diagnosis = f"📊 {days_to_high}天後見高點 {max_high:.1f}"
 
                 # ========= 損益計算 =========
                 buy_fee = int((b_price * shares * 1000) * fee_rate)
@@ -221,17 +216,76 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     "淨利": pnl,
                     "報酬%": roi,
                     "心魔": tag,
-                    "AI診斷": diagnosis
+                    "AI診斷": diagnosis,
+                    "_少賺": missed_profit_val # 隱藏欄位供 V2 分析
                 })
 
-        # ========= 顯示畫面 =========
+        # =========================================================
+        # 👑 交易行為分析 AI v2 (全新高階教練看板)
+        # =========================================================
         if results:
             res = pd.DataFrame(results)
+            
+            st.markdown(f"### 🎯 <span class='highlight-gold'>交易教練 V2 總結報告</span>", unsafe_allow_html=True)
+            st.markdown(f"#### 💰 歷史戰役總淨利：<span style='color:#EF4444; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+            
+            # --- V2 面板區塊 ---
+            c1, c2, c3 = st.columns(3)
+            
+            # 1. 🔪 心魔代價排行榜
+            with c1:
+                st.markdown("<div class='tier-card'>", unsafe_allow_html=True)
+                st.markdown("#### 🔪 心魔代價排行榜")
+                demon_loss = res[res['心魔'] != ""].groupby('心魔')['_少賺'].sum().reset_index()
+                demon_loss = demon_loss[demon_loss['_少賺'] > 0].sort_values('_少賺', ascending=False)
+                if not demon_loss.empty:
+                    top_demon = demon_loss.iloc[0]
+                    st.markdown(f"<span style='color:#9CA3AF;'>您最大的敵人是：</span><br><span style='color:#EF4444; font-size:20px; font-weight:bold;'>「{top_demon['心魔']}」</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='color:#9CA3AF;'>總計讓您少賺了：</span> <span style='color:#F59E0B; font-weight:bold;'>{top_demon['_少賺']:,.0f} 元</span>", unsafe_allow_html=True)
+                else:
+                    st.success("✅ 目前沒有明顯的心魔失誤！")
+                st.markdown("</div>", unsafe_allow_html=True)
 
-            st.markdown(f"#### 💰 歷史戰役總淨利：<span style='color:#EF4444; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+            # 2. ⏳ 最佳持股時長雷達
+            with c2:
+                st.markdown("<div class='tier-card'>", unsafe_allow_html=True)
+                st.markdown("#### ⏳ 持股時長勝率")
+                res['時長分類'] = res['天數'].apply(lambda x: "⚡ 極短線 (1~3天)" if x <= 3 else ("🚶 短波段 (4~7天)" if x <= 7 else "🧘 長波段 (8天+)"))
+                hold_stats = res[res['賣出'] != "-"].groupby('時長分類').agg(
+                    勝率=('淨利', lambda x: f"{(x > 0).mean() * 100:.0f}%")
+                ).reset_index()
+                
+                if not hold_stats.empty:
+                    for _, r in hold_stats.iterrows():
+                        st.markdown(f"**{r['時長分類']}**：勝率 <span style='color:#38BDF8;'>{r['勝率']}</span>", unsafe_allow_html=True)
+                else:
+                    st.info("尚無足夠平倉數據")
+                st.markdown("</div>", unsafe_allow_html=True)
 
+            # 3. 🛡️ 紀律勝率對比
+            with c3:
+                st.markdown("<div class='tier-card'>", unsafe_allow_html=True)
+                st.markdown("#### 🛡️ 紀律 vs 情緒")
+                res['操作類型'] = res['心魔'].apply(lambda x: "嚴格紀律" if '紀律' in x else ("情緒干擾" if x else "無標籤"))
+                type_stats = res[res['賣出'] != "-"].groupby('操作類型').agg(
+                    均報=('報酬%', 'mean')
+                ).reset_index()
+                
+                if not type_stats.empty:
+                    for _, r in type_stats.iterrows():
+                        color = "#10B981" if r['均報'] > 0 else "#EF4444"
+                        st.markdown(f"**{r['操作類型']}**：均報酬 <span style='color:{color};'>{r['均報']:.2f}%</span>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            st.markdown("---")
+            st.markdown("#### 📜 詳細戰報清單")
+
+            # 移除隱藏的計算欄位
+            display_df = res.drop(columns=['_少賺', '時長分類', '操作類型'], errors='ignore')
+
+            # 👑 完美欄位排版設定
             st.dataframe(
-                res.style.format({
+                display_df.style.format({
                     "淨利": "{:,.0f}",
                     "報酬%": "{:.2f}%"
                 }).map(
