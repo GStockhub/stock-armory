@@ -84,7 +84,7 @@ with st.sidebar:
         st.success("快取已清除！請重新載入。")
 
 st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.2</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 智慧緩存引擎 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ FinMind API ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -627,7 +627,7 @@ if len(chip_db) >= 3:
                                 elif ret >= 6: act = "🛡️ +6% 達標 (賣出一半鎖利)"
                                 elif p_now < r['M10'] or ret <= -3: act = "💀 破線硬停損 (無情砍倉)"
                                 
-                                res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作作戰指示': act})
+                                res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作戰指示': act})
                             except: continue
                             
                         df_res = pd.DataFrame(res_h)
@@ -662,7 +662,7 @@ if len(chip_db) >= 3:
                     
                     with st.spinner('🕵️ 情報兵正在調閱歷史戰報，計算錯失利潤與心理盲點...'):
                         
-                        # 👑 核心優化：建立戰術緩存庫，同檔股票不管交易幾次，都只抓一次！
+                        # 👑 核心情報快取：同檔股票只抓一次！
                         aar_cache = {} 
                         
                         for idx, row in aar_df.iterrows():
@@ -688,23 +688,41 @@ if len(chip_db) >= 3:
                             s_date = None
                             
                             # ==========================================
-                            # 👑 情報快取機制：如果這檔股票沒抓過，才向 API 請求
+                            # 👑 情報快取機制：改用 FinMind API (台灣專用) + yfinance 雙引擎備援
                             # ==========================================
                             if sid not in aar_cache:
                                 hist_full = pd.DataFrame()
-                                for suffix in [".TW", ".TWO"]:
-                                    try:
-                                        temp_df = yf.Ticker(f"{sid}{suffix}").history(period="6mo")
-                                        if not temp_df.empty:
-                                            hist_full = temp_df
-                                            break
-                                    except:
-                                        # 👑 擬真潛行：遇到例外時冷卻
-                                        time.sleep(1.2 + np.random.rand())
-                                        
+                                # 🚀 優先使用 FinMind API (不抓 YF，完美避開雲端 IP 封鎖)
+                                try:
+                                    fm_url = "https://api.finmindtrade.com/api/v4/data"
+                                    # 往前抓 180 天確保資料充裕
+                                    fm_start = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
+                                    fm_params = {"dataset": "TaiwanStockPrice", "data_id": sid, "start_date": fm_start}
+                                    fm_res = requests.get(fm_url, params=fm_params, timeout=10, verify=False).json()
+                                    
+                                    if fm_res.get("msg") == "success" and len(fm_res.get("data", [])) > 0:
+                                        hist_full = pd.DataFrame(fm_res["data"])
+                                        hist_full['date'] = pd.to_datetime(hist_full['date'])
+                                        hist_full.set_index('date', inplace=True)
+                                        hist_full.rename(columns={'max': 'High', 'close': 'Close'}, inplace=True)
+                                except Exception:
+                                    pass
+                                
+                                # 如果 FinMind 沒抓到，才用 yfinance 做最後掙扎
+                                if hist_full.empty:
+                                    for suffix in [".TW", ".TWO"]:
+                                        try:
+                                            temp_df = yf.Ticker(f"{sid}{suffix}").history(period="6mo")
+                                            if not temp_df.empty:
+                                                temp_df.index = pd.to_datetime(temp_df.index).tz_localize(None)
+                                                hist_full = temp_df
+                                                break
+                                        except:
+                                            time.sleep(0.5)
+                                
                                 aar_cache[sid] = hist_full
-                                # 👑 擬真潛行：成功抓完一檔新的，強制休息，騙過機關槍雷達
-                                time.sleep(1.2 + np.random.rand()) 
+                                # 👑 擬真潛行：成功抓完一檔新的，稍微休息
+                                time.sleep(0.2) 
                             
                             # 直接從快取庫把這檔股票的 6 個月資料拿出來用
                             hist_current = aar_cache[sid].copy()
@@ -725,8 +743,9 @@ if len(chip_db) >= 3:
                                 future_hist = pd.DataFrame() 
                                 
                                 if not hist_current.empty:
-                                    # 去除時區避免比對錯誤
-                                    hist_current.index = pd.to_datetime(hist_current.index).tz_localize(None)
+                                    # 確保時間格式統一且無時區
+                                    if hist_current.index.tz is not None:
+                                        hist_current.index = hist_current.index.tz_localize(None)
                                     # 切割賣出後 20 天內的資料
                                     mask = (hist_current.index > s_date) & (hist_current.index <= future_end)
                                     future_hist = hist_current.loc[mask]
