@@ -6,14 +6,15 @@ import time
 import yfinance as yf
 import numpy as np
 
-def robust_yf_download(sid, period="2y"):
+def robust_yf_download(sid, start_date):
     """YF 備援引擎：附帶抖動延遲與重試機制"""
     suffixes = [".TW", ".TWO"]
     for attempt in range(2):
         for suffix in suffixes:
             try:
                 sym = f"{sid}{suffix}"
-                df = yf.Ticker(sym).history(period=period)
+                # 改為用 start_date 抓取，確保涵蓋所有歷史
+                df = yf.Ticker(sym).history(start=start_date)
                 if not df.empty and len(df) > 5:
                     if df.index.tz is not None:
                         df.index = pd.to_datetime(df.index).tz_localize(None)
@@ -40,13 +41,19 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             st.error(f"❌ 欄位不符！請確保包含：{', '.join(required_cols)}")
             return
 
+        # 👑 破案關鍵：找出日誌中最古老的那一筆交易，往前推 30 天當作全域抓取起點
+        try:
+            earliest_date = pd.to_datetime(aar_df['買進日期']).min()
+            global_start = (earliest_date - timedelta(days=30)).strftime("%Y-%m-%d")
+        except:
+            global_start = "2020-01-01" # 萬一日期解析失敗，直接從2020年開始抓，絕對不漏！
+
         review_results = []
         total_realized_pnl = 0
         active_fee_rate = 0.001425 * fee_discount
         
         with st.spinner('🕵️ 情報兵正在調閱歷史戰報，啟動雙引擎快取庫...'):
             
-            # 👑 核心快取字典：同檔股票不管幾筆，只請求一次！
             aar_cache = {} 
             
             for idx, row in aar_df.iterrows():
@@ -68,23 +75,19 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 diagnosis = "✅ 戰報已收錄" 
                 s_price = 0.0
                 s_date = None
-                api_debug_msg = "" # 紀錄出錯原因
+                api_debug_msg = ""
                 
-                # ===================================================
-                # 👑 雙引擎抓取邏輯 (FinMind -> YF)
-                # ===================================================
                 if sid not in aar_cache:
                     hist_full = pd.DataFrame()
                     
-                    # 1. 主攻：FinMind API (強制參數餵食金鑰)
+                    # 1. 主攻：FinMind API
                     try:
                         fm_url = "https://api.finmindtrade.com/api/v4/data"
-                        fm_start = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
                         fm_params = {
                             "dataset": "TaiwanStockPrice",
                             "data_id": sid,
-                            "start_date": fm_start,
-                            "token": fm_token  # 👑 破案關鍵：直接把金鑰塞在參數裡強迫讀取！
+                            "start_date": global_start, # 👈 使用最古老日期作為起點
+                            "token": fm_token
                         }
                         
                         fm_res = requests.get(fm_url, params=fm_params, timeout=10, verify=False).json()
@@ -95,14 +98,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                             hist_full.set_index('date', inplace=True)
                             hist_full.rename(columns={'max': 'High', 'close': 'Close'}, inplace=True)
                         else:
-                            # 拔除消音器：紀錄 FinMind 給的拒絕原因
                             api_debug_msg = fm_res.get("msg", "空資料")
                     except Exception as e:
                         api_debug_msg = str(e)[:20]
                     
-                    # 2. 備援：如果 FinMind 失敗或沒這檔股票，用 YF 救火
+                    # 2. 備援：YFinance
                     if hist_full.empty:
-                        hist_full = robust_yf_download(sid, period="2y")
+                        hist_full = robust_yf_download(sid, start_date=global_start)
                         if hist_full.empty:
                             api_debug_msg += " | YF亦無資料"
                     
@@ -133,7 +135,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         if (datetime.now() - s_date).days <= 3:
                             diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
                         else:
-                            # 印出真正的死因，不再死得不明不白
                             diagnosis = f"⚠️ 無法診斷 (錯誤代碼: {api_debug_msg})" if api_debug_msg else "⚠️ 查無該區間足夠數據"
                     else:
                         max_future_price = future_hist['High'].max()
