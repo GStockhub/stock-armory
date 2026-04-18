@@ -74,7 +74,7 @@ def get_yf_data(sid, start_date):
     return pd.DataFrame()
 
 # =========================
-# 主函數 (V2.3 終極動線 + 雙向盈虧精算版)
+# 主函數 (V2.3 終極動線 + 雙向盈虧精算 + 神仙模式版)
 # =========================
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
     if not aar_sheet_url:
@@ -180,8 +180,16 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
         if results:
             res = pd.DataFrame(results)
+            
+            # 👑 新增：精算神仙模式的理論極限值
+            total_missed = res['_少賺'].sum()
+            god_mode_pnl = total_pnl + total_missed
+            
             st.markdown(f"### 🎯 <span class='highlight-gold'>游擊隊 V2.3 戰果看板</span>", unsafe_allow_html=True)
             st.markdown(f"#### 💰 總收割淨利：<span style='color:#EF4444; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+            
+            # 👑 滿足大將軍的「上帝視角」標示
+            st.caption(f"✨ **【神仙模式】理論極限淨利**：<span style='color:#F59E0B; font-size:16px;'>**{god_mode_pnl:,.0f}**</span> 元 (若每筆皆賣在絕對高點，尚有 {total_missed:,.0f} 元的潛在空間)", unsafe_allow_html=True)
 
             # --- 交易風格分析 ---
             ad = res[res['賣'] != "-"].copy()
