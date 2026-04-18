@@ -685,11 +685,17 @@ if len(chip_db) >= 3:
                             
                             if pd.isna(row['賣出日期']) or pd.isna(row['賣出價']) or str(row['賣出價']).strip() == "":
                                 hist_current = pd.DataFrame()
+                                # 👑 為未平倉裝甲：重試 3 次，避免阻擋
                                 for suffix in [".TW", ".TWO"]:
-                                    try:
-                                        hist_current = yf.Ticker(f"{sid}{suffix}").history(period="1mo")
-                                        if not hist_current.empty: break
-                                    except Exception: pass
+                                    for _ in range(3):
+                                        try:
+                                            temp_hist = yf.Ticker(f"{sid}{suffix}").history(period="1mo")
+                                            if not temp_hist.empty:
+                                                hist_current = temp_hist
+                                                break
+                                        except Exception:
+                                            time.sleep(0.5)
+                                    if not hist_current.empty: break
                                 
                                 if not hist_current.empty:
                                     s_price = float(hist_current['Close'].iloc[-1])
@@ -704,21 +710,27 @@ if len(chip_db) >= 3:
                                 future_end = s_date + timedelta(days=15)
                                 future_hist = pd.DataFrame() 
                                 
-                                # 👑 修復：抓取 6 個月資料，用 pandas 自己切割，保證 100% 抓到資料
-                                try:
-                                    for suffix in [".TW", ".TWO"]:
-                                        hist_full = yf.Ticker(f"{sid}{suffix}").history(period="6mo")
-                                        if not hist_full.empty:
-                                            # 去除時區避免比對錯誤
-                                            hist_full.index = pd.to_datetime(hist_full.index).tz_localize(None)
-                                            # 切割賣出後 15 天內的資料
-                                            mask = (hist_full.index > s_date) & (hist_full.index <= future_end)
-                                            future_hist = hist_full.loc[mask]
-                                            if not future_hist.empty:
-                                                break 
-                                except Exception:
-                                    pass 
+                                # 👑 修復：為 AAR 裝上與大盤一樣的「重試防護裝甲」，抵抗雲端阻擋
+                                hist_full = pd.DataFrame()
+                                for suffix in [".TW", ".TWO"]:
+                                    for _ in range(3): # 嘗試 3 次
+                                        try:
+                                            temp_df = yf.Ticker(f"{sid}{suffix}").history(period="6mo")
+                                            if not temp_df.empty:
+                                                hist_full = temp_df
+                                                break
+                                        except:
+                                            time.sleep(0.5)
+                                    if not hist_full.empty:
+                                        break
                                 
+                                if not hist_full.empty:
+                                    # 去除時區避免比對錯誤
+                                    hist_full.index = pd.to_datetime(hist_full.index).tz_localize(None)
+                                    # 切割賣出後 15 天內的資料
+                                    mask = (hist_full.index > s_date) & (hist_full.index <= future_end)
+                                    future_hist = hist_full.loc[mask]
+
                                 if future_hist.empty:
                                     if (datetime.now() - s_date).days <= 1:
                                         diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
@@ -760,7 +772,8 @@ if len(chip_db) >= 3:
                                 '心魔檢定': tag.split('(')[0].strip() if '(' in tag else tag, 
                                 'AI 毒舌診斷': diagnosis
                             })
-                            time.sleep(1.5) 
+                            # 給情報兵喘息時間，避免被機關槍阻擋
+                            time.sleep(0.5) 
 
                     if review_results:
                         res_df = pd.DataFrame(review_results)
