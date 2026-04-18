@@ -43,7 +43,7 @@ def get_finmind_data(sid, start_date, fm_token):
             df['date'] = pd.to_datetime(df['date']).dt.date # 強制轉為純日期
             df.set_index('date', inplace=True)
             
-            # 👑 強制轉為數值，防止 FinMind 回傳字串導致誤刪資料
+            # 強制轉為數值
             df['High'] = pd.to_numeric(df.get('max', df.get('high', df['close'])), errors='coerce')
             df['Close'] = pd.to_numeric(df['close'], errors='coerce')
 
@@ -54,15 +54,13 @@ def get_finmind_data(sid, start_date, fm_token):
         pass
     return pd.DataFrame()
 
-
 # =========================
-# YF 備援引擎 (👑 修復 ETF 爆表 Bug)
+# YF 備援引擎 
 # =========================
 def get_yf_data(sid, start_date):
     suffixes = [".TW", ".TWO"]
     for suf in suffixes:
         try:
-            # 加上 auto_adjust=False 關閉 YF 智障的股息還原
             df = yf.Ticker(f"{sid}{suf}").history(start=start_date, auto_adjust=False)
             if not df.empty:
                 df.index = pd.to_datetime(df.index).dt.date # 強制轉為純日期
@@ -75,7 +73,6 @@ def get_yf_data(sid, start_date):
         except:
             continue
     return pd.DataFrame()
-
 
 # =========================
 # 主函數
@@ -98,7 +95,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
         fm_ok, yf_ok, fail = 0, 0, 0
 
-        with st.spinner("AI 覆盤分析中... (正在啟動核彈級日期過濾)"):
+        with st.spinner("AI 覆盤分析中... (正在修復索引對齊)"):
 
             for _, row in df.iterrows():
                 try:
@@ -110,7 +107,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     b_price = float(row['買進價'])
                     shares = float(row['張數'])
                     
-                    # 👑 心魔標籤去蕪存菁：去除括號及其內容
                     raw_tag = str(row.get('心理標籤', '')).strip()
                     tag = raw_tag.split('(')[0].split('（')[0].strip()
 
@@ -141,7 +137,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 s_price = b_price
                 s_date = None
                 
-                # 買進日期格式化 (MM/DD)
                 b_date_str = b_date.strftime('%m/%d') if pd.notnull(b_date) else "-"
                 s_date_str = "-"
 
@@ -164,19 +159,16 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     else:
                         hist = hist.sort_index()
 
-                        # 👑 核彈級過濾：全部轉成純 Date 比較，徹底杜絕時區與 Pandas 切片地雷
                         s_date_obj = s_date.date()
                         future_end_obj = (s_date + timedelta(days=10)).date()
                         
-                        # 只留下 > 賣出日，且 <= 賣出後10天 的資料
-                        hist_dates = pd.Series(hist.index) # index 已經是純 date
-                        future_data = hist[(hist_dates > s_date_obj) & (hist_dates <= future_end_obj)]
+                        # 👑 核心修復：直接拿 hist.index 去比較，不再建立會導致對齊錯誤的新 Series！
+                        future_data = hist[(hist.index > s_date_obj) & (hist.index <= future_end_obj)]
 
                         if future_data.empty:
                             if (datetime.now().date() - s_date_obj).days <= 3:
                                 diagnosis = "⏳ 剛賣出"
                             else:
-                                # 印出完整的西元年，方便抓出是否為格式解析錯誤
                                 diagnosis = f"⚠️ 無後續 ({s_date_obj.strftime('%Y-%m-%d')}後10天)"
                         else:
                             max_high = future_data['High'].max()
@@ -184,7 +176,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                             if pd.isna(max_high):
                                 diagnosis = "⚠️ 價格異常"
                             else:
-                                # 提高判定門檻至 4% (1.04)
                                 if '恐高' in tag or '耐心' in tag:
                                     if max_high > s_price * 1.04:
                                         missed = (max_high - s_price) * shares * 1000
@@ -222,7 +213,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 else:
                     held_days = (datetime.now() - b_date).days
 
-                # 整理成最終顯示格式
                 results.append({
                     "代號": sid,
                     "買進": b_date_str,
@@ -240,7 +230,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
             st.markdown(f"#### 💰 歷史戰役總淨利：<span style='color:#EF4444; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
 
-            # 👑 完美欄位排版設定
             st.dataframe(
                 res.style.format({
                     "淨利": "{:,.0f}",
