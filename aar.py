@@ -40,9 +40,9 @@ def get_finmind_data(sid, start_date, fm_token):
 
         if res.get("data") and len(res["data"]) > 0:
             df = pd.DataFrame(res["data"])
-            df['date'] = pd.to_datetime(df['date']).dt.date # 強制轉為純日期
+            df['date'] = pd.to_datetime(df['date']).dt.date
             df.set_index('date', inplace=True)
-            
+
             df['High'] = pd.to_numeric(df.get('max', df.get('high', df['close'])), errors='coerce')
             df['Close'] = pd.to_numeric(df['close'], errors='coerce')
 
@@ -52,6 +52,7 @@ def get_finmind_data(sid, start_date, fm_token):
     except:
         pass
     return pd.DataFrame()
+
 
 # =========================
 # YF 備援引擎 
@@ -73,6 +74,7 @@ def get_yf_data(sid, start_date):
             continue
     return pd.DataFrame()
 
+
 # =========================
 # 主函數 (V2 系統升級)
 # =========================
@@ -92,7 +94,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         results = []
         total_pnl = 0
 
-        with st.spinner("🧠 交易行為分析 AI v2 正在萃取您的作戰數據..."):
+        with st.spinner("🧠 交易行為分析 AI v2 正在為您萃取高階戰情..."):
 
             for _, row in df.iterrows():
                 try:
@@ -127,7 +129,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 diagnosis = "⚠️ 無資料"
                 s_price = b_price
                 s_date = None
-                missed_profit_val = 0  # 紀錄少賺金額供 V2 分析使用
+                missed_profit_val = 0 
                 
                 b_date_str = b_date.strftime('%m/%d') if pd.notnull(b_date) else "-"
                 s_date_str = "-"
@@ -162,7 +164,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                             else:
                                 diagnosis = f"⚠️ 無後續"
                         else:
-                            # 找出最高點與發生日期
                             max_high = future_data['High'].max()
                             max_date = future_data['High'].idxmax()
                             days_to_high = (max_date - s_date_obj).days
@@ -173,7 +174,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                                 if '恐高' in tag or '耐心' in tag:
                                     if max_high > s_price * 1.04:
                                         missed_profit_val = (max_high - s_price) * shares * 1000
-                                        # 👑 升級版毒舌診斷：精準指出幾天後發生，用圖示強調血虧
                                         diagnosis = f"🚨 賣飛！(🩸 {days_to_high}天後見高點 {max_high:.1f}，少賺 {missed_profit_val:,.0f} 元)"
                                     else:
                                         diagnosis = "✅ 賣點漂亮，入袋為安"
@@ -217,11 +217,11 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     "報酬%": roi,
                     "心魔": tag,
                     "AI診斷": diagnosis,
-                    "_少賺": missed_profit_val # 隱藏欄位供 V2 分析
+                    "_少賺": missed_profit_val 
                 })
 
         # =========================================================
-        # 👑 交易行為分析 AI v2 (全新高階教練看板)
+        # 👑 交易行為分析 AI v2 (全新高階教練看板 - UI 完美修復版)
         # =========================================================
         if results:
             res = pd.DataFrame(results)
@@ -229,61 +229,65 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             st.markdown(f"### 🎯 <span class='highlight-gold'>交易教練 V2 總結報告</span>", unsafe_allow_html=True)
             st.markdown(f"#### 💰 歷史戰役總淨利：<span style='color:#EF4444; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
             
-            # --- V2 面板區塊 ---
             c1, c2, c3 = st.columns(3)
             
-            # 1. 🔪 心魔代價排行榜
-            with c1:
-                st.markdown("<div class='tier-card'>", unsafe_allow_html=True)
-                st.markdown("#### 🔪 心魔代價排行榜")
-                demon_loss = res[res['心魔'] != ""].groupby('心魔')['_少賺'].sum().reset_index()
-                demon_loss = demon_loss[demon_loss['_少賺'] > 0].sort_values('_少賺', ascending=False)
-                if not demon_loss.empty:
-                    top_demon = demon_loss.iloc[0]
-                    st.markdown(f"<span style='color:#9CA3AF;'>您最大的敵人是：</span><br><span style='color:#EF4444; font-size:20px; font-weight:bold;'>「{top_demon['心魔']}」</span>", unsafe_allow_html=True)
-                    st.markdown(f"<span style='color:#9CA3AF;'>總計讓您少賺了：</span> <span style='color:#F59E0B; font-weight:bold;'>{top_demon['_少賺']:,.0f} 元</span>", unsafe_allow_html=True)
-                else:
-                    st.success("✅ 目前沒有明顯的心魔失誤！")
-                st.markdown("</div>", unsafe_allow_html=True)
+            # 1. 🔪 心魔代價排行榜 (整包 HTML 輸出)
+            demon_loss = res[res['心魔'] != ""].groupby('心魔')['_少賺'].sum().reset_index()
+            demon_loss = demon_loss[demon_loss['_少賺'] > 0].sort_values('_少賺', ascending=False)
+            
+            if not demon_loss.empty:
+                top_demon = demon_loss.iloc[0]
+                c1_html = f"""
+                <div class='tier-card'>
+                    <h4 style='margin-top:0;'>🔪 心魔代價排行榜</h4>
+                    <span style='color:#9CA3AF;'>您最大的敵人是：</span><br>
+                    <span style='color:#EF4444; font-size:22px; font-weight:bold;'>「{top_demon['心魔']}」</span><br><br>
+                    <span style='color:#9CA3AF;'>總計讓您少賺了：</span><br>
+                    <span style='color:#F59E0B; font-size:20px; font-weight:bold;'>{top_demon['_少賺']:,.0f} 元</span>
+                </div>
+                """
+            else:
+                c1_html = "<div class='tier-card'><h4 style='margin-top:0;'>🔪 心魔代價排行榜</h4><br><span style='color:#10B981; font-size:18px;'>✅ 目前無明顯心魔失誤！</span></div>"
+            
+            with c1: st.markdown(c1_html, unsafe_allow_html=True)
 
-            # 2. ⏳ 最佳持股時長雷達
-            with c2:
-                st.markdown("<div class='tier-card'>", unsafe_allow_html=True)
-                st.markdown("#### ⏳ 持股時長勝率")
-                res['時長分類'] = res['天數'].apply(lambda x: "⚡ 極短線 (1~3天)" if x <= 3 else ("🚶 短波段 (4~7天)" if x <= 7 else "🧘 長波段 (8天+)"))
-                hold_stats = res[res['賣出'] != "-"].groupby('時長分類').agg(
-                    勝率=('淨利', lambda x: f"{(x > 0).mean() * 100:.0f}%")
-                ).reset_index()
+            # 2. ⏳ 最佳持股時長雷達 (整包 HTML 輸出)
+            res['時長分類'] = res['天數'].apply(lambda x: "⚡ 極短線 (1~3天)" if x <= 3 else ("🚶 短波段 (4~7天)" if x <= 7 else "🧘 長波段 (8天+)"))
+            hold_stats = res[res['賣出'] != "-"].groupby('時長分類').agg(
+                勝率=('淨利', lambda x: f"{(x > 0).mean() * 100:.0f}%")
+            ).reset_index()
+            
+            c2_content = ""
+            if not hold_stats.empty:
+                for _, r in hold_stats.iterrows():
+                    c2_content += f"<div style='margin-bottom:8px;'><b>{r['時長分類']}</b>：勝率 <span style='color:#38BDF8; font-size:18px; font-weight:bold;'>{r['勝率']}</span></div>"
+            else:
+                c2_content = "<span style='color:#9CA3AF;'>尚無足夠平倉數據</span>"
                 
-                if not hold_stats.empty:
-                    for _, r in hold_stats.iterrows():
-                        st.markdown(f"**{r['時長分類']}**：勝率 <span style='color:#38BDF8;'>{r['勝率']}</span>", unsafe_allow_html=True)
-                else:
-                    st.info("尚無足夠平倉數據")
-                st.markdown("</div>", unsafe_allow_html=True)
+            c2_html = f"<div class='tier-card'><h4 style='margin-top:0;'>⏳ 持股時長勝率</h4>{c2_content}</div>"
+            with c2: st.markdown(c2_html, unsafe_allow_html=True)
 
-            # 3. 🛡️ 紀律勝率對比
-            with c3:
-                st.markdown("<div class='tier-card'>", unsafe_allow_html=True)
-                st.markdown("#### 🛡️ 紀律 vs 情緒")
-                res['操作類型'] = res['心魔'].apply(lambda x: "嚴格紀律" if '紀律' in x else ("情緒干擾" if x else "無標籤"))
-                type_stats = res[res['賣出'] != "-"].groupby('操作類型').agg(
-                    均報=('報酬%', 'mean')
-                ).reset_index()
-                
-                if not type_stats.empty:
-                    for _, r in type_stats.iterrows():
-                        color = "#10B981" if r['均報'] > 0 else "#EF4444"
-                        st.markdown(f"**{r['操作類型']}**：均報酬 <span style='color:{color};'>{r['均報']:.2f}%</span>", unsafe_allow_html=True)
-                st.markdown("</div>", unsafe_allow_html=True)
+            # 3. 🛡️ 紀律勝率對比 (整包 HTML 輸出)
+            res['操作類型'] = res['心魔'].apply(lambda x: "👑 嚴格紀律" if '紀律' in x else ("👻 情緒干擾" if x else "⚪ 無標籤"))
+            type_stats = res[res['賣出'] != "-"].groupby('操作類型').agg(
+                均報=('報酬%', 'mean')
+            ).reset_index()
+            
+            c3_content = ""
+            if not type_stats.empty:
+                for _, r in type_stats.iterrows():
+                    color = "#10B981" if r['均報'] > 0 else "#EF4444"
+                    c3_content += f"<div style='margin-bottom:8px;'><b>{r['操作類型']}</b>：均報酬 <span style='color:{color}; font-size:18px; font-weight:bold;'>{r['均報']:.2f}%</span></div>"
+                    
+            c3_html = f"<div class='tier-card'><h4 style='margin-top:0;'>🛡️ 紀律 vs 情緒</h4>{c3_content}</div>"
+            with c3: st.markdown(c3_html, unsafe_allow_html=True)
+
 
             st.markdown("---")
             st.markdown("#### 📜 詳細戰報清單")
 
-            # 移除隱藏的計算欄位
             display_df = res.drop(columns=['_少賺', '時長分類', '操作類型'], errors='ignore')
 
-            # 👑 完美欄位排版設定
             st.dataframe(
                 display_df.style.format({
                     "淨利": "{:,.0f}",
@@ -302,7 +306,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     "淨利": st.column_config.NumberColumn("淨利", width="small"),
                     "報酬%": st.column_config.TextColumn("報酬%", width="small"),
                     "心魔": st.column_config.TextColumn("心魔", width="small"),
-                    "AI診斷": st.column_config.TextColumn("AI毒舌診斷", width="large"),
+                    "AI診力量": st.column_config.TextColumn("AI毒舌診斷", width="large"),
                 }
             )
         else:
