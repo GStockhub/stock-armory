@@ -7,26 +7,29 @@ import yfinance as yf
 import numpy as np
 
 def robust_yf_download(sid, start_date):
-    """YF 備援引擎：附帶抖動延遲與重試機制"""
+    """YF 備援引擎：針對台股代號進行多重嘗試"""
     suffixes = [".TW", ".TWO"]
-    for attempt in range(2):
-        for suffix in suffixes:
-            try:
-                sym = f"{sid}{suffix}"
-                # 改為用 start_date 抓取，確保涵蓋所有歷史
-                df = yf.Ticker(sym).history(start=start_date)
-                if not df.empty and len(df) > 5:
-                    if df.index.tz is not None:
-                        df.index = pd.to_datetime(df.index).tz_localize(None)
-                    return df
-            except:
-                pass
-        time.sleep(1.0 + np.random.rand())
+    for suffix in suffixes:
+        try:
+            sym = f"{sid}{suffix}"
+            df = yf.Ticker(sym).history(start=start_date)
+            if not df.empty and len(df) > 0:
+                if df.index.tz is not None:
+                    df.index = pd.to_datetime(df.index).tz_localize(None)
+                # 確保欄位統一
+                if 'High' not in df.columns and 'high' in df.columns:
+                    df['High'] = df['high']
+                if 'Close' not in df.columns and 'close' in df.columns:
+                    df['Close'] = df['close']
+                return df
+        except:
+            continue
     return pd.DataFrame()
 
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
     """
-    獨立的 AAR 戰術覆盤引擎：雙引擎備援 (FinMind主攻 -> YFinance備援)
+    軍規級 AAR 戰術覆盤引擎
+    融合 GPT 容錯邏輯與 FinMind/YF 雙引擎
     """
     if not aar_sheet_url:
         st.info("請在左側邊欄輸入您的【交易日誌】CSV 網址，喚醒 AI 覆盤引擎。")
@@ -41,18 +44,14 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             st.error(f"❌ 欄位不符！請確保包含：{', '.join(required_cols)}")
             return
 
-        # 👑 破案關鍵：找出日誌中最古老的那一筆交易，往前推 30 天當作全域抓取起點
-        try:
-            earliest_date = pd.to_datetime(aar_df['買進日期']).min()
-            global_start = (earliest_date - timedelta(days=30)).strftime("%Y-%m-%d")
-        except:
-            global_start = "2020-01-01" # 萬一日期解析失敗，直接從2020年開始抓，絕對不漏！
+        # 👑 時間邏輯升級：拉長到 800 天，確保覆蓋所有區間
+        global_start = (datetime.now() - timedelta(days=800)).strftime("%Y-%m-%d")
 
         review_results = []
         total_realized_pnl = 0
         active_fee_rate = 0.001425 * fee_discount
         
-        with st.spinner('🕵️ 情報兵正在調閱歷史戰報，啟動雙引擎快取庫...'):
+        with st.spinner('🕵️ AI 正在掃描歷史戰報 (執行軍規級容錯對齊)...'):
             
             aar_cache = {} 
             
@@ -69,7 +68,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     tax_rate = 0.001 if sid.startswith('00') else 0.003
                     buy_fee = int((b_price * shares * 1000) * active_fee_rate)
                     cost = (b_price * shares * 1000) + buy_fee
-                except Exception:
+                except:
                     continue 
                 
                 diagnosis = "✅ 戰報已收錄" 
@@ -77,86 +76,101 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 s_date = None
                 api_debug_msg = ""
                 
+                # ===================================================
+                # 👑 雙引擎抓取 (FinMind -> YF) + 欄位萬用對齊
+                # ===================================================
                 if sid not in aar_cache:
                     hist_full = pd.DataFrame()
                     
-                    # 1. 主攻：FinMind API
+                    # 1. FinMind (強制 Token 參數)
                     try:
                         fm_url = "https://api.finmindtrade.com/api/v4/data"
                         fm_params = {
                             "dataset": "TaiwanStockPrice",
                             "data_id": sid,
-                            "start_date": global_start, # 👈 使用最古老日期作為起點
+                            "start_date": global_start,
                             "token": fm_token
                         }
-                        
                         fm_res = requests.get(fm_url, params=fm_params, timeout=10, verify=False).json()
                         
                         if fm_res.get("msg") == "success" and len(fm_res.get("data", [])) > 0:
                             hist_full = pd.DataFrame(fm_res["data"])
                             hist_full['date'] = pd.to_datetime(hist_full['date'])
                             hist_full.set_index('date', inplace=True)
-                            hist_full.rename(columns={'max': 'High', 'close': 'Close'}, inplace=True)
+                            
+                            # GPT 建議：欄位萬用對齊
+                            if 'max' in hist_full.columns: hist_full['High'] = hist_full['max']
+                            elif 'high' in hist_full.columns: hist_full['High'] = hist_full['high']
+                            
+                            if 'close' in hist_full.columns: hist_full['Close'] = hist_full['close']
                         else:
-                            api_debug_msg = fm_res.get("msg", "空資料")
+                            api_debug_msg = f"FM:{fm_res.get('msg', '無資料')}"
                     except Exception as e:
-                        api_debug_msg = str(e)[:20]
+                        api_debug_msg = f"FM異常:{str(e)[:10]}"
                     
-                    # 2. 備援：YFinance
+                    # 2. YF 備援
                     if hist_full.empty:
                         hist_full = robust_yf_download(sid, start_date=global_start)
                         if hist_full.empty:
-                            api_debug_msg += " | YF亦無資料"
+                            api_debug_msg += " | YF無效"
                     
                     aar_cache[sid] = hist_full
                     time.sleep(0.1) 
                     
                 hist_current = aar_cache[sid].copy()
 
+                # ===================================================
+                # 👑 診斷邏輯升級 (GPT 的索引切片建議)
+                # ===================================================
                 if pd.isna(row['賣出日期']) or pd.isna(row['賣出價']) or str(row['賣出價']).strip() == "":
                     if not hist_current.empty:
                         s_price = float(hist_current['Close'].iloc[-1])
                         diagnosis = "⚪ 尚未平倉 (計算目前帳面損益)"
                     else:
                         s_price = b_price
-                        diagnosis = f"⚪ 尚未平倉 (查無現價: {api_debug_msg})"
+                        diagnosis = f"⚪ 尚未平倉 (查無現價資料)"
                 else:
                     s_date = pd.to_datetime(row['賣出日期'])
                     s_price = float(row['賣出價'])
                     
-                    future_end = s_date + timedelta(days=20)
-                    future_hist = pd.DataFrame() 
-                    
                     if not hist_current.empty:
-                        mask = (hist_current.index > s_date) & (hist_current.index <= future_end)
-                        future_hist = hist_current.loc[mask]
-                    
-                    if future_hist.empty or len(future_hist) < 3:
-                        if (datetime.now() - s_date).days <= 3:
-                            diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
-                        else:
-                            diagnosis = f"⚠️ 無法診斷 (錯誤代碼: {api_debug_msg})" if api_debug_msg else "⚠️ 查無該區間足夠數據"
+                        # GPT 建議：改用 loc 區間抓取，再用 iloc[1:] 跳過賣出當天
+                        future_end = s_date + timedelta(days=20)
+                        try:
+                            future_hist = hist_current.loc[s_date:future_end].copy()
+                            future_hist = future_hist.iloc[1:] # 移除賣出日當天
+                            
+                            if future_hist.empty:
+                                if (datetime.now() - s_date).days <= 3:
+                                    diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據"
+                                else:
+                                    diagnosis = f"⚠️ 無未來數據 (原因:{api_debug_msg if api_debug_msg else '區間空值'})"
+                            else:
+                                max_future_price = future_hist['High'].max()
+                                # 判斷邏輯
+                                if '恐高早退' in tag or '失去耐心' in tag:
+                                    if max_future_price > s_price * 1.02:
+                                        missed = (max_future_price - s_price) * shares * 1000
+                                        diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed:,.0f}元。"
+                                    else:
+                                        diagnosis = "✅ 賣出後未見顯著創高，撤退精準！"
+                                elif '恐慌砍倉' in tag:
+                                    if max_future_price > b_price:
+                                        diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
+                                    else:
+                                        diagnosis = "🛡️ 後續未反彈，提早砍倉算是不幸中大幸。"
+                                elif '紀律' in tag:
+                                    diagnosis = "👑 嚴格執行紀律，不參與後續波動。"
+                                else:
+                                    diagnosis = f"✅ 已結案 | 撤退後最高價 {max_future_price:.1f}"
+                        except:
+                            diagnosis = f"⚠️ 數據切片失敗 ({api_debug_msg})"
                     else:
-                        max_future_price = future_hist['High'].max()
-                        if '恐高早退' in tag or '失去耐心' in tag:
-                            if max_future_price > s_price * 1.02:
-                                missed_profit = (max_future_price - s_price) * shares * 1000
-                                diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed_profit:,.0f}元。"
-                            else:
-                                diagnosis = "✅ 賣出後未見顯著創高，撤退精準！"
-                        elif '恐慌砍倉' in tag:
-                            if max_future_price > b_price:
-                                diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
-                            else:
-                                diagnosis = "🛡️ 後續未反彈，提早砍倉算是不幸中大幸。"
-                        elif '紀律' in tag:
-                            diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌！"
-                        else:
-                            diagnosis = f"✅ 已結案 | 撤退後最高價 {max_future_price:.1f}"
+                        diagnosis = f"⚠️ 無法調閱 K 線資料 ({api_debug_msg})"
 
+                # 計算損益
                 sell_fee = int((s_price * shares * 1000) * active_fee_rate)
                 sell_tax = int((s_price * shares * 1000) * tax_rate)
-                
                 revenue = (s_price * shares * 1000) - sell_fee - sell_tax
                 net_profit = revenue - cost
                 roi = (net_profit / cost) * 100 if cost > 0 else 0
@@ -185,4 +199,4 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         else:
             st.warning("日誌中無有效交易紀錄。")
     except Exception as e:
-        st.error(f"❌ 讀取交易日誌失敗：{e}")
+        st.error(f"❌ 系統嚴重崩潰：{e}")
