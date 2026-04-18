@@ -84,7 +84,7 @@ with st.sidebar:
         st.success("快取已清除！請重新載入。")
 
 st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.2</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ FinMind合法金鑰 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 自訂稅費精算 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -163,7 +163,7 @@ def get_macro_dashboard():
                 if last_p > ma20: score += 1
                 else: score -= 1
                 
-            macro_data.append({"戰區": display_name, "現值": f"{last_p:.2f}", "月線": f"{ma20:.2f}", "狀態": status})
+            macro_data.append({"战區": display_name, "現值": f"{last_p:.2f}", "月線": f"{ma20:.2f}", "狀態": status})
         except: 
             macro_data.append({"戰區": display_name, "現值": "計算失敗", "月線": "-", "狀態": "⚪ 斷線"})
             continue
@@ -355,7 +355,7 @@ def level2_quant_engine(id_tuple):
 # 【第五區塊：軍事化分頁渲染與系統顯示】
 # ==============================================================================
 
-# 👑 核心修復：把 risk_color 移出 Tab1 迴圈，設定為全域可用，修復 NameError 當機！
+# 👑 修復點：將 risk_color 移至全域，供所有 Tab 呼叫，徹底斬除 NameError！
 def risk_color(val):
     try:
         v = int(val)
@@ -591,17 +591,14 @@ if len(chip_db) >= 3:
                         
                         for _, r in m_df.iterrows():
                             try:
-                                sid = str(r['代號']).strip()
                                 p_now = float(r['現價'])
                                 p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
                                 qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
                                 
-                                # 👑 修復：ETF (00開頭) 交易稅降為千分之1
-                                tax_rate = 0.001 if sid.startswith('00') else 0.003
-                                
+                                # 使用標準整數化(truncation)最接近台灣券商算法
                                 buy_fee = int((p_cost * qty * 1000) * active_fee_rate)
                                 sell_fee = int((p_now * qty * 1000) * active_fee_rate)
-                                sell_tax = int((p_now * qty * 1000) * tax_rate)
+                                sell_tax = int((p_now * qty * 1000) * 0.003)
                                 
                                 buy_cost_total = (p_cost * qty * 1000) + buy_fee
                                 sell_revenue_net = (p_now * qty * 1000) - sell_fee - sell_tax
@@ -615,7 +612,7 @@ if len(chip_db) >= 3:
                                 act = "✅ 抱緊處理"
                                 if ret >= 10: act = "💰 +10% 達標 (強制全出)"
                                 elif ret >= 6: act = "🛡️ +6% 達標 (賣出一半鎖利)"
-                                elif p_now < r['M10'] or ret <= -3: act = "💀 破線硬停損 (無情砍倉)"
+                                elif p_now < r['M10'] or ret <= -3: act = "💀 破線硬停損 (無情砍仓)"
                                 
                                 res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作戰指示': act})
                             except: continue
@@ -650,13 +647,7 @@ if len(chip_db) >= 3:
                     total_realized_pnl = 0
                     active_fee_rate = 0.001425 * fee_discount
                     
-                    with st.spinner('🕵️ 情報兵正在調閱歷史戰報，啟動 FinMind 皇家快取引擎...'):
-                        
-                        # 👑 核心情報快取庫：同檔股票不管幾筆，都只向 FinMind 查一次
-                        aar_cache = {}
-                        # 👑 將軍專屬 FinMind API 金鑰
-                        fm_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiZGVraTEwMjMiLCJlbWFpbCI6ImRla2kxMDIzQGdtYWlsLmNvbSJ9.-wVo_6BD8ac8cGCOi8C3J58KUGZ1c0CMwTU9lYPltNM"
-                        
+                    with st.spinner('🕵️ 情報兵正在調閱歷史戰報，計算錯失利潤與心理盲點...'):
                         for idx, row in aar_df.iterrows():
                             try:
                                 if pd.isna(row['代號']): continue
@@ -667,9 +658,7 @@ if len(chip_db) >= 3:
                                 tag = str(row['心理標籤'])
                                 if pd.isna(tag) or tag.lower() == "nan": tag = ""
                                 
-                                # 👑 修復：ETF 交易稅
-                                tax_rate = 0.001 if sid.startswith('00') else 0.003
-                                
+                                # 👑 運用無條件捨去的券商標準算法
                                 buy_fee = int((b_price * shares * 1000) * active_fee_rate)
                                 cost = (b_price * shares * 1000) + buy_fee
                             except Exception:
@@ -679,80 +668,63 @@ if len(chip_db) >= 3:
                             s_price = 0.0
                             s_date = None
                             
-                            # ===================================================
-                            # 👑 FinMind 高速合法連線，完全取代被封鎖的 YFinance
-                            # ===================================================
-                            if sid not in aar_cache:
-                                hist_full = pd.DataFrame()
-                                try:
-                                    fm_url = "https://api.finmindtrade.com/api/v4/data"
-                                    # 往前抓半年確保資料充裕，完美覆蓋 3/18 以來的紀錄
-                                    fm_start = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
-                                    fm_params = {
-                                        "dataset": "TaiwanStockPrice",
-                                        "data_id": sid,
-                                        "start_date": fm_start,
-                                        "token": fm_token
-                                    }
-                                    # 帶著金鑰去要資料，再也不會被擋
-                                    fm_res = requests.get(fm_url, params=fm_params, timeout=10, verify=False).json()
-                                    
-                                    if fm_res.get("msg") == "success" and len(fm_res.get("data", [])) > 0:
-                                        hist_full = pd.DataFrame(fm_res["data"])
-                                        # FinMind 日期格式乾淨，無須處理時區
-                                        hist_full['date'] = pd.to_datetime(hist_full['date'])
-                                        hist_full.set_index('date', inplace=True)
-                                        # 為了配合下面您的 AAR 邏輯，把欄位名改成大寫
-                                        hist_full.rename(columns={'max': 'High', 'close': 'Close'}, inplace=True)
-                                except Exception:
-                                    pass
-                                
-                                aar_cache[sid] = hist_full
-                                time.sleep(0.1) # FinMind合法快速，不需像小偷一樣等太久
-                                
-                            hist_current = aar_cache[sid].copy()
-
                             if pd.isna(row['賣出日期']) or pd.isna(row['賣出價']) or str(row['賣出價']).strip() == "":
+                                hist_current = pd.DataFrame()
+                                for suffix in [".TW", ".TWO"]:
+                                    try:
+                                        hist_current = yf.Ticker(f"{sid}{suffix}").history(period="5d")
+                                        if not hist_current.empty: break
+                                    except Exception: pass
+                                
                                 if not hist_current.empty:
                                     s_price = float(hist_current['Close'].iloc[-1])
                                     diagnosis = "⚪ 尚未平倉 (計算目前帳面損益)"
                                 else:
                                     s_price = b_price
-                                    diagnosis = "⚪ 尚未平倉 (查無該股，無法取得現價)"
+                                    diagnosis = "⚪ 尚未平倉 (API阻擋，無法取得現價)"
                             else:
                                 s_date = pd.to_datetime(row['賣出日期'])
                                 s_price = float(row['賣出價'])
                                 
                                 future_end = s_date + timedelta(days=15)
-                                future_hist = pd.DataFrame() 
+                                hist = pd.DataFrame() 
                                 
-                                if not hist_current.empty:
-                                    # 切割賣出後 15 天內的資料
-                                    mask = (hist_current.index > s_date) & (hist_current.index <= future_end)
-                                    future_hist = hist_current.loc[mask]
+                                try:
+                                    for suffix in [".TW", ".TWO"]:
+                                        temp_hist = yf.Ticker(f"{sid}{suffix}").history(start=s_date.strftime('%Y-%m-%d'), end=future_end.strftime('%Y-%m-%d'))
+                                        if not temp_hist.empty:
+                                            hist = temp_hist
+                                            break
+                                except Exception:
+                                    pass 
                                 
-                                if future_hist.empty:
-                                    diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
+                                if hist.empty:
+                                    diagnosis = "⚠️ API 阻擋或無數據，無法診斷"
+                                elif len(hist) > 1:
+                                    future_hist = hist.iloc[1:]
+                                    if not future_hist.empty:
+                                        max_future_price = future_hist['High'].max()
+                                        if '恐高早退' in tag or '失去耐心' in tag:
+                                            if max_future_price > s_price * 1.02:
+                                                missed_profit = (max_future_price - s_price) * shares * 1000
+                                                diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed_profit:,.0f}元。"
+                                            else:
+                                                diagnosis = "✅ 賣出後未見創高，此撤退時機精準！"
+                                        elif '恐慌砍倉' in tag:
+                                            if max_future_price > b_price:
+                                                diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
+                                            else:
+                                                diagnosis = "🛡️ 後續未反彈，提早砍倉算是不幸中大幸。"
+                                        elif '紀律' in tag:
+                                            diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌！"
+                                        else:
+                                            diagnosis = "✅ 已結案"
                                 else:
-                                    max_future_price = future_hist['High'].max()
-                                    if '恐高早退' in tag or '失去耐心' in tag:
-                                        if max_future_price > s_price * 1.02:
-                                            missed_profit = (max_future_price - s_price) * shares * 1000
-                                            diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed_profit:,.0f}元。"
-                                        else:
-                                            diagnosis = "✅ 賣出後未見創高，此撤退時機精準！"
-                                    elif '恐慌砍倉' in tag:
-                                        if max_future_price > b_price:
-                                            diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
-                                        else:
-                                            diagnosis = "🛡️ 後續未反彈，提早砍倉算是不幸中大幸。"
-                                    elif '紀律' in tag:
-                                        diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌！"
-                                    else:
-                                        diagnosis = "✅ 已結案"
+                                    diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
 
+                            # 👑 同樣使用捨去法精算賣出稅費
                             sell_fee = int((s_price * shares * 1000) * active_fee_rate)
-                            sell_tax = int((s_price * shares * 1000) * tax_rate)
+                            sell_tax = int((s_price * shares * 1000) * 0.003)
                             
                             revenue = (s_price * shares * 1000) - sell_fee - sell_tax
                             net_profit = revenue - cost
@@ -769,6 +741,7 @@ if len(chip_db) >= 3:
                                 '心魔檢定': tag.split('(')[0].strip() if '(' in tag else tag, 
                                 'AI 毒舌診斷': diagnosis
                             })
+                            time.sleep(0.1) 
 
                     if review_results:
                         res_df = pd.DataFrame(review_results)
@@ -804,4 +777,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.2 (FinMind 終極合法版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.2</p>", unsafe_allow_html=True)
