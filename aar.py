@@ -38,13 +38,13 @@ def get_finmind_data(sid, start_date, fm_token):
         }
         res = requests.get(url, params=params, timeout=10, verify=False).json()
 
-        # 👑 防禦升級：擋掉「幽靈空資料」與被限流的狀況
+        # 防禦升級：擋掉「幽靈空資料」與被限流的狀況
         if res.get("msg") != "success":
             return pd.DataFrame()
 
         if res.get("data") and len(res["data"]) > 0:
             df = pd.DataFrame(res["data"])
-            df['date'] = pd.to_datetime(df['date']).dt.date # 強制轉為純日期
+            df['date'] = pd.to_datetime(df['date']).dt.date
             df.set_index('date', inplace=True)
             
             df['High'] = pd.to_numeric(df.get('max', df.get('high', df['close'])), errors='coerce')
@@ -78,7 +78,7 @@ def get_yf_data(sid, start_date):
     return pd.DataFrame()
 
 # =========================
-# 主函數 (V2 系統升級)
+# 主函數 (V2.1 終極系統升級)
 # =========================
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
@@ -96,7 +96,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         results = []
         total_pnl = 0
 
-        with st.spinner("🧠 交易行為分析 AI v2 正在萃取雙視角戰情..."):
+        with st.spinner("🧠 交易行為分析 AI v2.1 正在執行雙視角與動態門檻運算..."):
 
             for _, row in df.iterrows():
                 try:
@@ -136,6 +136,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 b_date_str = b_date.strftime('%m/%d') if pd.notnull(b_date) else "-"
                 s_date_str = "-"
 
+                # 👑 提前計算持有天數 (為了後面的動態門檻判斷)
+                temp_s_date = parse_tw_date(row.get('賣出日期')) if pd.notnull(row.get('賣出日期')) else None
+                if temp_s_date is not None and not pd.isna(temp_s_date):
+                    held_days = (temp_s_date - b_date).days
+                else:
+                    held_days = (datetime.now() - b_date).days
+
                 # ========= 未平倉 =========
                 if pd.isna(row.get('賣出日期')) or str(row.get('賣出價', '')).strip() == "":
                     if not hist.empty:
@@ -146,7 +153,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
                 # ========= 已平倉 (雙視角 AI 診斷核心) =========
                 else:
-                    s_date = parse_tw_date(row['賣出日期'])
+                    s_date = temp_s_date
                     s_price = float(row['賣出價'])
                     s_date_str = s_date.strftime('%m/%d') if pd.notnull(s_date) else "-"
 
@@ -157,35 +164,43 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
                         s_date_obj = s_date.date()
                         
-                        # 👑 雙視角：定義 7 天短線與 20 天波段
                         future_7d_obj = (s_date + timedelta(days=7)).date()
                         future_20d_obj = (s_date + timedelta(days=20)).date()
                         
                         future_data_7d = hist[(hist.index > s_date_obj) & (hist.index <= future_7d_obj)]
                         future_data_20d = hist[(hist.index > s_date_obj) & (hist.index <= future_20d_obj)]
 
-                        if future_data_20d.empty:
+                        # 👑 GPT 建議：防呆機制，避免 High 全是 NaN 導致出錯
+                        if future_data_20d.empty or future_data_20d['High'].isna().all():
                             if (datetime.now().date() - s_date_obj).days <= 3:
                                 diagnosis = "⏳ 剛賣出"
                             else:
                                 diagnosis = f"⚠️ 無後續"
                         else:
-                            # 抓取雙視角最高點
                             max_20d = future_data_20d['High'].max()
-                            max_7d = future_data_7d['High'].max() if not future_data_7d.empty else s_price
+                            
+                            # 👑 GPT 建議：短線嚴謹空值判斷，不自我安慰
+                            if future_data_7d.empty or future_data_7d['High'].isna().all():
+                                max_7d = None
+                            else:
+                                max_7d = future_data_7d['High'].max()
 
                             if pd.isna(max_20d):
                                 diagnosis = "⚠️ 價格異常"
                             else:
                                 if '恐高' in tag or '耐心' in tag:
                                     # 🟢 視角一：短線判斷
-                                    if max_7d > s_price * 1.02:
+                                    if max_7d is None:
+                                        short_term = "⏳ 短線資料不足"
+                                    elif max_7d > s_price * 1.02:
                                         short_term = "📉 短線即賣飛"
                                     else:
                                         short_term = "✅ 短線躲過震盪"
 
-                                    # 🔴 視角二：波段潛力判斷
-                                    if max_20d > s_price * 1.05:
+                                    # 🔴 視角二：波段潛力判斷 (👑 GPT 建議：動態門檻)
+                                    threshold = 1.03 if held_days <= 3 else 1.05
+                                    
+                                    if max_20d > s_price * threshold:
                                         max_date = future_data_20d['High'].idxmax()
                                         days_to_high = (max_date - s_date_obj).days
                                         missed_profit_val = (max_20d - s_price) * shares * 1000
@@ -193,7 +208,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                                     else:
                                         long_term = "且無錯失大波段，精準撤退！"
 
-                                    # 組合雙視角診斷
                                     diagnosis = f"{short_term} ｜ {long_term}"
 
                                 elif '恐慌' in tag:
@@ -208,7 +222,10 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                                     diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌"
 
                                 else:
-                                    diagnosis = f"📊 7天高點 {max_7d:.1f} ｜ 20天高點 {max_20d:.1f}"
+                                    if max_7d is not None:
+                                        diagnosis = f"📊 7天高點 {max_7d:.1f} ｜ 20天高點 {max_20d:.1f}"
+                                    else:
+                                        diagnosis = f"📊 20天高點 {max_20d:.1f}"
 
                 # ========= 損益計算 =========
                 buy_fee = int((b_price * shares * 1000) * fee_rate)
@@ -223,11 +240,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
                 total_pnl += pnl
 
-                if s_date is not None:
-                    held_days = (s_date - b_date).days
-                else:
-                    held_days = (datetime.now() - b_date).days
-
                 results.append({
                     "代號": sid,
                     "買進": b_date_str,
@@ -241,7 +253,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 })
 
         # =========================================================
-        # 👑 交易行為分析 AI v2 (全新高階教練看板)
+        # 👑 交易行為分析 AI v2.1 (心理核彈重擊版)
         # =========================================================
         if results:
             res = pd.DataFrame(results)
@@ -251,9 +263,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             
             c1, c2, c3 = st.columns(3)
             
-            # 1. 🔪 心魔代價排行榜 (整包 HTML 輸出)
+            # 1. 🔪 心魔代價排行榜 (👑 GPT 建議：加入平均少賺金額)
             demon_loss = res[res['心魔'] != ""].groupby('心魔')['_少賺'].sum().reset_index()
             demon_loss = demon_loss[demon_loss['_少賺'] > 0].sort_values('_少賺', ascending=False)
+            
+            # 計算所有有賣飛(少賺)的交易的平均值
+            avg_missed = res['_少賺'][res['_少賺'] > 0].mean()
+            if pd.isna(avg_missed): avg_missed = 0
             
             if not demon_loss.empty:
                 top_demon = demon_loss.iloc[0]
@@ -263,7 +279,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     <span style='color:#9CA3AF;'>您最大的敵人是：</span><br>
                     <span style='color:#EF4444; font-size:22px; font-weight:bold;'>「{top_demon['心魔']}」</span><br><br>
                     <span style='color:#9CA3AF;'>總計讓您少賺了：</span><br>
-                    <span style='color:#F59E0B; font-size:20px; font-weight:bold;'>{top_demon['_少賺']:,.0f} 元</span>
+                    <span style='color:#F59E0B; font-size:18px; font-weight:bold;'>{top_demon['_少賺']:,.0f} 元</span><br>
+                    <span style='color:#9CA3AF;'>平均每筆賣飛代價：</span><br>
+                    <span style='color:#EF4444; font-size:18px; font-weight:bold;'>{avg_missed:,.0f} 元</span>
                 </div>
                 """
             else:
@@ -271,7 +289,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             
             with c1: st.markdown(c1_html, unsafe_allow_html=True)
 
-            # 2. ⏳ 最佳持股時長雷達 (整包 HTML 輸出)
+            # 2. ⏳ 最佳持股時長雷達
             res['時長分類'] = res['天數'].apply(lambda x: "⚡ 極短線 (1~3天)" if x <= 3 else ("🚶 短波段 (4~7天)" if x <= 7 else "🧘 長波段 (8天+)"))
             hold_stats = res[res['賣出'] != "-"].groupby('時長分類').agg(
                 勝率=('淨利', lambda x: f"{(x > 0).mean() * 100:.0f}%")
@@ -287,7 +305,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             c2_html = f"<div class='tier-card'><h4 style='margin-top:0;'>⏳ 持股時長勝率</h4>{c2_content}</div>"
             with c2: st.markdown(c2_html, unsafe_allow_html=True)
 
-            # 3. 🛡️ 紀律勝率對比 (整包 HTML 輸出)
+            # 3. 🛡️ 紀律勝率對比
             res['操作類型'] = res['心魔'].apply(lambda x: "👑 嚴格紀律" if '紀律' in x else ("👻 情緒干擾" if x else "⚪ 無標籤"))
             type_stats = res[res['賣出'] != "-"].groupby('操作類型').agg(
                 均報=('報酬%', 'mean')
@@ -302,13 +320,11 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             c3_html = f"<div class='tier-card'><h4 style='margin-top:0;'>🛡️ 紀律 vs 情緒</h4>{c3_content}</div>"
             with c3: st.markdown(c3_html, unsafe_allow_html=True)
 
-
             st.markdown("---")
             st.markdown("#### 📜 詳細戰報清單")
 
             display_df = res.drop(columns=['_少賺', '時長分類', '操作類型'], errors='ignore')
 
-            # 👑 修正了欄位打字錯誤 "AI診斷"
             st.dataframe(
                 display_df.style.format({
                     "淨利": "{:,.0f}",
