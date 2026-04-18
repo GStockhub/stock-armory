@@ -84,7 +84,7 @@ with st.sidebar:
         st.success("快取已清除！請重新載入。")
 
 st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.2</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 自訂稅費精算 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 智慧緩存引擎 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -627,7 +627,7 @@ if len(chip_db) >= 3:
                                 elif ret >= 6: act = "🛡️ +6% 達標 (賣出一半鎖利)"
                                 elif p_now < r['M10'] or ret <= -3: act = "💀 破線硬停損 (無情砍倉)"
                                 
-                                res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作戰指示': act})
+                                res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作作戰指示': act})
                             except: continue
                             
                         df_res = pd.DataFrame(res_h)
@@ -661,6 +661,10 @@ if len(chip_db) >= 3:
                     active_fee_rate = 0.001425 * fee_discount
                     
                     with st.spinner('🕵️ 情報兵正在調閱歷史戰報，計算錯失利潤與心理盲點...'):
+                        
+                        # 👑 核心優化：建立戰術緩存庫，同檔股票不管交易幾次，都只抓一次！
+                        aar_cache = {} 
+                        
                         for idx, row in aar_df.iterrows():
                             try:
                                 if pd.isna(row['代號']): continue
@@ -683,59 +687,56 @@ if len(chip_db) >= 3:
                             s_price = 0.0
                             s_date = None
                             
-                            if pd.isna(row['賣出日期']) or pd.isna(row['賣出價']) or str(row['賣出價']).strip() == "":
-                                hist_current = pd.DataFrame()
-                                # 👑 為未平倉裝甲：重試 3 次，避免阻擋
+                            # ==========================================
+                            # 👑 情報快取機制：如果這檔股票沒抓過，才向 API 請求
+                            # ==========================================
+                            if sid not in aar_cache:
+                                hist_full = pd.DataFrame()
                                 for suffix in [".TW", ".TWO"]:
-                                    for _ in range(3):
-                                        try:
-                                            temp_hist = yf.Ticker(f"{sid}{suffix}").history(period="1mo")
-                                            if not temp_hist.empty:
-                                                hist_current = temp_hist
-                                                break
-                                        except Exception:
-                                            time.sleep(0.5)
-                                    if not hist_current.empty: break
-                                
+                                    try:
+                                        temp_df = yf.Ticker(f"{sid}{suffix}").history(period="6mo")
+                                        if not temp_df.empty:
+                                            hist_full = temp_df
+                                            break
+                                    except:
+                                        # 👑 擬真潛行：遇到例外時冷卻
+                                        time.sleep(1.2 + np.random.rand())
+                                        
+                                aar_cache[sid] = hist_full
+                                # 👑 擬真潛行：成功抓完一檔新的，強制休息，騙過機關槍雷達
+                                time.sleep(1.2 + np.random.rand()) 
+                            
+                            # 直接從快取庫把這檔股票的 6 個月資料拿出來用
+                            hist_current = aar_cache[sid].copy()
+
+                            if pd.isna(row['賣出日期']) or pd.isna(row['賣出價']) or str(row['賣出價']).strip() == "":
                                 if not hist_current.empty:
                                     s_price = float(hist_current['Close'].iloc[-1])
                                     diagnosis = "⚪ 尚未平倉 (計算目前帳面損益)"
                                 else:
                                     s_price = b_price
-                                    diagnosis = "⚪ 尚未平倉 (API阻擋，無法取得現價)"
+                                    diagnosis = "⚪ 尚未平倉 (API阻擋或查無該股，無法取得現價)"
                             else:
                                 s_date = pd.to_datetime(row['賣出日期'])
                                 s_price = float(row['賣出價'])
                                 
-                                future_end = s_date + timedelta(days=15)
+                                # 👑 寬容切割：放寬到 20 天，確保包容台灣的六日與連假
+                                future_end = s_date + timedelta(days=20)
                                 future_hist = pd.DataFrame() 
                                 
-                                # 👑 修復：為 AAR 裝上與大盤一樣的「重試防護裝甲」，抵抗雲端阻擋
-                                hist_full = pd.DataFrame()
-                                for suffix in [".TW", ".TWO"]:
-                                    for _ in range(3): # 嘗試 3 次
-                                        try:
-                                            temp_df = yf.Ticker(f"{sid}{suffix}").history(period="6mo")
-                                            if not temp_df.empty:
-                                                hist_full = temp_df
-                                                break
-                                        except:
-                                            time.sleep(0.5)
-                                    if not hist_full.empty:
-                                        break
-                                
-                                if not hist_full.empty:
+                                if not hist_current.empty:
                                     # 去除時區避免比對錯誤
-                                    hist_full.index = pd.to_datetime(hist_full.index).tz_localize(None)
-                                    # 切割賣出後 15 天內的資料
-                                    mask = (hist_full.index > s_date) & (hist_full.index <= future_end)
-                                    future_hist = hist_full.loc[mask]
+                                    hist_current.index = pd.to_datetime(hist_current.index).tz_localize(None)
+                                    # 切割賣出後 20 天內的資料
+                                    mask = (hist_current.index > s_date) & (hist_current.index <= future_end)
+                                    future_hist = hist_current.loc[mask]
 
-                                if future_hist.empty:
-                                    if (datetime.now() - s_date).days <= 1:
+                                # 👑 過濾雜訊：加入 len < 3 避免單日錯誤資料干擾
+                                if future_hist.empty or len(future_hist) < 3:
+                                    if (datetime.now() - s_date).days <= 3:
                                         diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
                                     else:
-                                        diagnosis = "⚠️ API 阻擋或查無該區間數據，無法診斷"
+                                        diagnosis = "⚠️ API 阻擋或查無該區間足夠數據，無法診斷"
                                 else:
                                     max_future_price = future_hist['High'].max()
                                     if '恐高早退' in tag or '失去耐心' in tag:
@@ -743,7 +744,7 @@ if len(chip_db) >= 3:
                                             missed_profit = (max_future_price - s_price) * shares * 1000
                                             diagnosis = f"⚠️ 錯失飆漲！後續最高達 {max_future_price:.1f}，少賺約 +{missed_profit:,.0f}元。"
                                         else:
-                                            diagnosis = "✅ 賣出後未見創高，此撤退時機精準！"
+                                            diagnosis = "✅ 賣出後未見顯著創高，此撤退時機精準！"
                                     elif '恐慌砍倉' in tag:
                                         if max_future_price > b_price:
                                             diagnosis = "🩸 賣出後股價成功反彈解套，被洗出局了。"
@@ -772,8 +773,6 @@ if len(chip_db) >= 3:
                                 '心魔檢定': tag.split('(')[0].strip() if '(' in tag else tag, 
                                 'AI 毒舌診斷': diagnosis
                             })
-                            # 給情報兵喘息時間，避免被機關槍阻擋
-                            time.sleep(0.5) 
 
                     if review_results:
                         res_df = pd.DataFrame(review_results)
