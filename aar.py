@@ -80,7 +80,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         return
 
     try:
-        df = pd.read_csv(aar_sheet_url).applymap(lambda x: x.strip() if isinstance(x, str) else x)
+        # 👑 修正點：自動偵測 Pandas 版本，避免 applymap 被拔除的報錯
+        df = pd.read_csv(aar_sheet_url, dtype=str)
+        if hasattr(df, 'map'):
+            df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+        else:
+            df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+            
         df.columns = df.columns.str.strip()
         global_start = (datetime.now() - timedelta(days=800)).strftime("%Y-%m-%d")
         cache, results, total_pnl = {}, [], 0
