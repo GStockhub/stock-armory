@@ -16,6 +16,8 @@ def parse_tw_date(d_str):
             y = int(parts[0])
             if y < 200: y += 1911  # 民國年自動轉西元
             return pd.to_datetime(f"{y}-{parts[1]}-{parts[2]}")
+        elif len(parts) == 2:
+            return pd.to_datetime(f"{datetime.now().year}-{parts[0]}-{parts[1]}")
         return pd.to_datetime(d_str)
     except:
         return pd.NaT
@@ -38,11 +40,12 @@ def get_finmind_data(sid, start_date, fm_token):
 
         if res.get("data") and len(res["data"]) > 0:
             df = pd.DataFrame(res["data"])
-            df['date'] = pd.to_datetime(df['date'])
+            df['date'] = pd.to_datetime(df['date']).dt.date # 強制轉為純日期
             df.set_index('date', inplace=True)
-
-            df['High'] = df.get('max', df.get('high', df['close']))
-            df['Close'] = df['close']
+            
+            # 👑 強制轉為數值，防止 FinMind 回傳字串導致誤刪資料
+            df['High'] = pd.to_numeric(df.get('max', df.get('high', df['close'])), errors='coerce')
+            df['Close'] = pd.to_numeric(df['close'], errors='coerce')
 
             df = df[['High', 'Close']].dropna()
             df = df.sort_index()
@@ -59,11 +62,13 @@ def get_yf_data(sid, start_date):
     suffixes = [".TW", ".TWO"]
     for suf in suffixes:
         try:
-            # 👑 加上 auto_adjust=False 關閉 YF 智障的股息還原，取得最真實價格
+            # 加上 auto_adjust=False 關閉 YF 智障的股息還原
             df = yf.Ticker(f"{sid}{suf}").history(start=start_date, auto_adjust=False)
             if not df.empty:
-                df.index = pd.to_datetime(df.index.date)
-                df['High'] = df.get('High', df['Close'])
+                df.index = pd.to_datetime(df.index).dt.date # 強制轉為純日期
+                df['High'] = pd.to_numeric(df.get('High', df['Close']), errors='coerce')
+                df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
+                
                 df = df[['High', 'Close']].dropna()
                 df = df.sort_index()
                 return df
@@ -93,7 +98,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
         fm_ok, yf_ok, fail = 0, 0, 0
 
-        with st.spinner("AI 覆盤分析中... (正在調教價值觀與排版)"):
+        with st.spinner("AI 覆盤分析中... (正在啟動核彈級日期過濾)"):
 
             for _, row in df.iterrows():
                 try:
@@ -105,7 +110,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     b_price = float(row['買進價'])
                     shares = float(row['張數'])
                     
-                    # 👑 心魔標籤去蕪存菁：去除括號及其內容，只留前面四字
+                    # 👑 心魔標籤去蕪存菁：去除括號及其內容
                     raw_tag = str(row.get('心理標籤', '')).strip()
                     tag = raw_tag.split('(')[0].split('（')[0].strip()
 
@@ -159,34 +164,39 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     else:
                         hist = hist.sort_index()
 
-                        # 👑 調整為波段預期：只看賣出後 10 天
-                        future_end = s_date + timedelta(days=10)
-                        future_data = hist[(hist.index > s_date) & (hist.index <= future_end)]
+                        # 👑 核彈級過濾：全部轉成純 Date 比較，徹底杜絕時區與 Pandas 切片地雷
+                        s_date_obj = s_date.date()
+                        future_end_obj = (s_date + timedelta(days=10)).date()
+                        
+                        # 只留下 > 賣出日，且 <= 賣出後10天 的資料
+                        hist_dates = pd.Series(hist.index) # index 已經是純 date
+                        future_data = hist[(hist_dates > s_date_obj) & (hist_dates <= future_end_obj)]
 
                         if future_data.empty:
-                            if (datetime.now() - s_date).days <= 3:
+                            if (datetime.now().date() - s_date_obj).days <= 3:
                                 diagnosis = "⏳ 剛賣出"
                             else:
-                                diagnosis = "⚠️ 無後續資料"
+                                # 印出完整的西元年，方便抓出是否為格式解析錯誤
+                                diagnosis = f"⚠️ 無後續 ({s_date_obj.strftime('%Y-%m-%d')}後10天)"
                         else:
                             max_high = future_data['High'].max()
 
                             if pd.isna(max_high):
                                 diagnosis = "⚠️ 價格異常"
                             else:
-                                # 👑 提高判定門檻至 4% (1.04)，避免 AI 吹毛求疵
+                                # 提高判定門檻至 4% (1.04)
                                 if '恐高' in tag or '耐心' in tag:
                                     if max_high > s_price * 1.04:
                                         missed = (max_high - s_price) * shares * 1000
                                         diagnosis = f"⚠️ 賣飛！後高{max_high:.1f} 少賺 {missed:,.0f}"
                                     else:
-                                        diagnosis = "✅ 賣在相對高點，入袋為安"
+                                        diagnosis = "✅ 賣點漂亮，入袋為安"
 
                                 elif '恐慌' in tag:
                                     if max_high > b_price:
-                                        diagnosis = "🩸 洗盤被騙出場，後續已反彈"
+                                        diagnosis = "🩸 洗盤被騙出場，後續反彈"
                                     else:
-                                        diagnosis = "🛡️ 果斷停損正確！"
+                                        diagnosis = "🛡️ 停損正確！"
 
                                 elif '紀律' in tag:
                                     diagnosis = "👑 嚴格執行紀律"
@@ -212,7 +222,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 else:
                     held_days = (datetime.now() - b_date).days
 
-                # 👑 整理成最終顯示格式
+                # 整理成最終顯示格式
                 results.append({
                     "代號": sid,
                     "買進": b_date_str,
@@ -230,7 +240,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
             st.markdown(f"#### 💰 歷史戰役總淨利：<span style='color:#EF4444; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
 
-            # 👑 完美欄位排版設定 (動態壓縮小欄位，把空間留給診斷)
+            # 👑 完美欄位排版設定
             st.dataframe(
                 res.style.format({
                     "淨利": "{:,.0f}",
