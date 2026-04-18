@@ -51,7 +51,6 @@ def get_finmind_data(sid, start_date, fm_token):
         pass
     return pd.DataFrame()
 
-
 # =========================
 # YF 備援引擎 (👑 修復 ETF 爆表 Bug)
 # =========================
@@ -70,7 +69,6 @@ def get_yf_data(sid, start_date):
         except:
             continue
     return pd.DataFrame()
-
 
 # =========================
 # 主函數
@@ -93,7 +91,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
         fm_ok, yf_ok, fail = 0, 0, 0
 
-        with st.spinner("AI 覆盤分析中... (正在調教價值觀與排版)"):
+        with st.spinner("AI 覆盤分析中... (正在調教價值觀)"):
 
             for _, row in df.iterrows():
                 try:
@@ -104,10 +102,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     b_date = parse_tw_date(row['買進日期'])
                     b_price = float(row['買進價'])
                     shares = float(row['張數'])
-                    
-                    # 👑 心魔標籤去蕪存菁：去除括號及其內容，只留前面四字
-                    raw_tag = str(row.get('心理標籤', '')).strip()
-                    tag = raw_tag.split('(')[0].split('（')[0].strip()
+                    tag = str(row.get('心理標籤', '')).strip()
 
                     fee_rate = 0.001425 * fee_discount
                     tax_rate = 0.001 if sid.startswith('00') else 0.003
@@ -135,10 +130,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 diagnosis = "⚠️ 無資料"
                 s_price = b_price
                 s_date = None
-                
-                # 買進日期格式化 (MM/DD)
-                b_date_str = b_date.strftime('%m/%d') if pd.notnull(b_date) else "-"
-                s_date_str = "-"
 
                 # ========= 未平倉 =========
                 if pd.isna(row.get('賣出日期')) or str(row.get('賣出價', '')).strip() == "":
@@ -152,7 +143,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 else:
                     s_date = parse_tw_date(row['賣出日期'])
                     s_price = float(row['賣出價'])
-                    s_date_str = s_date.strftime('%m/%d') if pd.notnull(s_date) else "-"
 
                     if hist.empty:
                         diagnosis = "⚠️ 無K線資料"
@@ -212,15 +202,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 else:
                     held_days = (datetime.now() - b_date).days
 
-                # 👑 整理成最終顯示格式
                 results.append({
                     "代號": sid,
-                    "買進": b_date_str,
-                    "賣出": s_date_str,
-                    "天數": held_days,
+                    "持有天數": held_days,
                     "淨利": pnl,
                     "報酬%": roi,
-                    "心魔": tag,
+                    "心魔": tag[:10],
                     "AI診斷": diagnosis
                 })
 
@@ -228,29 +215,22 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         if results:
             res = pd.DataFrame(results)
 
+            # 👑 強制將總淨利顯示為紅色
             st.markdown(f"#### 💰 歷史戰役總淨利：<span style='color:#EF4444; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+            
+            # (選用) 隱藏 DEBUG 訊息，大將軍若需要可隨時加回
+            # st.write(f"FinMind成功: {fm_ok} | YF成功: {yf_ok} | 失敗: {fail}")
 
-            # 👑 完美欄位排版設定 (動態壓縮小欄位，把空間留給診斷)
             st.dataframe(
                 res.style.format({
                     "淨利": "{:,.0f}",
                     "報酬%": "{:.2f}%"
                 }).map(
-                    lambda x: "color:#EF4444" if x > 0 else "color:#10B981", 
+                    lambda x: "color:#EF4444" if x > 0 else "color:#10B981", # 台股習慣：紅賺綠賠
                     subset=["淨利", "報酬%"]
                 ),
                 use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "代號": st.column_config.TextColumn("代號", width="small"),
-                    "買進": st.column_config.TextColumn("買進", width="small"),
-                    "賣出": st.column_config.TextColumn("賣出", width="small"),
-                    "天數": st.column_config.NumberColumn("天數", width="small"),
-                    "淨利": st.column_config.NumberColumn("淨利", width="small"),
-                    "報酬%": st.column_config.TextColumn("報酬%", width="small"),
-                    "心魔": st.column_config.TextColumn("心魔", width="small"),
-                    "AI診斷": st.column_config.TextColumn("AI毒舌診斷", width="large"),
-                }
+                hide_index=True
             )
         else:
             st.warning("沒有資料")
