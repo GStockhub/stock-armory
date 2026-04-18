@@ -28,7 +28,7 @@ import aar  # 👈 呼叫外掛的 AAR 模組
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="游擊隊終極軍火庫 v24.2",
+    page_title="游擊隊終極軍火庫 v24.3",
     page_icon="⚔️",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -84,8 +84,8 @@ with st.sidebar:
         st.cache_data.clear()
         st.success("快取已清除！請重新載入。")
 
-st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.2</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 雙雷達分離模組 ——</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.3</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 交易教練 V2 完全體 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -108,7 +108,6 @@ def load_industry_map():
     return ind_map, name_map
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
-# ✂️ 已為大將軍移除廢棄的 LOCAL_PATCH
 
 def safe_download(sid, retries=2):
     for suffix in [".TW", ".TWO"]:
@@ -235,7 +234,6 @@ def level2_quant_engine(id_tuple):
             if not sid.startswith('00') and not sid.isdigit():
                 continue
             
-            # 👑 依據指示：移除 LOCAL_PATCH，完全採用大將軍的 CSV 產業字典
             ind = TWSE_IND_MAP.get(sid) or "其他"
             if sid.startswith('00'): ind = "ETF"
             if "金融" in ind or "保險" in ind: continue
@@ -347,11 +345,6 @@ def level2_quant_engine(id_tuple):
             
     return pd.DataFrame(intel_results)
 
-# ==============================================================================
-# 【第五區塊：軍事化分頁渲染與系統顯示】
-# ==============================================================================
-
-# 👑 修復點：將 risk_color 移至全域，供所有 Tab 呼叫，徹底斬除 NameError！
 def risk_color(val):
     try:
         v = int(val)
@@ -360,6 +353,10 @@ def risk_color(val):
         return 'color: #F59E0B; font-weight: bold;'
     except: return ''
 
+# ==============================================================================
+# 【第五區塊：軍事化分頁渲染與系統顯示】
+# ==============================================================================
+
 if MACRO_SCORE <= 3:
     st.error(f"🔴 **最高紅色警戒 (大盤分數 {MACRO_SCORE}/10)**：市場極度恐慌！系統建議：**【全面停止交易】**，保留 100% 現金。", icon="🚨")
 elif MACRO_SCORE <= 5:
@@ -367,6 +364,8 @@ elif MACRO_SCORE <= 5:
 
 with st.spinner('情報兵正在進行職業級波段回測與籌碼精算...'):
     chip_db = fetch_chips_data()
+
+m_df = pd.DataFrame() # 預防未輸入網址時出錯
 
 if len(chip_db) >= 3:
     dates = sorted(list(chip_db.keys()), reverse=True)
@@ -384,6 +383,20 @@ if len(chip_db) >= 3:
     today_df['連買'] = today_df.apply(get_streak, axis=1)
 
     top_80_chips = today_df.sort_values('投信(張)', ascending=False).head(80)['代號'].tolist()
+
+    # 👑 戰略前置：在進入分頁前，提早將「現役持股」結算完畢！(供一鍵下載與總部共用)
+    if sheet_url:
+        try:
+            sheet_df = pd.read_csv(sheet_url, dtype=str)
+            sheet_df.columns = sheet_df.columns.str.strip()
+            h_df = sheet_df[sheet_df['分類'] == '持股'].copy()
+            if not h_df.empty:
+                h_intel = level2_quant_engine(tuple(h_df['代號'].tolist()))
+                if not h_intel.empty:
+                    m_df = pd.merge(h_df, h_intel, on='代號', how='inner')
+                    m_df = pd.merge(m_df, today_df[['代號', '名稱']], on='代號', how='left').fillna('未知')
+        except Exception as e:
+            st.error(f"❌ 讀取持股部位失敗：{e}")
     
     t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs([
         "🎯 戰術指揮所 (S/A/B/C)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"
@@ -459,18 +472,70 @@ if len(chip_db) >= 3:
                 master_list = pd.concat([top_tier, b_tier, c_tier]).reset_index(drop=True).head(20)
                 master_list['名次'] = master_list.index + 1
                 
+                # ==============================================================
+                # 👑 縫合手術：打造手機版【終極作戰地圖 (含持股與狙擊)】
+                # ==============================================================
                 if not master_list.empty:
-                    export_df = master_list[['名次', '評級', '代號', '名稱_x', '產業', '勝率(%)', '均報(%)', '現價', '停損價', '建議買量(張)']].rename(columns={'名稱_x':'名稱'}).copy()
-                    export_df['勝率(%)'] = export_df['勝率(%)'].round(1)
-                    export_df['均報(%)'] = export_df['均報(%)'].round(2)
-                    export_df['現價'] = export_df['現價'].round(2)
-                    export_df['停損價'] = export_df['停損價'].round(2)
+                    export_rows = []
+                    active_fee_rate = 0.001425 * fee_discount
+
+                    # 1. 🛡️ 優先排入現役持股 (先防守)
+                    if not m_df.empty:
+                        for _, r in m_df.iterrows():
+                            try:
+                                p_now = float(r['現價'])
+                                p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
+                                qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
+
+                                buy_fee = int((p_cost * qty * 1000) * active_fee_rate)
+                                sell_fee = int((p_now * qty * 1000) * active_fee_rate)
+                                sell_tax = int((p_now * qty * 1000) * 0.003)
+
+                                buy_cost_total = (p_cost * qty * 1000) + buy_fee
+                                sell_revenue_net = (p_now * qty * 1000) - sell_fee - sell_tax
+
+                                pnl = sell_revenue_net - buy_cost_total
+                                ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0
+
+                                act = "✅ 續抱"
+                                if ret >= 10: act = "💰 +10% 強制全出"
+                                elif ret >= 6: act = "🛡️ +6% 一半鎖利"
+                                elif p_now < r['M10'] or ret <= -3: act = "💀 破線硬停損"
+
+                                export_rows.append({
+                                    "戰區": "🛡️ 現役持股",
+                                    "代號": r['代號'],
+                                    "名稱": r['名稱_y'] if '名稱_y' in r else r.get('名稱',''),
+                                    "戰術行動": act,
+                                    "現價": round(p_now, 2),
+                                    "防守底線": round(r['停損價'], 2),
+                                    "次要數據": f"帳面 {ret:.2f}%",
+                                    "產業": r['產業']
+                                })
+                            except: continue
+
+                    # 2. 🎯 接續排入狙擊兵力 (後進攻)
+                    tier_names = {'S': '🥇 S級狙擊', 'A': '🥈 A級狙擊', 'B': '⚔️ B級穩健'}
+                    for _, r in master_list.iterrows():
+                        if r['評級'] == 'C': continue # C級不列入作戰開槍清單
+                        export_rows.append({
+                            "戰區": tier_names.get(r['評級'], ""),
+                            "代號": r['代號'],
+                            "名稱": r['名稱_x'],
+                            "戰術行動": f"建議買 {r['建議買量(張)']} 張",
+                            "現價": round(r['現價'], 2),
+                            "防守底線": round(r['停損價'], 2),
+                            "次要數據": f"勝率 {r['勝率(%)']:.1f}%",
+                            "產業": r['產業']
+                        })
+
+                    final_export_df = pd.DataFrame(export_rows)
+                    csv_data = final_export_df.to_csv(index=False).encode('utf-8-sig')
                     
-                    csv_data = export_df.to_csv(index=False).encode('utf-8-sig')
                     st.download_button(
-                        label="💾 一鍵下載今日作戰清單 (Top 20 菁英)",
+                        label="📱 一鍵下載明日作戰地圖 (含持股與狙擊)",
                         data=csv_data,
-                        file_name=f"Tactical_List_{datetime.now().strftime('%Y%m%d')}.csv",
+                        file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv",
                         mime="text/csv",
                     )
                 
@@ -571,65 +636,50 @@ if len(chip_db) >= 3:
         if not sheet_url:
             st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
         else:
-            try:
-                sheet_df = pd.read_csv(sheet_url, dtype=str)
-                sheet_df.columns = sheet_df.columns.str.strip()
-                h_df = sheet_df[sheet_df['分類'] == '持股'].copy()
+            if not m_df.empty:
+                res_h, total_pnl, current_exposure = [], 0, 0
+                active_fee_rate = 0.001425 * fee_discount
                 
-                if not h_df.empty:
-                    h_intel = level2_quant_engine(tuple(h_df['代號'].tolist()))
-                    if not h_intel.empty:
-                        m_df = pd.merge(h_df, h_intel, on='代號', how='inner')
-                        m_df = pd.merge(m_df, today_df[['代號', '名稱']], on='代號', how='left').fillna('未知')
-                        res_h, total_pnl, current_exposure = [], 0, 0
+                for _, r in m_df.iterrows():
+                    try:
+                        p_now = float(r['現價'])
+                        p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
+                        qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
                         
-                        # 👑 依據將軍側邊欄設定的折數來算稅費
-                        active_fee_rate = 0.001425 * fee_discount
+                        buy_fee = int((p_cost * qty * 1000) * active_fee_rate)
+                        sell_fee = int((p_now * qty * 1000) * active_fee_rate)
+                        sell_tax = int((p_now * qty * 1000) * 0.003)
                         
-                        for _, r in m_df.iterrows():
-                            try:
-                                p_now = float(r['現價'])
-                                p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
-                                qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
-                                
-                                # 使用標準整數化(truncation)最接近台灣券商算法
-                                buy_fee = int((p_cost * qty * 1000) * active_fee_rate)
-                                sell_fee = int((p_now * qty * 1000) * active_fee_rate)
-                                sell_tax = int((p_now * qty * 1000) * 0.003)
-                                
-                                buy_cost_total = (p_cost * qty * 1000) + buy_fee
-                                sell_revenue_net = (p_now * qty * 1000) - sell_fee - sell_tax
-                                
-                                pnl = sell_revenue_net - buy_cost_total
-                                ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0
-                                
-                                current_exposure += (p_now * qty * 1000)
-                                total_pnl += pnl
-                                
-                                act = "✅ 抱緊處理"
-                                if ret >= 10: act = "💰 +10% 達標 (強制全出)"
-                                elif ret >= 6: act = "🛡️ +6% 達標 (賣出一半鎖利)"
-                                elif p_now < r['M10'] or ret <= -3: act = "💀 破線硬停損 (無情砍倉)"
-                                
-                                res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作戰指示': act})
-                            except: continue
-                            
-                        df_res = pd.DataFrame(res_h)
-                        p_color = "#EF4444" if total_pnl > 0 else "#10B981"
-                        st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+                        buy_cost_total = (p_cost * qty * 1000) + buy_fee
+                        sell_revenue_net = (p_now * qty * 1000) - sell_fee - sell_tax
                         
-                        styled_h = (df_res.style.set_properties(**{'text-align': 'center'})
-                                    .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
-                                    .map(lambda x: 'color: #EF4444; font-weight: bold;' if x > 0 else ('color: #10B981; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
-                        st.dataframe(styled_h, use_container_width=True, hide_index=True)
-            except Exception as e:
-                st.error(f"❌ 讀取持股部位失敗：{e}")
+                        pnl = sell_revenue_net - buy_cost_total
+                        ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0
+                        
+                        current_exposure += (p_now * qty * 1000)
+                        total_pnl += pnl
+                        
+                        act = "✅ 抱緊處理"
+                        if ret >= 10: act = "💰 +10% 達標 (強制全出)"
+                        elif ret >= 6: act = "🛡️ +6% 達標 (賣出一半鎖利)"
+                        elif p_now < r['M10'] or ret <= -3: act = "💀 破線硬停損 (無情砍倉)"
+                        
+                        res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作戰指示': act})
+                    except: continue
+                    
+                df_res = pd.DataFrame(res_h)
+                p_color = "#EF4444" if total_pnl > 0 else "#10B981"
+                st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+                
+                styled_h = (df_res.style.set_properties(**{'text-align': 'center'})
+                            .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
+                            .map(lambda x: 'color: #EF4444; font-weight: bold;' if x > 0 else ('color: #10B981; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
+                st.dataframe(styled_h, use_container_width=True, hide_index=True)
 
         st.markdown("---")
         st.markdown("### 📊 <span class='highlight-cyan'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
         st.caption("💡 **戰術覆盤**：解析歷史戰役與心理盲點，由 AI 精算錯失利潤以精進戰術。")
         
-        # 👑 核心優化：將原本破百行的舊 AAR 邏輯刪除，改用 2 行指令直接呼叫獨立兵器！
         fm_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiZGVraTEwMjMiLCJlbWFpbCI6ImRla2kxMDIzQGdtYWlsLmNvbSJ9.-wVo_6BD8ac8cGCOi8C3J58KUGZ1c0CMwTU9lYPltNM"
         aar.render_aar_tab(aar_sheet_url, fee_discount, fm_token)
 
@@ -653,4 +703,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.2</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.3</p>", unsafe_allow_html=True)
