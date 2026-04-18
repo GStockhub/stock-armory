@@ -78,7 +78,7 @@ def get_yf_data(sid, start_date):
     return pd.DataFrame()
 
 # =========================
-# 主函數 (V2.1 終極系統升級)
+# 主函數 (V2.2 終極交易教練升級版)
 # =========================
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
@@ -96,7 +96,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         results = []
         total_pnl = 0
 
-        with st.spinner("🧠 交易行為分析 AI v2.1 正在執行雙視角與動態門檻運算..."):
+        with st.spinner("🧠 交易行為分析 AI v2.2 正在執行雙視角與交易風格運算..."):
 
             for _, row in df.iterrows():
                 try:
@@ -170,7 +170,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         future_data_7d = hist[(hist.index > s_date_obj) & (hist.index <= future_7d_obj)]
                         future_data_20d = hist[(hist.index > s_date_obj) & (hist.index <= future_20d_obj)]
 
-                        # 👑 GPT 建議：防呆機制，避免 High 全是 NaN 導致出錯
+                        # 👑 防呆機制，避免 High 全是 NaN 導致出錯
                         if future_data_20d.empty or future_data_20d['High'].isna().all():
                             if (datetime.now().date() - s_date_obj).days <= 3:
                                 diagnosis = "⏳ 剛賣出"
@@ -179,7 +179,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         else:
                             max_20d = future_data_20d['High'].max()
                             
-                            # 👑 GPT 建議：短線嚴謹空值判斷，不自我安慰
+                            # 👑 短線嚴謹空值判斷，不自我安慰
                             if future_data_7d.empty or future_data_7d['High'].isna().all():
                                 max_7d = None
                             else:
@@ -197,7 +197,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                                     else:
                                         short_term = "✅ 短線躲過震盪"
 
-                                    # 🔴 視角二：波段潛力判斷 (👑 GPT 建議：動態門檻)
+                                    # 🔴 視角二：波段潛力判斷 (動態門檻)
                                     threshold = 1.03 if held_days <= 3 else 1.05
                                     
                                     if max_20d > s_price * threshold:
@@ -253,7 +253,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 })
 
         # =========================================================
-        # 👑 交易行為分析 AI v2.1 (心理核彈重擊版)
+        # 👑 交易行為分析 AI v2.2 (交易風格判定與完美排版版)
         # =========================================================
         if results:
             res = pd.DataFrame(results)
@@ -261,13 +261,67 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             st.markdown(f"### 🎯 <span class='highlight-gold'>交易教練 V2 總結報告</span>", unsafe_allow_html=True)
             st.markdown(f"#### 💰 歷史戰役總淨利：<span style='color:#EF4444; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
             
+            # =====================================================
+            # 🤖 新增：交易風格 AI 判斷系統（GPT 核心升級）
+            # =====================================================
+            analysis_df = res[res['賣出'] != "-"].copy()
+            if not analysis_df.empty:
+                short_df = analysis_df[analysis_df['天數'] <= 3]
+                mid_df = analysis_df[(analysis_df['天數'] >= 4) & (analysis_df['天數'] <= 7)]
+                long_df = analysis_df[analysis_df['天數'] >= 8]
+
+                def calc_stats(df_chunk):
+                    if df_chunk.empty: return 0, 0
+                    win_rate = (df_chunk['淨利'] > 0).mean() * 100
+                    avg_roi = df_chunk['報酬%'].mean()
+                    return win_rate, avg_roi
+
+                s_win, s_roi = calc_stats(short_df)
+                m_win, m_roi = calc_stats(mid_df)
+                l_win, l_roi = calc_stats(long_df)
+
+                st.markdown("#### 🧠 您的交易風格與勝率雷達")
+                col_s, col_m, col_l = st.columns(3)
+                col_s.metric("⚡ 短線 (1~3天)", f"{s_win:.0f}% 勝率", f"{s_roi:.2f}% 均報")
+                col_m.metric("🚶 波段 (4~7天)", f"{m_win:.0f}% 勝率", f"{m_roi:.2f}% 均報")
+                col_l.metric("🧘 長波段 (8天+)", f"{l_win:.0f}% 勝率", f"{l_roi:.2f}% 均報")
+
+                # AI 判斷核心
+                style_title = ""
+                style_reason = ""
+
+                if s_win > m_win and s_win > l_win:
+                    style_title = "⚡ 您是【短線爆發型交易者】"
+                    style_reason = "您在 1~3 天內的勝率最高，代表您抓轉折進出點的能力很強，適合快進快出的游擊戰。"
+                elif m_win > s_win and m_win > l_win:
+                    style_title = "🚶 您是【波段穩定型交易者】"
+                    style_reason = "您在 4~7 天的勝率最好，代表您適合吃一段小趨勢，太快賣反而會錯失獲利。"
+                elif l_win > s_win and l_win > m_win:
+                    style_title = "🧘 您是【波段耐心型交易者】"
+                    style_reason = "您長抱反而勝率最高，代表您的眼光很準，您其實適合賺大波段，千萬要管住手！"
+                else:
+                    style_title = "⚖️ 您是【混合型交易者】"
+                    style_reason = "不同區間表現接近，代表您的策略尚未完全定型，或者您能完美適應各種盤勢。"
+
+                st.markdown(f"""
+                <div class='tier-card' style='border-top: 4px solid #38BDF8;'>
+                    <h4 style='margin-top:0; color:#38BDF8;'>👑 AI 交易人格診斷</h4>
+                    <span style='font-size:20px; font-weight:bold; color:#F59E0B;'>{style_title}</span><br><br>
+                    <span style='color:#9CA3AF;'>{style_reason}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+
+            # =====================================================
+            # 🛡️ 戰略弱點掃描 (原有的 3 區塊)
+            # =====================================================
             c1, c2, c3 = st.columns(3)
             
-            # 1. 🔪 心魔代價排行榜 (👑 GPT 建議：加入平均少賺金額)
+            # 1. 🔪 心魔代價排行榜 
             demon_loss = res[res['心魔'] != ""].groupby('心魔')['_少賺'].sum().reset_index()
             demon_loss = demon_loss[demon_loss['_少賺'] > 0].sort_values('_少賺', ascending=False)
             
-            # 計算所有有賣飛(少賺)的交易的平均值
             avg_missed = res['_少賺'][res['_少賺'] > 0].mean()
             if pd.isna(avg_missed): avg_missed = 0
             
@@ -289,7 +343,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             
             with c1: st.markdown(c1_html, unsafe_allow_html=True)
 
-            # 2. ⏳ 最佳持股時長雷達
+            # 2. ⏳ 最佳持股時長雷達 (保留作為對照)
             res['時長分類'] = res['天數'].apply(lambda x: "⚡ 極短線 (1~3天)" if x <= 3 else ("🚶 短波段 (4~7天)" if x <= 7 else "🧘 長波段 (8天+)"))
             hold_stats = res[res['賣出'] != "-"].groupby('時長分類').agg(
                 勝率=('淨利', lambda x: f"{(x > 0).mean() * 100:.0f}%")
@@ -325,14 +379,21 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
             display_df = res.drop(columns=['_少賺', '時長分類', '操作類型'], errors='ignore')
 
+            # =====================================================
+            # 👑 救贖之光：強制「自動換行 (Wrap Text)」渲染
+            # =====================================================
+            styled_df = display_df.style.format({
+                "淨利": "{:,.0f}",
+                "報酬%": "{:.2f}%"
+            }).map(
+                lambda x: "color:#EF4444" if x > 0 else "color:#10B981", 
+                subset=["淨利", "報酬%"]
+            ).set_properties(
+                subset=["AI診斷"], **{'white-space': 'pre-wrap'} # 👈 就是這行魔法！強迫文字遇到邊界往下折！
+            )
+
             st.dataframe(
-                display_df.style.format({
-                    "淨利": "{:,.0f}",
-                    "報酬%": "{:.2f}%"
-                }).map(
-                    lambda x: "color:#EF4444" if x > 0 else "color:#10B981", 
-                    subset=["淨利", "報酬%"]
-                ),
+                styled_df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
