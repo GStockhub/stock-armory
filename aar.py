@@ -23,18 +23,11 @@ def parse_tw_date(d_str):
         return pd.NaT
 
 # =========================
-# 名稱對照模組
+# 👑 名稱對照模組 (純淨版：100% 讀取本地字典)
 # =========================
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_names():
-    name_map = {
-        "0050": "元大台灣50", "0051": "元大中型100", "0052": "富邦科技",
-        "0056": "元大高股息", "00631L": "台灣50正2", "00632R": "台灣50反1",
-        "00679B": "元大美債20年", "00687B": "國泰20年美債", "00713": "元大台灣高息低波",
-        "00878": "國泰永續高股息", "00919": "群益台灣精選高息", "00929": "復華台灣科技優息",
-        "00939": "統一台灣高息動能", "00940": "元大台灣價值高息",
-        "8358": "金居", "3189": "景碩", "4958": "臻鼎-KY", "2605": "新興"
-    }
+    name_map = {}
     try:
         df = pd.read_csv("industry_map.csv", dtype=str)
         for _, row in df.iterrows():
@@ -44,7 +37,7 @@ def load_names():
     return name_map
 
 # =========================
-# FinMind 主引擎 (👑 補抓最低價 Low)
+# FinMind 主引擎 
 # =========================
 def get_finmind_data(sid, start_date, fm_token):
     if not fm_token: return pd.DataFrame()
@@ -58,14 +51,14 @@ def get_finmind_data(sid, start_date, fm_token):
             df['date'] = pd.to_datetime(df['date']).dt.date
             df.set_index('date', inplace=True)
             df['High'] = pd.to_numeric(df.get('max', df.get('high', df['close'])), errors='coerce')
-            df['Low'] = pd.to_numeric(df.get('min', df.get('low', df['close'])), errors='coerce') # 抓取最低價
+            df['Low'] = pd.to_numeric(df.get('min', df.get('low', df['close'])), errors='coerce') 
             df['Close'] = pd.to_numeric(df['close'], errors='coerce')
             return df[['High', 'Low', 'Close']].dropna().sort_index()
     except: pass
     return pd.DataFrame()
 
 # =========================
-# YF 備援引擎 (👑 補抓最低價 Low)
+# YF 備援引擎 
 # =========================
 def get_yf_data(sid, start_date):
     for suf in [".TW", ".TWO"]:
@@ -74,7 +67,7 @@ def get_yf_data(sid, start_date):
             if not df.empty:
                 df.index = pd.to_datetime(df.index).dt.date
                 df['High'] = pd.to_numeric(df.get('High', df['Close']), errors='coerce')
-                df['Low'] = pd.to_numeric(df.get('Low', df['Close']), errors='coerce') # 抓取最低價
+                df['Low'] = pd.to_numeric(df.get('Low', df['Close']), errors='coerce') 
                 df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
                 return df[['High', 'Low', 'Close']].dropna().sort_index()
         except: continue
@@ -150,27 +143,24 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                                 m7 = f7['High'].max()
                                 short_text = "✅ 精準收割" if m7 <= s_price * 1.02 else "📉 短線留肉"
                             
-                            # 🔴 波段雙向潛力精算 (創高賺多少 vs 破底省多少)
+                            # 🔴 波段雙向潛力精算
                             m20 = f20['High'].max()
                             min20 = f20['Low'].min()
                             threshold = 1.03 if held_days <= 3 else 1.05
                             
                             if pd.notna(m20) and m20 > s_price * threshold:
-                                # 狀況 A：後來噴上去了 (算潛在空間)
                                 days_to_h = (f20['High'].idxmax() - s_obj).days
                                 missed_profit = (m20 - s_price) * shares * 1000
                                 pct_up = ((m20 / s_price) - 1) * 100
                                 long_text = f"🔭 第{days_to_h}天見高 {m20:.1f} (+{pct_up:.1f}%)，潛在空間 {missed_profit:,.0f}元"
                             
                             elif pd.notna(min20) and min20 < s_price * 0.98:
-                                # 狀況 B：後來跌下去了 (算避開虧損)
                                 days_to_l = (f20['Low'].idxmin() - s_obj).days
                                 avoided_loss = (s_price - min20) * shares * 1000
                                 pct_down = ((min20 / s_price) - 1) * 100
                                 long_text = f"🛡️ 第{days_to_l}天跌至 {min20:.1f} ({pct_down:.1f}%)，避開虧損 {avoided_loss:,.0f}元"
                                 
                             else:
-                                # 狀況 C：死魚盤整
                                 long_text = "🛡️ 賣出後陷入橫盤震盪，資金撤退極為精準！"
                             
                             diagnosis = f"{short_text} ｜ {long_text}"
@@ -216,7 +206,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             st.markdown("---")
             st.markdown("#### 📜 詳細收割清單")
             
-            # 依大將軍指定順序排列顯示
             display_cols = ["代號", "名稱", "AI診斷", "買", "賣", "天", "淨利", "報酬%", "心魔"]
             display_df = res[display_cols]
 
@@ -228,7 +217,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 column_config={
                     "代號": st.column_config.TextColumn(width="small"),
                     "名稱": st.column_config.TextColumn(width="small"),
-                    "AI診斷": st.column_config.TextColumn(width="large"), # 霸佔主要視野
+                    "AI診斷": st.column_config.TextColumn(width="large"),
                     "買": st.column_config.TextColumn(width="small"),
                     "賣": st.column_config.TextColumn(width="small"),
                     "天": st.column_config.NumberColumn(width="small"),
