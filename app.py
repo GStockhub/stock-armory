@@ -84,7 +84,7 @@ with st.sidebar:
         st.success("快取已清除！請重新載入。")
 
 st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.2</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ FinMind API ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 大一統引擎 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -115,15 +115,18 @@ LOCAL_PATCH = {
     "3711": "半導體業", "2886": "金融保險業", "2884": "金融保險業", "2002": "鋼鐵工業"
 }
 
-def safe_download(sid, retries=2):
+# 👑 核心升級：統一的最強下載器，抓取2年資料，並具備「空白重試」裝甲
+def safe_download(sid, retries=3):
     for suffix in [".TW", ".TWO"]:
         for _ in range(retries):
             try:
                 sym = f"{sid}{suffix}"
-                df = yf.Ticker(sym).history(period="3mo")
+                df = yf.Ticker(sym).history(period="2y")
+                # 如果 Yahoo 塞空白檔案來防爬蟲，df.empty 會是 True，就不會 return，會強制進入下一次迴圈重試！
                 if not df.empty and len(df) > 5: return df
+                time.sleep(0.5) 
             except:
-                time.sleep(0.5 + np.random.rand())
+                time.sleep(1.0)
     return pd.DataFrame()
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -139,11 +142,19 @@ def get_macro_dashboard():
     
     for main_sym, (base_name, fallback_sym) in indices.items():
         display_name = base_name
-        hist = safe_download(main_sym.replace('^','')) 
+        # 大盤因為沒有後綴，所以手動抓 1 年
+        hist = pd.DataFrame()
+        try:
+            hist = yf.Ticker(main_sym).history(period="1y")
+        except:
+            pass
+            
         if hist.empty:
-            hist = yf.Ticker(fallback_sym).history(period="3mo")
-            if not hist.empty:
-                display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
+            try:
+                hist = yf.Ticker(fallback_sym).history(period="1y")
+                if not hist.empty:
+                    display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
+            except: pass
         
         if hist.empty:
             macro_data.append({"戰區": display_name, "現值": "抓取失敗", "月線": "-", "狀態": "⚪ 斷線"})
@@ -662,7 +673,6 @@ if len(chip_db) >= 3:
                     
                     with st.spinner('🕵️ 情報兵正在調閱歷史戰報，計算錯失利潤與心理盲點...'):
                         
-                        # 👑 核心情報快取：同檔股票只抓一次！
                         aar_cache = {} 
                         
                         for idx, row in aar_df.iterrows():
@@ -675,9 +685,7 @@ if len(chip_db) >= 3:
                                 tag = str(row['心理標籤'])
                                 if pd.isna(tag) or tag.lower() == "nan": tag = ""
                                 
-                                # 👑 修復：ETF 交易稅
                                 tax_rate = 0.001 if sid.startswith('00') else 0.003
-                                
                                 buy_fee = int((b_price * shares * 1000) * active_fee_rate)
                                 cost = (b_price * shares * 1000) + buy_fee
                             except Exception:
@@ -688,43 +696,16 @@ if len(chip_db) >= 3:
                             s_date = None
                             
                             # ==========================================
-                            # 👑 情報快取機制：改用 FinMind API (台灣專用) + yfinance 雙引擎備援
+                            # 👑 大一統升級：直接借用戰區雷達最強的 safe_download (抓2年)
                             # ==========================================
                             if sid not in aar_cache:
-                                hist_full = pd.DataFrame()
-                                # 🚀 優先使用 FinMind API (不抓 YF，完美避開雲端 IP 封鎖)
-                                try:
-                                    fm_url = "https://api.finmindtrade.com/api/v4/data"
-                                    # 往前抓 180 天確保資料充裕
-                                    fm_start = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
-                                    fm_params = {"dataset": "TaiwanStockPrice", "data_id": sid, "start_date": fm_start}
-                                    fm_res = requests.get(fm_url, params=fm_params, timeout=10, verify=False).json()
-                                    
-                                    if fm_res.get("msg") == "success" and len(fm_res.get("data", [])) > 0:
-                                        hist_full = pd.DataFrame(fm_res["data"])
-                                        hist_full['date'] = pd.to_datetime(hist_full['date'])
-                                        hist_full.set_index('date', inplace=True)
-                                        hist_full.rename(columns={'max': 'High', 'close': 'Close'}, inplace=True)
-                                except Exception:
-                                    pass
-                                
-                                # 如果 FinMind 沒抓到，才用 yfinance 做最後掙扎
-                                if hist_full.empty:
-                                    for suffix in [".TW", ".TWO"]:
-                                        try:
-                                            temp_df = yf.Ticker(f"{sid}{suffix}").history(period="6mo")
-                                            if not temp_df.empty:
-                                                temp_df.index = pd.to_datetime(temp_df.index).tz_localize(None)
-                                                hist_full = temp_df
-                                                break
-                                        except:
-                                            time.sleep(0.5)
-                                
+                                hist_full = safe_download(sid, retries=3) # 自帶被封鎖就重試的裝甲
+                                if not hist_full.empty:
+                                    # 去除時區避免比對錯誤
+                                    hist_full.index = pd.to_datetime(hist_full.index).tz_localize(None)
                                 aar_cache[sid] = hist_full
-                                # 👑 擬真潛行：成功抓完一檔新的，稍微休息
-                                time.sleep(0.2) 
+                                time.sleep(0.5) 
                             
-                            # 直接從快取庫把這檔股票的 6 個月資料拿出來用
                             hist_current = aar_cache[sid].copy()
 
                             if pd.isna(row['賣出日期']) or pd.isna(row['賣出價']) or str(row['賣出價']).strip() == "":
@@ -743,9 +724,6 @@ if len(chip_db) >= 3:
                                 future_hist = pd.DataFrame() 
                                 
                                 if not hist_current.empty:
-                                    # 確保時間格式統一且無時區
-                                    if hist_current.index.tz is not None:
-                                        hist_current.index = hist_current.index.tz_localize(None)
                                     # 切割賣出後 20 天內的資料
                                     mask = (hist_current.index > s_date) & (hist_current.index <= future_end)
                                     future_hist = hist_current.loc[mask]
