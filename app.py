@@ -9,7 +9,7 @@ import yfinance as yf
 import concurrent.futures
 import ssl
 
-# 👑 解決大將軍環境的 SSL 憑證錯誤 (CERTIFICATE_VERIFY_FAILED)
+# 👑 解決大將軍環境的 SSL 憑證錯誤
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -19,10 +19,6 @@ else:
 
 # 👑 導入您專屬的外部軍火庫 (教戰手冊與開發史)
 from manual import MANUAL_TEXT, HISTORY_TEXT
-
-# ==============================================================================
-# 【第一區塊：系統底層與現代化防禦配置】
-# ==============================================================================
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -50,6 +46,49 @@ st.markdown("""
     .discipline-box { background-color: #2D1A1A; border-left: 5px solid #EF4444; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
     </style>
     """, unsafe_allow_html=True)
+
+# ==============================================================================
+# 【第一區塊：全局防禦連線 (Perplexity 裝甲)】
+# ==============================================================================
+
+@st.cache_resource(ttl=3600)
+def get_global_yf_session():
+    """偽裝成一般使用者的瀏覽器，騙過 Yahoo 防火牆"""
+    session = requests.Session()
+    session.verify = False
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    })
+    return session
+
+YF_SESSION = get_global_yf_session()
+
+def safe_download(sid, period="2y", retries=3, backoff=1.0):
+    """
+    結合智能抖動(Jitter)與多後綴重試的終極下載器
+    設定抓取 '2y' (兩年)，確保所有歷史覆盤都能查到
+    """
+    suffixes = [".TW", ".TWO", ""] if not sid.startswith("^") else [""]
+    for attempt in range(retries):
+        for suffix in suffixes:
+            try:
+                sym = f"{sid}{suffix}" if suffix else sid
+                ticker = yf.Ticker(sym, session=YF_SESSION)
+                df = ticker.history(period=period)
+                if not df.empty and len(df) > 5:
+                    # 統一去除時區，避免與 Excel 日期比對時報錯
+                    if df.index.tz is not None:
+                        df.index = pd.to_datetime(df.index).tz_localize(None)
+                    return df
+            except:
+                pass
+        
+        # 智能抖動延遲：隨機秒數避開規律偵測
+        sleep_time = backoff * (1 + np.random.rand())
+        time.sleep(sleep_time)
+        backoff *= 1.5
+    
+    return pd.DataFrame()
 
 # ==============================================================================
 # 【第二區塊：側邊欄 (Sidebar) & 總部紀律風控】
@@ -84,7 +123,7 @@ with st.sidebar:
         st.success("快取已清除！請重新載入。")
 
 st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.2</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 大一統引擎 ✕ 戰術覆盤 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極裝甲 ✕ 智能緩存 ✕ 無阻擋覆盤 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -115,20 +154,6 @@ LOCAL_PATCH = {
     "3711": "半導體業", "2886": "金融保險業", "2884": "金融保險業", "2002": "鋼鐵工業"
 }
 
-# 👑 核心升級：統一的最強下載器，抓取2年資料，並具備「空白重試」裝甲
-def safe_download(sid, retries=3):
-    for suffix in [".TW", ".TWO"]:
-        for _ in range(retries):
-            try:
-                sym = f"{sid}{suffix}"
-                df = yf.Ticker(sym).history(period="2y")
-                # 如果 Yahoo 塞空白檔案來防爬蟲，df.empty 會是 True，就不會 return，會強制進入下一次迴圈重試！
-                if not df.empty and len(df) > 5: return df
-                time.sleep(0.5) 
-            except:
-                time.sleep(1.0)
-    return pd.DataFrame()
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_macro_dashboard():
     score = 5.0
@@ -142,19 +167,12 @@ def get_macro_dashboard():
     
     for main_sym, (base_name, fallback_sym) in indices.items():
         display_name = base_name
-        # 大盤因為沒有後綴，所以手動抓 1 年
-        hist = pd.DataFrame()
-        try:
-            hist = yf.Ticker(main_sym).history(period="1y")
-        except:
-            pass
-            
+        # 大盤只需抓 3 個月計算 MA20
+        hist = safe_download(main_sym, period="3mo", retries=2) 
         if hist.empty:
-            try:
-                hist = yf.Ticker(fallback_sym).history(period="1y")
-                if not hist.empty:
-                    display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
-            except: pass
+            hist = safe_download(fallback_sym, period="3mo", retries=2)
+            if not hist.empty:
+                display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
         
         if hist.empty:
             macro_data.append({"戰區": display_name, "現值": "抓取失敗", "月線": "-", "狀態": "⚪ 斷線"})
@@ -228,7 +246,8 @@ def format_lots(shares):
     return f"{lots:.3f}".rstrip('0').rstrip('.')
 
 def fetch_single_stock_batch(sid):
-    df = safe_download(sid)
+    # 量化引擎只需 3 個月資料
+    df = safe_download(sid, period="3mo", retries=2)
     if not df.empty: return sid, df
     return sid, None
 
@@ -607,7 +626,6 @@ if len(chip_db) >= 3:
                         m_df = pd.merge(m_df, today_df[['代號', '名稱']], on='代號', how='left').fillna('未知')
                         res_h, total_pnl, current_exposure = [], 0, 0
                         
-                        # 👑 依據將軍側邊欄設定的折數來算稅費
                         active_fee_rate = 0.001425 * fee_discount
                         
                         for _, r in m_df.iterrows():
@@ -617,7 +635,6 @@ if len(chip_db) >= 3:
                                 p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
                                 qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
                                 
-                                # 👑 修復：ETF (00開頭) 交易稅降為千分之1
                                 tax_rate = 0.001 if sid.startswith('00') else 0.003
                                 
                                 buy_fee = int((p_cost * qty * 1000) * active_fee_rate)
@@ -667,13 +684,15 @@ if len(chip_db) >= 3:
                 if not all(col in aar_df.columns for col in required_cols):
                     st.error(f"❌ 欄位不符！請確保包含：{', '.join(required_cols)}")
                 else:
-                    review_results = []
-                    total_realized_pnl = 0
-                    active_fee_rate = 0.001425 * fee_discount
-                    
-                    with st.spinner('🕵️ 情報兵正在調閱歷史戰報，計算錯失利潤與心理盲點...'):
+                    with st.spinner('🕵️ 情報兵正在調閱歷史戰報，啟動 AAR 快取引擎...'):
+                        review_results = []
+                        total_realized_pnl = 0
+                        active_fee_rate = 0.001425 * fee_discount
+                        block_count = 0  # 紀錄 API 阻擋次數
                         
-                        aar_cache = {} 
+                        # 🧠 GPT 神級武裝：AAR 專屬快取字典
+                        # 讓系統對同一檔股票只抓一次，極大減輕 API 壓力
+                        aar_cache = {}
                         
                         for idx, row in aar_df.iterrows():
                             try:
@@ -682,7 +701,7 @@ if len(chip_db) >= 3:
                                 b_date = pd.to_datetime(row['買進日期'])
                                 b_price = float(row['買進價'])
                                 shares = float(row['張數'])
-                                tag = str(row['心理標籤'])
+                                tag = str(row['心理標籤']).strip()
                                 if pd.isna(tag) or tag.lower() == "nan": tag = ""
                                 
                                 tax_rate = 0.001 if sid.startswith('00') else 0.003
@@ -691,49 +710,49 @@ if len(chip_db) >= 3:
                             except Exception:
                                 continue 
                             
-                            diagnosis = "✅ 戰報已收錄" 
-                            s_price = 0.0
+                            s_price = b_price 
                             s_date = None
+                            diagnosis = "🔄 資料蒐集中..."
                             
-                            # ==========================================
-                            # 👑 大一統升級：直接借用戰區雷達最強的 safe_download (抓2年)
-                            # ==========================================
+                            # 🛡️ 調用終極下載器 (內建 2y 抓取, 多後綴, Jitter 延遲, 假 User-Agent)
                             if sid not in aar_cache:
-                                hist_full = safe_download(sid, retries=3) # 自帶被封鎖就重試的裝甲
-                                if not hist_full.empty:
-                                    # 去除時區避免比對錯誤
-                                    hist_full.index = pd.to_datetime(hist_full.index).tz_localize(None)
-                                aar_cache[sid] = hist_full
-                                time.sleep(0.5) 
-                            
+                                df_full = safe_download(sid, period="2y", retries=3)
+                                aar_cache[sid] = df_full
+                                if not df_full.empty:
+                                    # 抓取成功後，隨機休息一下，避免連續觸發不同股票的抓取被盯上
+                                    time.sleep(0.5 + np.random.rand())
+                                
                             hist_current = aar_cache[sid].copy()
 
                             if pd.isna(row['賣出日期']) or pd.isna(row['賣出價']) or str(row['賣出價']).strip() == "":
+                                # 未平倉處理
                                 if not hist_current.empty:
                                     s_price = float(hist_current['Close'].iloc[-1])
                                     diagnosis = "⚪ 尚未平倉 (計算目前帳面損益)"
                                 else:
-                                    s_price = b_price
                                     diagnosis = "⚪ 尚未平倉 (API阻擋或查無該股，無法取得現價)"
+                                    block_count += 1
                             else:
+                                # 已平倉處理
                                 s_date = pd.to_datetime(row['賣出日期'])
                                 s_price = float(row['賣出價'])
                                 
-                                # 👑 寬容切割：放寬到 20 天，確保包容台灣的六日與連假
+                                # 放寬到 20 天，確保包容台灣的六日與連假
                                 future_end = s_date + timedelta(days=20)
-                                future_hist = pd.DataFrame() 
+                                future_hist = pd.DataFrame()
                                 
                                 if not hist_current.empty:
-                                    # 切割賣出後 20 天內的資料
+                                    # 利用 Pandas 遮罩，精準切出賣出後 20 天內的歷史高點
                                     mask = (hist_current.index > s_date) & (hist_current.index <= future_end)
                                     future_hist = hist_current.loc[mask]
 
-                                # 👑 過濾雜訊：加入 len < 3 避免單日錯誤資料干擾
+                                # GPT 邏輯：加入 len(future_hist) < 3 避免誤判少數錯誤資料
                                 if future_hist.empty or len(future_hist) < 3:
                                     if (datetime.now() - s_date).days <= 3:
                                         diagnosis = "⏳ 剛賣出不久，尚無足夠未來數據比對"
                                     else:
                                         diagnosis = "⚠️ API 阻擋或查無該區間足夠數據，無法診斷"
+                                        block_count += 1
                                 else:
                                     max_future_price = future_hist['High'].max()
                                     if '恐高早退' in tag or '失去耐心' in tag:
@@ -750,14 +769,14 @@ if len(chip_db) >= 3:
                                     elif '紀律' in tag:
                                         diagnosis = "👑 嚴格執行紀律，無須留戀後續漲跌！"
                                     else:
-                                        diagnosis = "✅ 已結案"
+                                        diagnosis = f"✅ 已結案 | 撤退後最高價 {max_future_price:.1f}"
 
                             sell_fee = int((s_price * shares * 1000) * active_fee_rate)
                             sell_tax = int((s_price * shares * 1000) * tax_rate)
                             
                             revenue = (s_price * shares * 1000) - sell_fee - sell_tax
                             net_profit = revenue - cost
-                            roi = (net_profit / cost) * 100
+                            roi = (net_profit / cost) * 100 if cost > 0 else 0
                             total_realized_pnl += net_profit
                             
                             held_days = (s_date - b_date).days if s_date else (datetime.now() - b_date).days
@@ -776,6 +795,11 @@ if len(chip_db) >= 3:
                         p_color = "#EF4444" if total_realized_pnl > 0 else "#10B981"
                         st.markdown(f"#### 💰 歷史戰役總淨利：<span style='color:{p_color}; font-size:24px;'>{total_realized_pnl:,.0f} 元</span>", unsafe_allow_html=True)
                         
+                        if block_count > 0:
+                            st.warning(f"⚡ 戰術報告：本次覆盤共 {len(review_results)} 筆，其中有 {block_count} 筆遭敵方雷達阻擋。")
+                        else:
+                            st.success(f"✅ 戰術報告：全數 {len(review_results)} 筆覆盤完畢，成功突破敵方所有雷達！")
+
                         styled_res = (res_df.style.set_properties(**{'text-align': 'center'})
                                     .format({'淨利(元)':'{:,.0f}', '報酬(%)':'{:.2f}%'})
                                     .map(lambda x: 'color: #EF4444; font-weight: bold;' if x > 0 else ('color: #10B981;' if x < 0 else ''), subset=['淨利(元)', '報酬(%)']))
@@ -805,4 +829,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.2 (純淨修復版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.2 (終極融合版)</p>", unsafe_allow_html=True)
