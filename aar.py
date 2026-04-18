@@ -14,13 +14,27 @@ def parse_tw_date(d_str):
         parts = d_str.split('-')
         if len(parts) == 3:
             y = int(parts[0])
-            if y < 200: y += 1911  # 民國年自動轉西元
+            if y < 200: y += 1911  
             return pd.to_datetime(f"{y}-{parts[1]}-{parts[2]}")
         elif len(parts) == 2:
             return pd.to_datetime(f"{datetime.now().year}-{parts[0]}-{parts[1]}")
         return pd.to_datetime(d_str)
     except:
         return pd.NaT
+
+# =========================
+# 名稱對照模組 (新增)
+# =========================
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_names():
+    name_map = {}
+    try:
+        df = pd.read_csv("industry_map.csv", dtype=str)
+        for _, row in df.iterrows():
+            name_map[str(row['代號']).strip()] = str(row['名稱']).strip()
+    except:
+        pass
+    return name_map
 
 # =========================
 # FinMind 主引擎
@@ -58,7 +72,7 @@ def get_yf_data(sid, start_date):
     return pd.DataFrame()
 
 # =========================
-# 主函數 (V2.3 混合型收割者專屬版)
+# 主函數 (V2.3 混合型收割者 + 完美動線版)
 # =========================
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
     if not aar_sheet_url:
@@ -70,6 +84,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         df.columns = df.columns.str.strip()
         global_start = (datetime.now() - timedelta(days=800)).strftime("%Y-%m-%d")
         cache, results, total_pnl = {}, [], 0
+        name_map = load_names() # 載入名稱字典
 
         with st.spinner("🧠 混合型收割者 AI 正在掃描戰場潛力..."):
             for _, row in df.iterrows():
@@ -92,6 +107,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 hist = cache[sid]
                 diagnosis, s_price, s_date, missed_profit = "⚠️ 無資料", b_price, None, 0
                 b_date_str, s_date_str = b_date.strftime('%m/%d'), "-"
+                s_name = name_map.get(sid, "未知") # 獲取名稱
 
                 # 判定持有天數
                 temp_s = parse_tw_date(row.get('賣出日期'))
@@ -115,33 +131,37 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                             diagnosis = "⏳ 剛賣出或暫無後續"
                         else:
                             # 🟢 短線視角
-                            if f7.empty: short_text = "短線資料待補"
+                            if f7.empty or f7['High'].isna().all(): 
+                                short_text = "⏳ 缺短線資料"
+                                m7 = None
                             else:
                                 m7 = f7['High'].max()
                                 short_text = "✅ 精準收割" if m7 <= s_price * 1.02 else "📉 短線留肉"
                             
                             # 🔴 波段潛力與少賺精算
                             m20 = f20['High'].max()
-                            days_to_h = (f20['High'].idxmax() - s_obj).days
                             threshold = 1.03 if held_days <= 3 else 1.05
                             
-                            if m20 > s_price * threshold:
+                            if pd.notna(m20) and m20 > s_price * threshold:
+                                days_to_h = (f20['High'].idxmax() - s_obj).days
                                 missed_profit = (m20 - s_price) * shares * 1000
-                                long_text = f"🔭 強勢股(20天內續創高 {((m20/s_price)-1)*100:.1f}%)，少賺 {missed_profit:,.0f}元"
+                                long_text = f"🔭 強勢股(20天內續創高 {((m20/s_price)-1)*100:.1f}%)，可圖 {missed_profit:,.0f}元"
                             else: long_text = "🔭 趨勢轉弱，撤退正確"
                             
                             diagnosis = f"{short_text} ｜ {long_text}"
 
-                # 損益計算 (券商整數法)
+                # 損益計算
                 b_cost = (b_price * shares * 1000) + int((b_price * shares * 1000) * fee_rate)
                 s_rev = (s_price * shares * 1000) - int((s_price * shares * 1000) * fee_rate) - int((s_price * shares * 1000) * tax_rate)
                 pnl = s_rev - b_cost
                 roi = (pnl / b_cost) * 100 if b_cost > 0 else 0
                 total_pnl += pnl
 
+                # 👑 將資料以大將軍指定的順序寫入字典
                 results.append({
-                    "代號": sid, "買": b_date_str, "賣": s_date_str, "天": held_days,
-                    "淨利": pnl, "報酬%": roi, "心魔": tag, "AI診斷": diagnosis, "_少賺": missed_profit
+                    "代號": sid, "名稱": s_name, "AI診斷": diagnosis,
+                    "買": b_date_str, "賣": s_date_str, "天": held_days,
+                    "淨利": pnl, "報酬%": roi, "心魔": tag, "_少賺": missed_profit
                 })
 
         if results:
@@ -158,9 +178,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 l_w, l_r = get_s(ad[ad['天']>=8])
                 
                 col1, col2, col3 = st.columns(3)
-                col1.metric("⚡ 隔日/極短", f"{s_w:.0f}% 勝率", f"{s_r:.2f}% 均報")
-                col2.metric("🚶 短波段", f"{m_w:.0f}% 勝率", f"{m_r:.2f}% 均報")
-                col3.metric("🧘 長波段", f"{l_w:.0f}% 勝率", f"{l_r:.2f}% 均報")
+                col1.metric("⚡ 隔日/極短 (1~3天)", f"{s_w:.0f}% 勝率", f"{s_r:.2f}% 均報")
+                col2.metric("🚶 短波段 (4~7天)", f"{m_w:.0f}% 勝率", f"{m_r:.2f}% 均報")
+                col3.metric("🧘 長波段 (8天+)", f"{l_w:.0f}% 勝率", f"{l_r:.2f}% 均報")
 
                 avg_m = res['_少賺'][res['_少賺']>0].mean()
                 st.markdown(f"""<div class='tier-card' style='border-top:4px solid #F59E0B;'>
@@ -172,20 +192,25 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             st.markdown("---")
             st.markdown("#### 📜 詳細收割清單")
             
-            # 👑 關鍵 UI 修復：前排極限壓縮，後排完全換行
+            # 👑 依大將軍指定順序排列顯示
+            display_cols = ["代號", "名稱", "AI診斷", "買", "賣", "天", "淨利", "報酬%", "心魔"]
+            display_df = res[display_cols]
+
             st.dataframe(
-                res.drop(columns=['_少賺']).style.format({"淨利":"{:,.0f}", "報酬%":"{:.2f}%"})
-                .map(lambda x: "color:#EF4444" if x > 0 else "color:#10B981", subset=["淨利", "報酬%"]),
+                display_df.style.format({"淨利":"{:,.0f}", "報酬%":"{:.2f}%"})
+                .map(lambda x: "color:#EF4444" if x > 0 else "color:#10B981", subset=["淨利", "報酬%"])
+                .set_properties(subset=["AI診斷"], **{'white-space': 'pre-wrap'}),
                 use_container_width=True, hide_index=True,
                 column_config={
                     "代號": st.column_config.TextColumn(width="small"),
+                    "名稱": st.column_config.TextColumn(width="small"),
+                    "AI診斷": st.column_config.TextColumn(width="large"), # 放在左側第3欄，霸佔主要視野
                     "買": st.column_config.TextColumn(width="small"),
                     "賣": st.column_config.TextColumn(width="small"),
                     "天": st.column_config.NumberColumn(width="small"),
                     "淨利": st.column_config.NumberColumn(width="small"),
                     "報酬%": st.column_config.TextColumn(width="small"),
-                    "心魔": st.column_config.TextColumn(width="small"),
-                    "AI診斷": st.column_config.TextColumn(width="large") # 讓診斷佔據最大空間
+                    "心魔": st.column_config.TextColumn(width="small")
                 }
             )
         else: st.warning("尚無資料")
