@@ -77,7 +77,7 @@ with st.sidebar:
     st.markdown("#### 🛡️ 總曝險與預備金")
     MAX_EXPOSURE_RATE = 0.60
     max_market_cap = total_capital * MAX_EXPOSURE_RATE
-    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**\n*(避險與股災專用)*")
+    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**\n*(避險與股災專用)*")
 
     st.markdown("---")
     if st.button("🔄 一鍵清空情報快取"):
