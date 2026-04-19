@@ -16,7 +16,7 @@ else: ssl._create_default_https_context = _create_unverified_https_context
 
 from manual import MANUAL_TEXT, HISTORY_TEXT
 import aar  
-import sidebar # 👑 載入獨立的側邊欄模組
+import sidebar 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -27,11 +27,6 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# ==============================================================================
-# 【第二區塊：召喚側邊欄 (Sidebar) 裝甲】
-# ==============================================================================
-
-# 👑 一行代碼喚醒側邊欄，並把所有參數接回來！
 configs = sidebar.render_sidebar()
 
 COLORS = configs["COLORS"]
@@ -41,9 +36,8 @@ total_capital = configs["total_capital"]
 risk_amount = configs["risk_amount"]
 fee_discount = configs["fee_discount"]
 
-# ==============================================================================
-# 【以下為大腦主邏輯：完全不受 UI 干擾】
-# ==============================================================================
+# 定義全域共用的表格樣式 (👑 解決表格底色死黑的關鍵！)
+table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 我要賺大錢 v24.3</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V2 完全體 ——</p>", unsafe_allow_html=True)
@@ -296,7 +290,7 @@ if len(chip_db) >= 3:
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty:
-                st.dataframe(MACRO_DF.style.set_properties(**{'text-align': 'center'}).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
+                st.dataframe(MACRO_DF.style.set_properties(**table_style).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
 
         pool_ids = today_df[today_df['連買'] >= 1]['代號'].tolist() 
         calc_list = tuple(set(pool_ids + top_80_chips))
@@ -397,7 +391,7 @@ if len(chip_db) >= 3:
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
                     styled_b = (ui_b[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','均報(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱'})
-                                    .style.set_properties(**{'text-align': 'center'})
+                                    .style.set_properties(**table_style)
                                     .format({'現價':'{:.2f}', '停損價':'{:.2f}', '勝率(%)':'{:.1f}%', '均報(%)':'{:.2f}%'})
                                     .map(risk_color, subset=['安全指數'])
                                     .map(lambda x: f'color: {COLORS["green"]}; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
@@ -409,7 +403,7 @@ if len(chip_db) >= 3:
                 else:
                     ui_c['戰術'] = ui_c.apply(lambda r: "💎 低檔潛伏" if r['乖離(%)'] < 3 else ("🚀 突破點火" if r['今日放量'] else "⏳ 盤整"), axis=1)
                     styled_c = (ui_c[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','現價','乖離(%)','連買','戰術']].rename(columns={'名稱_x':'名稱'})
-                                    .style.set_properties(**{'text-align': 'center'})
+                                    .style.set_properties(**table_style)
                                     .format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%'})
                                     .map(risk_color, subset=['安全指數']))
                     st.dataframe(styled_c, use_container_width=True, hide_index=True)
@@ -420,7 +414,7 @@ if len(chip_db) >= 3:
         surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
         if not surprise_atk.empty:
             st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
-            st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
+            st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.set_properties(**table_style).format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
             st.markdown("---")
             
         st.markdown("#### <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
@@ -431,7 +425,7 @@ if len(chip_db) >= 3:
         else: main_chips['安全指數'] = '-'
             
         st.dataframe(main_chips[['代號','名稱','連買','安全指數','外資(張)','投信(張)','自營(張)','三大法人合計']]
-                     .style.set_properties(**{'text-align': 'center'})
+                     .style.set_properties(**table_style)
                      .format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'})
                      .map(risk_color, subset=['安全指數']), height=500, use_container_width=True, hide_index=True)
 
@@ -458,7 +452,7 @@ if len(chip_db) >= 3:
                     
                 p_color = COLORS['red'] if total_pnl > 0 else COLORS['green']
                 st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
-                st.dataframe(pd.DataFrame(res_h).style.set_properties(**{'text-align': 'center'})
+                st.dataframe(pd.DataFrame(res_h).style.set_properties(**table_style)
                             .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
                             .map(lambda x: f'color: {COLORS["red"]}; font-weight: bold;' if x > 0 else (f'color: {COLORS["green"]}; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']), use_container_width=True, hide_index=True)
 
