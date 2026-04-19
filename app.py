@@ -34,11 +34,22 @@ st.set_page_config(
 with st.sidebar:
     st.markdown("### ⚙️ 紀律設定")
     st.markdown("---")
-    # 👑 UI 魔法切換開關
     theme_choice = st.selectbox("🎨 戰情室佈景主題", ["ocean", "gold", "gray"], index=0, format_func=lambda x: {"ocean":"🌊 深海藍 (推薦)", "gold":"👑 黑金專業盤手", "gray":"🧘 極簡灰 (冷靜)"}.get(x))
     
-    # 動態套用主題並取得當前顏色字典
-    COLORS = theme.apply_custom_theme(theme_choice)
+    # 🛡️ 終極防彈裝甲：防止 theme.py 沒更新導致系統當機
+    try:
+        COLORS = theme.apply_custom_theme(theme_choice)
+        # 確保回傳的是字典，否則主動觸發備用機制
+        if not isinstance(COLORS, dict):
+            raise TypeError("舊版 theme.py")
+    except Exception as e:
+        # 緊急備用色碼 (確保 app.py 絕對不會崩潰)
+        COLORS = {
+            "bg": "#0B132B", "card": "#1C2541", "border": "#2C3A5A",
+            "text": "#E0E6F1", "subtext": "#9FB3C8", "primary": "#5BC0BE",
+            "accent": "#CDE7F0", "green": "#6FFFB0", "red": "#FF6B6B"
+        }
+        st.error("⚠️ 偵測到雲端 `theme.py` 尚未更新！目前使用緊急備用色碼。請確保 GitHub 已上傳最新版 theme.py。")
 
     sheet_url = st.text_input("輸入【持股部位】CSV 網址：", value="", placeholder="貼上持股分頁網址")
     aar_sheet_url = st.text_input("輸入【交易日誌】CSV 網址：", value="", placeholder="貼上日誌分頁網址(供AAR使用)")
