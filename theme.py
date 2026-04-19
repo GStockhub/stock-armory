@@ -4,59 +4,48 @@ import streamlit as st
 # 🎨 戰情室專屬調色盤庫
 # =========================
 THEMES = {
-    "gold": {
-        "bg": "#181A1B", "card": "#232629", "border": "#3A3F44",
+    "gold": { # 👑 黑金專業盤手
+        "bg": "#121212", "card": "#1E1E1E", "border": "#333333",
         "text": "#F8F9FA", "subtext": "#A0AEC0", "primary": "#D4AF37",
         "accent": "#5A8DEE", "green": "#2F855A", "red": "#E53E3E"
     },
-    "gray": {
-        "bg": "#1E1F22", "card": "#2A2D31", "border": "#3A3F44",
+    "gray": { # 🧘 極簡灰 (冷靜)
+        "bg": "#181A1B", "card": "#242526", "border": "#3A3D41",
         "text": "#E5E7EB", "subtext": "#9CA3AF", "primary": "#9CA3AF",
         "accent": "#D1D5DB", "green": "#22C55E", "red": "#EF4444"
     },
-    "ocean": {
-        "bg": "#0B132B", "card": "#1C2541", "border": "#2C3A5A",
-        "text": "#E0E6F1", "subtext": "#9FB3C8", "primary": "#5BC0BE",
-        "accent": "#CDE7F0", "green": "#6FFFB0", "red": "#FF6B6B"
+    "navy": { # 🦈 鯊魚海軍藍 (藍灰質感，絕非藍屏)
+        "bg": "#0D1117", "card": "#161B22", "border": "#30363D",
+        "text": "#C9D1D9", "subtext": "#8B949E", "primary": "#58A6FF",
+        "accent": "#79C0FF", "green": "#3FB950", "red": "#FF7B72"
     },
-    "milktea_gold": { 
-        "bg": "#1F1A17", "card": "#2C2420", "border": "#3A312C",
-        "text": "#F5EDE6", "subtext": "#C2A58A", "primary": "#E6C7A1",
-        "accent": "#C2A58A", "green": "#4CAF7A", "red": "#D96C6C"
-    },
-    "milktea_light": { 
-        "bg": "#EDE6DF", "card": "#F5EFEA", "border": "#D6CCC2",
-        "text": "#3E3A39", "subtext": "#8C837E", "primary": "#A68A75",
-        "accent": "#8C837E", "green": "#4CA771", "red": "#D64040"
-    },
-    "milktea_tech": { 
+    "milktea_tech": { # ☕ 奶茶科技 (量化溫暖)
         "bg": "#191614", "card": "#26211D", "border": "#3B342E",
         "text": "#F1E9E0", "subtext": "#8FA3B0", "primary": "#D8B08C",
         "accent": "#8FA3B0", "green": "#59C9A5", "red": "#E57373"
     },
-    "milktea_blood": { 
-        "bg": "#1A1412", "card": "#241C19", "border": "#3B342E",
-        "text": "#F3E9E2", "subtext": "#A3938B", "primary": "#E0B89C",
-        "accent": "#A3938B", "green": "#3FBF7F", "red": "#FF5C5C"
+    "milktea_light": { # ☀️ 奶茶極簡 (日戰護目鏡)
+        "bg": "#F5F2ED", "card": "#FFFFFF", "border": "#E0D8D0",
+        "text": "#2C2A29", "subtext": "#8A827B", "primary": "#A68A75",
+        "accent": "#D1C7BD", "green": "#2E8B57", "red": "#D64040"
     }
 }
 
-def apply_custom_theme(mode="ocean"):
-    t = THEMES.get(mode, THEMES["ocean"])
+def apply_custom_theme(mode="navy"):
+    t = THEMES.get(mode, THEMES["navy"])
 
     st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
 
     /* =========================
-       🌑 全局
+       🌑 全局背景與字體
     ========================= */
     .stApp {{ background-color: {t['bg']}; }}
     h1, h2, h3, h4, h5, h6, p, div, span, label, li {{ color: {t['text']} !important; font-family: 'Inter', sans-serif; }}
-    table, [data-testid="stDataFrame"] {{ font-family: 'Roboto Mono', monospace !important; }}
 
     /* =========================
-       🎯 高亮色 
+       🎯 戰術高亮色 
     ========================= */
     .highlight-primary {{ color: {t['primary']} !important; font-weight: 700; }}
     .highlight-accent {{ color: {t['accent']} !important; font-weight: 700; }}
@@ -65,26 +54,33 @@ def apply_custom_theme(mode="ocean"):
     .text-sub {{ color: {t['subtext']} !important; }}
 
     /* =========================
-       🎛️ 強制覆蓋 Streamlit 原生元件 (消滅死黑區塊！)
+       🎛️ 強制覆蓋：終極防瞎眼裝甲 (修復輸入框白底白字)
     ========================= */
-    .stTextInput > div > div > input,
-    .stNumberInput > div > div > input {{
+    /* 輸入框本體 */
+    input[type="text"], input[type="number"], div[data-baseweb="input"] input {{
         color: {t['text']} !important;
-        background-color: {t['bg']} !important;
+        -webkit-text-fill-color: {t['text']} !important; /* 強制 Chrome 渲染字體顏色 */
+        background-color: {t['card']} !important;
     }}
-    div[data-baseweb="base-input"],
-    div[data-baseweb="input"],
-    div[data-baseweb="select"] > div {{
-        background-color: {t['bg']} !important;
+    /* 輸入框外框與下拉選單 */
+    div[data-baseweb="base-input"], div[data-baseweb="select"] > div {{
+        background-color: {t['card']} !important;
         border-color: {t['border']} !important;
-        color: {t['text']} !important;
     }}
+    /* 下拉選單的文字 */
+    div[data-baseweb="select"] span {{ color: {t['text']} !important; }}
+    /* 彈出選單底色 */
     div[data-baseweb="popover"] {{ background-color: {t['card']} !important; border: 1px solid {t['border']} !important; }}
     ul[role="listbox"] li {{ background-color: {t['card']} !important; color: {t['text']} !important; }}
-    div[data-testid="stAlert"] {{ background-color: {t['card']} !important; border: 1px solid {t['border']} !important; color: {t['text']} !important; }}
+    /* 提示框 (st.info / st.warning) 去除原本的藍黃色 */
+    div[data-testid="stAlert"] {{
+        background-color: {t['card']} !important; 
+        border: 1px solid {t['primary']} !important; 
+        color: {t['text']} !important; 
+    }}
 
     /* =========================
-       📊 Tabs
+       📊 Tabs 分頁自適應
     ========================= */
     .stTabs [data-baseweb="tab-list"] {{ display: flex; flex-wrap: wrap; gap: 8px; background-color: transparent; padding-bottom: 10px; }}
     .stTabs [data-baseweb="tab"] {{ flex-grow: 1; text-align: center; background-color: {t['card']}; border: 1px solid {t['border']}; color: {t['subtext']}; border-radius: 6px; padding: 8px 15px; transition: 0.2s; font-weight: 600; }}
