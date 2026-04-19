@@ -273,8 +273,14 @@ if len(chip_db) >= 3:
         try:
             sheet_df = pd.read_csv(sheet_url, dtype=str)
             sheet_df.columns = sheet_df.columns.str.strip()
-            h_df = sheet_df[sheet_df['分類'] == '持股'].copy()
-            if not h_df.empty:
+            
+            # 👑 終極防呆機制：如果 CSV 沒有「分類」欄位，就預設全部資料都是持股部位
+            if '分類' in sheet_df.columns:
+                h_df = sheet_df[sheet_df['分類'] == '持股'].copy()
+            else:
+                h_df = sheet_df.copy()
+                
+            if not h_df.empty and '代號' in h_df.columns:
                 h_intel = level2_quant_engine(tuple(h_df['代號'].tolist()))
                 if not h_intel.empty:
                     m_df = pd.merge(h_df, h_intel, on='代號', how='inner')
@@ -355,7 +361,6 @@ if len(chip_db) >= 3:
                 
                 ui_top, ui_b, ui_c = master_list[master_list['評級'].isin(['S', 'A'])], master_list[master_list['評級'] == 'B'], master_list[master_list['評級'] == 'C']
 
-                # 👑 統一 S 級與 A 級大標題為 primary 主色
                 if using_a_tier:
                     st.warning("⚠️ **系統判定：今日無完美 S 級標的。自動啟動【A 級】伏擊備援名單！**", icon="🛡️")
                     st.markdown("#### 🥈 <span class='highlight-primary'>【A級】伏擊備援</span>", unsafe_allow_html=True)
@@ -387,7 +392,7 @@ if len(chip_db) >= 3:
                             </div>
                             """, unsafe_allow_html=True)
 
-                st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True) # 👑 增加 A、B 間的呼吸空間
+                st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
                 st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (勝率 > 50%)</span>", unsafe_allow_html=True)
                 
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
@@ -399,7 +404,7 @@ if len(chip_db) >= 3:
                                     .map(lambda x: f'color: {COLORS["green"]}; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
-                st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True) # 👑 增加 B、C 間的呼吸空間
+                st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
                 st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
                 
                 if ui_c.empty: st.info("💡 今日無 C 級潛伏標的。")
