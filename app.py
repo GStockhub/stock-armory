@@ -36,7 +36,6 @@ total_capital = configs["total_capital"]
 risk_amount = configs["risk_amount"]
 fee_discount = configs["fee_discount"]
 
-# 定義全域共用的表格樣式 (👑 解決表格底色死黑的關鍵！)
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 我要賺大錢 v24.3</h1>", unsafe_allow_html=True)
@@ -356,10 +355,11 @@ if len(chip_db) >= 3:
                 
                 ui_top, ui_b, ui_c = master_list[master_list['評級'].isin(['S', 'A'])], master_list[master_list['評級'] == 'B'], master_list[master_list['評級'] == 'C']
 
+                # 👑 統一 S 級與 A 級大標題為 primary 主色
                 if using_a_tier:
                     st.warning("⚠️ **系統判定：今日無完美 S 級標的。自動啟動【A 級】伏擊備援名單！**", icon="🛡️")
-                    st.markdown("#### 🥈 <span class='highlight-accent'>【A級】伏擊備援</span>", unsafe_allow_html=True)
-                    border_color, title_color = COLORS['accent'], COLORS['accent']
+                    st.markdown("#### 🥈 <span class='highlight-primary'>【A級】伏擊備援</span>", unsafe_allow_html=True)
+                    border_color, title_color = COLORS['accent'], COLORS['primary']
                 else:
                     st.markdown("#### 🥇 <span class='highlight-primary'>【S級】完美狙擊</span>", unsafe_allow_html=True)
                     border_color, title_color = COLORS['primary'], COLORS['primary']
@@ -387,7 +387,9 @@ if len(chip_db) >= 3:
                             </div>
                             """, unsafe_allow_html=True)
 
-                st.markdown("#### ⚔️ <span class='highlight-accent'>【B級】穩健波段 (勝率 > 50%)</span>", unsafe_allow_html=True)
+                st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True) # 👑 增加 A、B 間的呼吸空間
+                st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (勝率 > 50%)</span>", unsafe_allow_html=True)
+                
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
                     styled_b = (ui_b[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','均報(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱'})
@@ -397,8 +399,9 @@ if len(chip_db) >= 3:
                                     .map(lambda x: f'color: {COLORS["green"]}; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
-                st.markdown("---")
+                st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True) # 👑 增加 B、C 間的呼吸空間
                 st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
+                
                 if ui_c.empty: st.info("💡 今日無 C 級潛伏標的。")
                 else:
                     ui_c['戰術'] = ui_c.apply(lambda r: "💎 低檔潛伏" if r['乖離(%)'] < 3 else ("🚀 突破點火" if r['今日放量'] else "⏳ 盤整"), axis=1)
@@ -456,8 +459,8 @@ if len(chip_db) >= 3:
                             .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
                             .map(lambda x: f'color: {COLORS["red"]}; font-weight: bold;' if x > 0 else (f'color: {COLORS["green"]}; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']), use_container_width=True, hide_index=True)
 
-        st.markdown("---")
-        st.markdown("### 📊 <span class='highlight-accent'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+        st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
         fm_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiZGVraTEwMjMiLCJlbWFpbCI6ImRla2kxMDIzQGdtYWlsLmNvbSJ9.-wVo_6BD8ac8cGCOi8C3J58KUGZ1c0CMwTU9lYPltNM"
         aar.render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS)
 
@@ -466,7 +469,7 @@ if len(chip_db) >= 3:
         st.markdown(MANUAL_TEXT, unsafe_allow_html=True)
 
     with t_hist:
-        st.markdown("### 🏛️ <span class='highlight-accent'>皇家軍史館：兵器開發檔案</span>", unsafe_allow_html=True)
+        st.markdown("### 🏛️ <span class='highlight-primary'>皇家軍史館：兵器開發檔案</span>", unsafe_allow_html=True)
         st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
