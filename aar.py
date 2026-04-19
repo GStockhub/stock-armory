@@ -4,6 +4,7 @@ import requests
 from datetime import datetime, timedelta
 import time
 import yfinance as yf
+from theme import COLORS  # 👑 引入全域色碼字典
 
 # =========================
 # 👑 台灣專屬：民國年校正模組
@@ -23,7 +24,7 @@ def parse_tw_date(d_str):
         return pd.NaT
 
 # =========================
-# 👑 名稱對照模組 (純淨版：100% 讀取本地字典)
+# 👑 名稱對照模組
 # =========================
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_names():
@@ -74,7 +75,7 @@ def get_yf_data(sid, start_date):
     return pd.DataFrame()
 
 # =========================
-# 主函數 (V2.3 終極動線 + 雙向盈虧精算 + 神仙模式版)
+# 主函數 (完全解耦調色盤版)
 # =========================
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
     if not aar_sheet_url:
@@ -136,14 +137,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         if f20.empty or f20['High'].isna().all():
                             diagnosis = "⏳剛賣出或暫無後續"
                         else:
-                            # 🟢 短線視角 (極限壓縮文字)
                             if f7.empty or f7['High'].isna().all(): 
                                 short_text = "⏳缺短線資料"
                             else:
                                 m7 = f7['High'].max()
                                 short_text = "✅精準收割" if m7 <= s_price * 1.02 else "📉短線留肉"
                             
-                            # 🔴 波段雙向潛力精算 (極限壓縮 + 紅綠燈號)
                             m20 = f20['High'].max()
                             min20 = f20['Low'].min()
                             threshold = 1.03 if held_days <= 3 else 1.05
@@ -163,7 +162,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                             else:
                                 long_text = "🛡️賣出後陷入橫盤，撤退精準！"
                             
-                            # 移除多餘空格
                             diagnosis = f"{short_text}｜{long_text}"
 
                 # 損益計算
@@ -182,17 +180,15 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
         if results:
             res = pd.DataFrame(results)
             
-            # 👑 新增：精算神仙模式的理論極限值
             total_missed = res['_少賺'].sum()
             god_mode_pnl = total_pnl + total_missed
             
+            # 👑 顏色統一改吃 COLORS 字典
             st.markdown(f"### 🎯 <span class='highlight-gold'>游擊隊 V2.3 戰果看板</span>", unsafe_allow_html=True)
-            st.markdown(f"#### 💰 總收割淨利：<span style='color:#E53E3E; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+            st.markdown(f"#### 💰 總收割淨利：<span style='color:{COLORS['red']}; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
             
-            # 👑 滿足大將軍的「上帝視角」標示
-            st.caption(f"✨ **【神仙模式】理論極限淨利**：<span style='color:#D4AF37; font-size:16px;'>**{god_mode_pnl:,.0f}**</span> 元 (若每筆皆賣在絕對高點，尚有 {total_missed:,.0f} 元的潛在空間)", unsafe_allow_html=True)
+            st.caption(f"✨ **【神仙模式】理論極限淨利**：<span style='color:{COLORS['gold']}; font-size:16px;'>**{god_mode_pnl:,.0f}**</span> 元 (若每筆皆賣在絕對高點，尚有 {total_missed:,.0f} 元的潛在空間)", unsafe_allow_html=True)
 
-            # --- 交易風格分析 ---
             ad = res[res['賣'] != "-"].copy()
             if not ad.empty:
                 def get_s(df): return (df['淨利']>0).mean()*100, df['報酬%'].mean()
@@ -206,11 +202,11 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 col3.metric("🧘 長波段 (8天+)", f"{l_w:.0f}% 勝率", f"{l_r:.2f}% 均報")
 
                 avg_m = res['_少賺'][res['_少賺']>0].mean()
-                st.markdown(f"""<div class='tier-card' style='border-top:4px solid #D4AF37;'>
+                st.markdown(f"""<div class='tier-card' style='border-top:4px solid {COLORS['gold']};'>
                     <h4 style='margin:0;'>👑 混合型收割者分析</h4>
-                    <b>人格診斷：</b> 您能適應各種持股天數，屬於全方位游擊手。<br>
-                    <b>收割效率：</b> 每一筆獲利交易平均留給市場 <span style='color:#E53E3E;'>{avg_m if not pd.isna(avg_m) else 0:,.0f} 元</span>。
-                    這不是損失，而是下次<b>『回頭收割』</b>的潛在空間！</div>""", unsafe_allow_html=True)
+                    <span class='text-sub'><b>人格診斷：</b> 您能適應各種持股天數，屬於全方位游擊手。<br>
+                    <b>收割效率：</b> 每一筆獲利交易平均留給市場</span> <span style='color:{COLORS['red']}; font-weight:bold;'>{avg_m if not pd.isna(avg_m) else 0:,.0f} 元</span>。<span class='text-sub'>
+                    這不是損失，而是下次<b>『回頭收割』</b>的潛在空間！</span></div>""", unsafe_allow_html=True)
 
             st.markdown("---")
             st.markdown("#### 📜 詳細收割清單")
@@ -218,9 +214,10 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             display_cols = ["代號", "名稱", "AI診斷", "買", "賣", "天", "淨利", "報酬%", "心魔"]
             display_df = res[display_cols]
 
+            # 👑 表格上色邏輯改吃 COLORS 字典
             st.dataframe(
                 display_df.style.format({"淨利":"{:,.0f}", "報酬%":"{:.2f}%"})
-                .map(lambda x: "color:#E53E3E" if x > 0 else "color:#38A169", subset=["淨利", "報酬%"])
+                .map(lambda x: f"color:{COLORS['red']}" if x > 0 else f"color:{COLORS['green']}", subset=["淨利", "報酬%"])
                 .set_properties(subset=["AI診斷"], **{'white-space': 'pre-wrap'}),
                 use_container_width=True, hide_index=True,
                 column_config={
