@@ -4,25 +4,46 @@ import streamlit as st
 # 🎨 戰情室專屬調色盤庫
 # =========================
 THEMES = {
-    # 👑 黑金專業盤手 (純粹黑深灰色，絕不泛綠)
+    # --- 原有冷色系陣營 ---
     "gold": {
-        "bg": "#121212", "card": "#1E1E1E", "border": "#333333",
+        "bg": "#181A1B", "card": "#232629", "border": "#3A3F44",
         "text": "#F8F9FA", "subtext": "#A0AEC0", "primary": "#D4AF37",
         "accent": "#5A8DEE", "green": "#2F855A", "red": "#E53E3E"
     },
-    # 🧘 極簡灰 (修正大便綠，改為純淨的冷炭灰)
     "gray": {
-        "bg": "#181A1B", "card": "#242526", "border": "#3A3D41",
+        "bg": "#1E1F22", "card": "#2A2D31", "border": "#3A3F44",
         "text": "#E5E7EB", "subtext": "#9CA3AF", "primary": "#9CA3AF",
         "accent": "#D1D5DB", "green": "#22C55E", "red": "#EF4444"
     },
-    # 🌊 深海藍
     "ocean": {
         "bg": "#0B132B", "card": "#1C2541", "border": "#2C3A5A",
         "text": "#E0E6F1", "subtext": "#9FB3C8", "primary": "#5BC0BE",
         "accent": "#CDE7F0", "green": "#6FFFB0", "red": "#FF6B6B"
+    },
+    
+    # --- ☕ 全新奶茶系陣營 ---
+    "milktea_gold": { # ① 奶茶金 (高級咖啡廳)
+        "bg": "#1F1A17", "card": "#2C2420", "border": "#3A312C",
+        "text": "#F5EDE6", "subtext": "#C2A58A", "primary": "#E6C7A1",
+        "accent": "#C2A58A", "green": "#4CAF7A", "red": "#D96C6C"
+    },
+    "milktea_light": { # ② 奶茶極簡 (唯一日戰淺色系)
+        "bg": "#EDE6DF", "card": "#F5EFEA", "border": "#D6CCC2",
+        "text": "#3E3A39", "subtext": "#8C837E", "primary": "#A68A75",
+        "accent": "#8C837E", "green": "#6BA292", "red": "#C65D5D"
+    },
+    "milktea_tech": { # ③ 奶茶科技 (溫暖量化)
+        "bg": "#191614", "card": "#26211D", "border": "#3B342E",
+        "text": "#F1E9E0", "subtext": "#8FA3B0", "primary": "#D8B08C",
+        "accent": "#8FA3B0", "green": "#59C9A5", "red": "#E57373"
+    },
+    "milktea_blood": { # ④ 奶茶黑紅 (殺手壓迫感)
+        "bg": "#1A1412", "card": "#241C19", "border": "#3B342E",
+        "text": "#F3E9E2", "subtext": "#A3938B", "primary": "#E0B89C",
+        "accent": "#A3938B", "green": "#3FBF7F", "red": "#FF5C5C"
     }
 }
+# (下面的 def apply_custom_theme 函式不用動，保持原樣即可)
 
 def apply_custom_theme(mode="ocean"):
     t = THEMES.get(mode, THEMES["ocean"])
