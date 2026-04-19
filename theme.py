@@ -27,7 +27,9 @@ THEMES = {
     "milktea_light": { 
         "bg": "#F5F2ED", "card": "#FFFFFF", "border": "#E0D8D0",
         "text": "#2C2A29", "subtext": "#8A827B", "primary": "#A68A75",
-        "accent": "#D1C7BD", "green": "#2E8B57", "red": "#D64040"
+        # 👑 修復 1：把瞎眼的淺灰色，改為極具質感的「深石板灰」，保證白底黑底都清晰！
+        "accent": "#6C7A89", 
+        "green": "#2E8B57", "red": "#D64040"
     }
 }
 
@@ -67,17 +69,28 @@ def apply_custom_theme(mode="navy"):
         border-color: {t['border']} !important;
     }}
     div[data-baseweb="select"] span {{ color: {t['text']} !important; }}
-    div[data-baseweb="popover"] {{ background-color: {t['card']} !important; border: 1px solid {t['border']} !important; }}
-    ul[role="listbox"] li {{ background-color: {t['card']} !important; color: {t['text']} !important; }}
     
-    /* 👑 終極修復：將 st.info/st.warning 的內部預設背景色徹底抹除 */
+    /* 👑 修復 2：無死角制霸下拉選單，強制抹除暗黑模式遺毒！ */
+    div[data-baseweb="popover"], div[data-baseweb="popover"] > div, div[data-baseweb="popover"] ul {{
+        background-color: {t['card']} !important;
+        border-color: {t['border']} !important;
+    }}
+    div[data-baseweb="popover"] li {{
+        background-color: transparent !important;
+    }}
+    div[data-baseweb="popover"] li span {{
+        color: {t['text']} !important;
+    }}
+    div[data-baseweb="popover"] li:hover {{
+        background-color: {t['bg']} !important;
+    }}
+
     div[data-testid="stAlert"] {{
         background-color: {t['card']} !important;
         border: 1px solid {t['border']} !important;
-        border-left: 4px solid {t['primary']} !important; /* 加上高質感的左側高亮邊框 */
+        border-left: 4px solid {t['primary']} !important; 
         color: {t['text']} !important;
     }}
-    /* 強制將原生半透明色改成透明 */
     div[data-testid="stAlert"] > div {{
         background-color: transparent !important;
     }}
