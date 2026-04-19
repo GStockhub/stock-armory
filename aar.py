@@ -4,11 +4,7 @@ import requests
 from datetime import datetime, timedelta
 import time
 import yfinance as yf
-from theme import COLORS  # 👑 引入全域色碼字典
 
-# =========================
-# 👑 台灣專屬：民國年校正模組
-# =========================
 def parse_tw_date(d_str):
     try:
         d_str = str(d_str).strip().replace('/', '-').replace('.', '-')
@@ -20,12 +16,8 @@ def parse_tw_date(d_str):
         elif len(parts) == 2:
             return pd.to_datetime(f"{datetime.now().year}-{parts[0]}-{parts[1]}")
         return pd.to_datetime(d_str)
-    except:
-        return pd.NaT
+    except: return pd.NaT
 
-# =========================
-# 👑 名稱對照模組
-# =========================
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_names():
     name_map = {}
@@ -33,13 +25,9 @@ def load_names():
         df = pd.read_csv("industry_map.csv", dtype=str)
         for _, row in df.iterrows():
             name_map[str(row['代號']).strip()] = str(row['名稱']).strip()
-    except:
-        pass
+    except: pass
     return name_map
 
-# =========================
-# FinMind 主引擎 
-# =========================
 def get_finmind_data(sid, start_date, fm_token):
     if not fm_token: return pd.DataFrame()
     try:
@@ -58,9 +46,6 @@ def get_finmind_data(sid, start_date, fm_token):
     except: pass
     return pd.DataFrame()
 
-# =========================
-# YF 備援引擎 
-# =========================
 def get_yf_data(sid, start_date):
     for suf in [".TW", ".TWO"]:
         try:
@@ -74,9 +59,7 @@ def get_yf_data(sid, start_date):
         except: continue
     return pd.DataFrame()
 
-# =========================
-# 主函數 (完全解耦調色盤版)
-# =========================
+# 👑 關鍵：這裡必須有 COLORS 這個參數！
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     if not aar_sheet_url:
         st.info("請在左側邊欄輸入【交易日誌】網址。")
@@ -158,13 +141,11 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                                 avoided_loss = (s_price - min20) * shares * 1000
                                 pct_down = ((min20 / s_price) - 1) * 100
                                 long_text = f"🛡️第{days_to_l}天跌至 {min20:.1f} ({pct_down:.1f}%)，🟢避開-{avoided_loss:,.0f}元"
-                                
                             else:
                                 long_text = "🛡️賣出後陷入橫盤，撤退精準！"
                             
                             diagnosis = f"{short_text}｜{long_text}"
 
-                # 損益計算
                 b_cost = (b_price * shares * 1000) + int((b_price * shares * 1000) * fee_rate)
                 s_rev = (s_price * shares * 1000) - int((s_price * shares * 1000) * fee_rate) - int((s_price * shares * 1000) * tax_rate)
                 pnl = s_rev - b_cost
@@ -179,15 +160,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
         if results:
             res = pd.DataFrame(results)
-            
             total_missed = res['_少賺'].sum()
             god_mode_pnl = total_pnl + total_missed
             
-            # 👑 顏色統一改吃 COLORS 字典
-            st.markdown(f"### 🎯 <span class='highlight-gold'>游擊隊 V2.3 戰果看板</span>", unsafe_allow_html=True)
+            st.markdown(f"### 🎯 <span class='highlight-primary'>游擊隊 V2.3 戰果看板</span>", unsafe_allow_html=True)
             st.markdown(f"#### 💰 總收割淨利：<span style='color:{COLORS['red']}; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
-            
-            st.caption(f"✨ **【神仙模式】理論極限淨利**：<span style='color:{COLORS['gold']}; font-size:16px;'>**{god_mode_pnl:,.0f}**</span> 元 (若每筆皆賣在絕對高點，尚有 {total_missed:,.0f} 元的潛在空間)", unsafe_allow_html=True)
+            st.caption(f"✨ **【神仙模式】理論極限淨利**：<span style='color:{COLORS['primary']}; font-size:16px;'>**{god_mode_pnl:,.0f}**</span> 元 (若每筆皆賣在絕對高點，尚有 {total_missed:,.0f} 元的潛在空間)", unsafe_allow_html=True)
 
             ad = res[res['賣'] != "-"].copy()
             if not ad.empty:
@@ -202,7 +180,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 col3.metric("🧘 長波段 (8天+)", f"{l_w:.0f}% 勝率", f"{l_r:.2f}% 均報")
 
                 avg_m = res['_少賺'][res['_少賺']>0].mean()
-                st.markdown(f"""<div class='tier-card' style='border-top:4px solid {COLORS['gold']};'>
+                st.markdown(f"""<div class='tier-card' style='border-top:4px solid {COLORS['primary']};'>
                     <h4 style='margin:0;'>👑 混合型收割者分析</h4>
                     <span class='text-sub'><b>人格診斷：</b> 您能適應各種持股天數，屬於全方位游擊手。<br>
                     <b>收割效率：</b> 每一筆獲利交易平均留給市場</span> <span style='color:{COLORS['red']}; font-weight:bold;'>{avg_m if not pd.isna(avg_m) else 0:,.0f} 元</span>。<span class='text-sub'>
@@ -210,11 +188,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
             st.markdown("---")
             st.markdown("#### 📜 詳細收割清單")
-            
             display_cols = ["代號", "名稱", "AI診斷", "買", "賣", "天", "淨利", "報酬%", "心魔"]
             display_df = res[display_cols]
 
-            # 👑 表格上色邏輯改吃 COLORS 字典
             st.dataframe(
                 display_df.style.format({"淨利":"{:,.0f}", "報酬%":"{:.2f}%"})
                 .map(lambda x: f"color:{COLORS['red']}" if x > 0 else f"color:{COLORS['green']}", subset=["淨利", "報酬%"])
