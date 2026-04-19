@@ -42,6 +42,7 @@ THEMES = {
     }
 }
 
+# 👑 關鍵：這裡必須要有 (mode="ocean") 接收參數
 def apply_custom_theme(mode="ocean"):
     # 抓取選擇的主題，找不到就預設 ocean
     t = THEMES.get(mode, THEMES["ocean"])
@@ -63,7 +64,7 @@ def apply_custom_theme(mode="ocean"):
     }}
 
     /* =========================
-       🎯 高亮色 (配合 GPT 改名 primary/accent)
+       🎯 高亮色 
     ========================= */
     .highlight-primary {{ color: {t['primary']} !important; font-weight: 700; }}
     .highlight-accent {{ color: {t['accent']} !important; font-weight: 700; }}
@@ -144,5 +145,5 @@ def apply_custom_theme(mode="ocean"):
     </style>
     """, unsafe_allow_html=True)
     
-    # 👑 關鍵：回傳當前選定的顏色字典，給 app.py 畫表格用！
+    # 👑 關鍵：回傳當前選定的顏色字典
     return t
