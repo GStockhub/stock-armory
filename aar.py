@@ -112,7 +112,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                     time.sleep(0.05)
 
                 hist = cache[sid]
-                diagnosis, s_price, s_date, missed_profit = "⚠️ 無資料", b_price, None, 0
+                diagnosis, s_price, s_date, missed_profit = "⚠️無資料", b_price, None, 0
                 b_date_str, s_date_str = b_date.strftime('%m/%d'), "-"
                 s_name = name_map.get(sid, sid) 
 
@@ -122,7 +122,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 if pd.isna(row.get('賣出日期')) or str(row.get('賣出價', '')).strip() == "":
                     if not hist.empty:
                         s_price = float(hist['Close'].iloc[-1])
-                        diagnosis = f"⚪ 持股中 | 現價 {s_price:.1f}"
+                        diagnosis = f"⚪持股中｜現價{s_price:.1f}"
                 else:
                     s_date = temp_s
                     s_price = float(row['賣出價'])
@@ -134,16 +134,16 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                         f20 = hist[(hist.index > s_obj) & (hist.index <= (s_date + timedelta(days=20)).date())]
 
                         if f20.empty or f20['High'].isna().all():
-                            diagnosis = "⏳ 剛賣出或暫無後續"
+                            diagnosis = "⏳剛賣出或暫無後續"
                         else:
-                            # 🟢 短線視角
+                            # 🟢 短線視角 (極限壓縮文字)
                             if f7.empty or f7['High'].isna().all(): 
-                                short_text = "⏳ 缺短線資料"
+                                short_text = "⏳缺短線資料"
                             else:
                                 m7 = f7['High'].max()
-                                short_text = "✅ 精準收割" if m7 <= s_price * 1.02 else "📉 短線留肉"
+                                short_text = "✅精準收割" if m7 <= s_price * 1.02 else "📉短線留肉"
                             
-                            # 🔴 波段雙向潛力精算
+                            # 🔴 波段雙向潛力精算 (極限壓縮 + 紅綠燈號)
                             m20 = f20['High'].max()
                             min20 = f20['Low'].min()
                             threshold = 1.03 if held_days <= 3 else 1.05
@@ -152,18 +152,19 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                                 days_to_h = (f20['High'].idxmax() - s_obj).days
                                 missed_profit = (m20 - s_price) * shares * 1000
                                 pct_up = ((m20 / s_price) - 1) * 100
-                                long_text = f"🔭 第{days_to_h}天見高 {m20:.1f} (+{pct_up:.1f}%)，潛在空間 {missed_profit:,.0f}元"
+                                long_text = f"🔭第{days_to_h}天見高 {m20:.1f} (+{pct_up:.1f}%)，🔴潛在+{missed_profit:,.0f}元"
                             
                             elif pd.notna(min20) and min20 < s_price * 0.98:
                                 days_to_l = (f20['Low'].idxmin() - s_obj).days
                                 avoided_loss = (s_price - min20) * shares * 1000
                                 pct_down = ((min20 / s_price) - 1) * 100
-                                long_text = f"🛡️ 第{days_to_l}天跌至 {min20:.1f} ({pct_down:.1f}%)，避開虧損 {avoided_loss:,.0f}元"
+                                long_text = f"🛡️第{days_to_l}天跌至 {min20:.1f} ({pct_down:.1f}%)，🟢避開-{avoided_loss:,.0f}元"
                                 
                             else:
-                                long_text = "🛡️ 賣出後陷入橫盤震盪，資金撤退極為精準！"
+                                long_text = "🛡️賣出後陷入橫盤，撤退精準！"
                             
-                            diagnosis = f"{short_text} ｜ {long_text}"
+                            # 移除多餘空格
+                            diagnosis = f"{short_text}｜{long_text}"
 
                 # 損益計算
                 b_cost = (b_price * shares * 1000) + int((b_price * shares * 1000) * fee_rate)
@@ -186,10 +187,10 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
             god_mode_pnl = total_pnl + total_missed
             
             st.markdown(f"### 🎯 <span class='highlight-gold'>游擊隊 V2.3 戰果看板</span>", unsafe_allow_html=True)
-            st.markdown(f"#### 💰 總收割淨利：<span style='color:#EF4444; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
+            st.markdown(f"#### 💰 總收割淨利：<span style='color:#E53E3E; font-size:28px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
             
             # 👑 滿足大將軍的「上帝視角」標示
-            st.caption(f"✨ **【神仙模式】理論極限淨利**：<span style='color:#F59E0B; font-size:16px;'>**{god_mode_pnl:,.0f}**</span> 元 (若每筆皆賣在絕對高點，尚有 {total_missed:,.0f} 元的潛在空間)", unsafe_allow_html=True)
+            st.caption(f"✨ **【神仙模式】理論極限淨利**：<span style='color:#D4AF37; font-size:16px;'>**{god_mode_pnl:,.0f}**</span> 元 (若每筆皆賣在絕對高點，尚有 {total_missed:,.0f} 元的潛在空間)", unsafe_allow_html=True)
 
             # --- 交易風格分析 ---
             ad = res[res['賣'] != "-"].copy()
@@ -205,10 +206,10 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
                 col3.metric("🧘 長波段 (8天+)", f"{l_w:.0f}% 勝率", f"{l_r:.2f}% 均報")
 
                 avg_m = res['_少賺'][res['_少賺']>0].mean()
-                st.markdown(f"""<div class='tier-card' style='border-top:4px solid #F59E0B;'>
+                st.markdown(f"""<div class='tier-card' style='border-top:4px solid #D4AF37;'>
                     <h4 style='margin:0;'>👑 混合型收割者分析</h4>
                     <b>人格診斷：</b> 您能適應各種持股天數，屬於全方位游擊手。<br>
-                    <b>收割效率：</b> 每一筆獲利交易平均留給市場 <span style='color:#EF4444;'>{avg_m if not pd.isna(avg_m) else 0:,.0f} 元</span>。
+                    <b>收割效率：</b> 每一筆獲利交易平均留給市場 <span style='color:#E53E3E;'>{avg_m if not pd.isna(avg_m) else 0:,.0f} 元</span>。
                     這不是損失，而是下次<b>『回頭收割』</b>的潛在空間！</div>""", unsafe_allow_html=True)
 
             st.markdown("---")
@@ -219,7 +220,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
 
             st.dataframe(
                 display_df.style.format({"淨利":"{:,.0f}", "報酬%":"{:.2f}%"})
-                .map(lambda x: "color:#EF4444" if x > 0 else "color:#10B981", subset=["淨利", "報酬%"])
+                .map(lambda x: "color:#E53E3E" if x > 0 else "color:#38A169", subset=["淨利", "報酬%"])
                 .set_properties(subset=["AI診斷"], **{'white-space': 'pre-wrap'}),
                 use_container_width=True, hide_index=True,
                 column_config={
