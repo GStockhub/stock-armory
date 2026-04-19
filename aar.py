@@ -91,7 +91,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     hist = get_finmind_data(sid, global_start, fm_token)
                     if hist.empty: hist = get_yf_data(sid, global_start)
                     if not hist.empty:
-                        # 🧠 V3 核心：計算歷史均線結構
                         hist['M5'] = hist['Close'].rolling(5).mean()
                         hist['M10'] = hist['Close'].rolling(10).mean()
                         hist['M20'] = hist['Close'].rolling(20).mean()
@@ -106,13 +105,11 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 temp_s = parse_tw_date(row.get('賣出日期'))
                 held_days = (temp_s - b_date).days if pd.notnull(temp_s) else (datetime.now() - b_date).days
                 
-                # 初始變數
                 structure_text = "⚪ 持股中/不明"
                 coach_text = "等待平倉結算"
                 grade = "⚪ 未評級"
                 roi = 0
                 
-                # 判斷是否已賣出
                 is_sold = pd.notna(row.get('賣出日期')) and str(row.get('賣出價', '')).strip() != ""
                 
                 if not is_sold:
@@ -128,7 +125,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         hist = hist.sort_index()
                         s_obj = s_date.date()
                         
-                        # 🧠 V3：抓取「賣出當下」的技術結構
                         if s_obj in hist.index:
                             m5_s = hist.loc[s_obj, 'M5']
                             m10_s = hist.loc[s_obj, 'M10']
@@ -162,14 +158,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             else:
                                 coach_text = "⚖️ 賣出後陷入橫盤，資金無效率，撤退合理"
 
-                # 損益精算
                 b_cost = (b_price * shares * 1000) + int((b_price * shares * 1000) * fee_rate)
                 s_rev = (s_price * shares * 1000) - int((s_price * shares * 1000) * fee_rate) - int((s_price * shares * 1000) * tax_rate)
                 pnl = s_rev - b_cost
                 roi = (pnl / b_cost) * 100 if b_cost > 0 else 0
                 if is_sold: total_pnl += pnl
 
-                # 🧠 V3 核心：嚴格交易評級 (S~D)
                 if is_sold:
                     if roi <= -5:
                         grade = "💀 D級 (情緒扛損)"
@@ -184,7 +178,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     else:
                         grade = "⚔️ B級 (普通操作)"
 
-                # 組裝 V3 結構化診斷字串
                 if is_sold:
                     final_diagnosis = f"【結構】{structure_text}\n【結果】{coach_text}"
                 else:
@@ -223,7 +216,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 </div>
                 """, unsafe_allow_html=True)
 
-            # 🧠 V3 核心：賣飛排行榜與心魔透視
             st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
             st.markdown("#### 💀 <span class='highlight-red'>系統洞察：賣飛心魔分析</span>", unsafe_allow_html=True)
             
@@ -264,12 +256,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
             st.markdown("#### 📜 逐筆交易評分清單")
             
-            display_cols = ["代號", "名稱", "評級", "買", "賣", "天", "淨利", "報酬%", "診斷詳情", "心魔"]
+            # 👑 變更順序：將「診斷詳情」移動到「評級」之前
+            display_cols = ["代號", "名稱", "診斷詳情", "評級", "買", "賣", "天", "淨利", "報酬%", "心魔"]
             display_df = res[display_cols]
             
             table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-            # 視覺化評級顏色
             def grade_color(val):
                 if 'S級' in str(val): return f"color: {COLORS['primary']}; font-weight: bold;"
                 if 'C級' in str(val): return f"color: {COLORS['accent']}; font-weight: bold;"
@@ -286,13 +278,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 column_config={
                     "代號": st.column_config.TextColumn(width="small"),
                     "名稱": st.column_config.TextColumn(width="small"),
+                    "診斷詳情": st.column_config.TextColumn(width="large"),
                     "評級": st.column_config.TextColumn(width="medium"),
                     "買": st.column_config.TextColumn(width="small"),
                     "賣": st.column_config.TextColumn(width="small"),
                     "天": st.column_config.NumberColumn(width="small"),
                     "淨利": st.column_config.NumberColumn(width="small"),
                     "報酬%": st.column_config.TextColumn(width="small"),
-                    "診斷詳情": st.column_config.TextColumn(width="large"),
                     "心魔": st.column_config.TextColumn(width="small")
                 }
             )
