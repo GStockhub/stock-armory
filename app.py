@@ -36,7 +36,7 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-   /* 導入 Google 現代字體 (Inter 處理介面，Roboto Mono 處理數字) */
+  /* 導入 Google 現代字體 (Inter 處理介面，Roboto Mono 處理數字) */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono:wght@400;600&display=swap');
 
     /* 全局背景與字體設定 (消光炭灰) */
@@ -81,6 +81,37 @@ st.markdown("""
     /* 側邊欄與表格柔化 */
     [data-testid="stSidebar"] { background-color: #141516; border-right: 1px solid #242729; }
     [data-testid="stDataFrame"] { border-radius: 8px !important; overflow: hidden; border: 1px solid #3A3F44; }
+
+    /* =========================================
+       👑 新增：三大去網頁化魔鬼細節 
+       ========================================= */
+
+    /* 1. 隱藏右上角官方標記與選單 */
+    [data-testid="stHeader"] { background-color: transparent; }
+    #MainMenu, .stDeployButton { display: none; }
+    footer { display: none; }
+
+    /* 2. 隱形戰術滾輪 (WebKit 專用) */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #141516; }
+    ::-webkit-scrollbar-thumb { background: #3A3F44; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #D4AF37; }
+
+    /* 3. 貴金屬按鈕設計 */
+    .stButton > button, .stDownloadButton > button {
+        background-color: #242729 !important; 
+        color: #D4AF37 !important;
+        border: 1px solid #3A3F44 !important; 
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        border-color: #D4AF37 !important; 
+        color: #181A1B !important; 
+        background-color: #D4AF37 !important;
+        box-shadow: 0 0 10px rgba(212, 175, 55, 0.3) !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
