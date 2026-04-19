@@ -421,7 +421,7 @@ if len(chip_db) >= 3:
         st.markdown("### 🎯 <span class='highlight-gold'>前線狙擊目標清單</span>", unsafe_allow_html=True)
         st.caption("💡 **盤前鐵律**：跳空>2%不買、9:05前不下單、單日限3筆、未達+6%不賣。詳細規範請見兵工廠教範。")
 
-        with st.expander("🌍 查看全球大盤診斷表"):
+        with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty:
                 st.dataframe(MACRO_DF.style.set_properties(**{'text-align': 'center'}).map(lambda x: 'color: #10B981;' if '多頭' in str(x) or '安定' in str(x) else ('color: #EF4444;' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
 
@@ -491,7 +491,7 @@ if len(chip_db) >= 3:
                     export_rows = []
                     active_fee_rate = 0.001425 * fee_discount
 
-                    # 1. 🛡️ 優先排入現役持股 (先防守)
+                    # 1. 🛡️ 現役持股
                     if not m_df.empty:
                         for _, r in m_df.iterrows():
                             try:
@@ -557,7 +557,7 @@ if len(chip_db) >= 3:
                     csv_data = final_export_df.to_csv(index=False).encode('utf-8-sig')
                     
                     st.download_button(
-                        label="📱 一鍵下載明日作戰地圖 (含持股與狙擊)",
+                        label="📱 明日目標下載",
                         data=csv_data,
                         file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv",
                         mime="text/csv",
@@ -628,7 +628,7 @@ if len(chip_db) >= 3:
     # --------------------------------------------------------------------------
     with t_chip:
         st.markdown("### 📡 <span class='highlight-gold'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
-        st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超部署 Top 200。")
+        st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
         
         surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
         if not surprise_atk.empty:
