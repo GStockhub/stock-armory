@@ -6,17 +6,16 @@ def render_sidebar():
         st.markdown("### ⚙️ 紀律設定")
         st.markdown("---")
         
-        # 1. 👑 UI 切換開關 (精簡為 5 大精銳主題)
+        # 1. 👑 拔除囉唆括號，清爽俐落！
         theme_options = {
-            "navy": "🦈 海軍藍",
-            "gold": "👑 黑金",
+            "navy": "🦈 鯊魚海軍藍",
+            "gold": "👑 黑金專業",
             "gray": "🧘 極簡炭灰",
             "milktea_tech": "☕ 奶茶科技",
             "milktea_light": "☀️ 奶茶極簡"
         }
         
-        # 大將軍若嫌選單能打字很煩，這裡維持 selectbox，但如果您想防呆，可以改成 st.radio
-        theme_choice = st.radio(
+        theme_choice = st.selectbox(
             "🎨 戰情室佈景主題", 
             list(theme_options.keys()), 
             index=0, 
@@ -44,7 +43,6 @@ def render_sidebar():
         risk_tolerance_pct = st.slider("單筆最大虧損容忍 (%)", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
         risk_amount = total_capital * (risk_tolerance_pct / 100)
         
-        # 這裡的 st.info 已經被 theme.py 的 CSS 強制改成融入主題的顏色了！
         st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**\n\n*(依此反推單筆最多買進張數)*")
         
         st.markdown("---")
