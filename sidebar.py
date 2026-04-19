@@ -1,37 +1,36 @@
 import streamlit as st
-import theme  # 讓側邊欄自己去呼叫主題兵工廠
+import theme  
 
 def render_sidebar():
     with st.sidebar:
         st.markdown("### ⚙️ 紀律設定")
         st.markdown("---")
         
-       # 1. 👑 UI 魔法切換開關 (7大戰情室塗裝)
+        # 1. 👑 UI 切換開關 (精簡為 5 大精銳主題)
         theme_options = {
-            "milktea_tech": "☕ 奶茶科技",
-            "milktea_gold": "🧋 奶茶金",
-            "ocean": "🌊 深海藍",
-            "gold": "👑 黑金專業",
+            "navy": "🦈 海軍藍",
+            "gold": "👑 黑金",
             "gray": "🧘 極簡炭灰",
-            "milktea_blood": "🩸 奶茶黑紅",
+            "milktea_tech": "☕ 奶茶科技",
             "milktea_light": "☀️ 奶茶極簡"
         }
-        theme_choice = st.selectbox(
+        
+        # 大將軍若嫌選單能打字很煩，這裡維持 selectbox，但如果您想防呆，可以改成 st.radio
+        theme_choice = st.radio(
             "🎨 戰情室佈景主題", 
             list(theme_options.keys()), 
             index=0, 
             format_func=lambda x: theme_options.get(x)
         )
         
-        # 🛡️ 終極防彈裝甲：防止 theme.py 沒更新導致系統當機
         try:
             COLORS = theme.apply_custom_theme(theme_choice)
             if not isinstance(COLORS, dict): raise TypeError("舊版 theme.py")
         except Exception as e:
             COLORS = {
-                "bg": "#0B132B", "card": "#1C2541", "border": "#2C3A5A",
-                "text": "#E0E6F1", "subtext": "#9FB3C8", "primary": "#5BC0BE",
-                "accent": "#CDE7F0", "green": "#6FFFB0", "red": "#FF6B6B"
+                "bg": "#0D1117", "card": "#161B22", "border": "#30363D",
+                "text": "#C9D1D9", "subtext": "#8B949E", "primary": "#58A6FF",
+                "accent": "#79C0FF", "green": "#3FB950", "red": "#FF7B72"
             }
             st.error("⚠️ 偵測到雲端 `theme.py` 尚未更新！目前使用緊急備用色碼。")
 
@@ -44,6 +43,8 @@ def render_sidebar():
         total_capital = st.number_input("作戰本金 (元)", value=200000, step=10000)
         risk_tolerance_pct = st.slider("單筆最大虧損容忍 (%)", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
         risk_amount = total_capital * (risk_tolerance_pct / 100)
+        
+        # 這裡的 st.info 已經被 theme.py 的 CSS 強制改成融入主題的顏色了！
         st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**\n\n*(依此反推單筆最多買進張數)*")
         
         st.markdown("---")
@@ -54,7 +55,6 @@ def render_sidebar():
         st.markdown("#### 🛡️ 總曝險與預備金")
         max_market_cap = total_capital * 0.60
         
-        # 👑 未來想改 HTML 或加顏色，都在這裡改！
         st.markdown(f"""
         <div style="background-color: {COLORS['card']}; padding: 15px; border-radius: 8px; border-left: 5px solid {COLORS['primary']}; margin-bottom: 15px;">
             <div style="margin-bottom: 12px; text-align: left;">
@@ -74,7 +74,6 @@ def render_sidebar():
             st.cache_data.clear()
             st.success("快取已清除！請重新載入。")
             
-        # 3. 📤 將所有大腦需要的參數打包送出去
         return {
             "COLORS": COLORS,
             "sheet_url": sheet_url,
