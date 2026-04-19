@@ -77,7 +77,19 @@ with st.sidebar:
     st.markdown("#### 🛡️ 總曝險與預備金")
     MAX_EXPOSURE_RATE = 0.60
     max_market_cap = total_capital * MAX_EXPOSURE_RATE
-    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**\n*(避險與股災專用)*")
+    st.markdown(f"""
+    <div style="background-color: #2D2A1A; padding: 15px; border-radius: 8px; border-left: 5px solid #F59E0B; margin-bottom: 15px;">
+        <div style="margin-bottom: 12px; text-align: left;">
+            ⚔️ <b style="color: #D1D5DB;">最高資金 (60%)：</b><br>
+            <span style="font-size: 18px; font-weight: bold; color: #F59E0B;">{max_market_cap:,.0f} 元</span>
+        </div>
+        <div style="text-align: left;">
+            🛡️ <b style="color: #D1D5DB;">預備部隊 (40%)：</b><br>
+            <span style="font-size: 18px; font-weight: bold; color: #38BDF8;">{total_capital - max_market_cap:,.0f} 元</span><br>
+            <span style="font-size: 14px; color: #9CA3AF;">*(極端避險與股災專用)*</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
     if st.button("🔄 一鍵清空情報快取"):
