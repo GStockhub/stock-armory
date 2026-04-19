@@ -21,6 +21,7 @@ else:
 from manual import MANUAL_TEXT, HISTORY_TEXT
 import aar  
 import theme  # 👈 呼叫您剛剛建好的 UI 模組
+from theme import COLORS # 👈 將色碼字典叫進來供邏輯使用
 
 # ==============================================================================
 # 【第一區塊：系統底層與防禦配置】
@@ -35,7 +36,7 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# 👑 套用華爾街黑金貴族 UI
+# 👑 套用暗黑量化神殿 UI (樣式解耦完成)
 theme.apply_custom_theme()
 
 # ==============================================================================
@@ -63,16 +64,17 @@ with st.sidebar:
     st.markdown("#### 🛡️ 總曝險與預備金")
     MAX_EXPOSURE_RATE = 0.60
     max_market_cap = total_capital * MAX_EXPOSURE_RATE
+    # 👑 這裡的顏色全部改為動態讀取 COLORS 字典
     st.markdown(f"""
-    <div style="background-color: #242729; padding: 15px; border-radius: 8px; border-left: 5px solid #D4AF37; margin-bottom: 15px;">
+    <div style="background-color: {COLORS['bg_card']}; padding: 15px; border-radius: 8px; border-left: 5px solid {COLORS['gold']}; margin-bottom: 15px;">
         <div style="margin-bottom: 12px; text-align: left;">
-            ⚔️ <b style="color: #F8F9FA;">最高資金 (60%)：</b><br>
-            <span style="font-size: 18px; font-weight: bold; color: #D4AF37;">{max_market_cap:,.0f} 元</span>
+            ⚔️ <b style="color: {COLORS['text_main']};">最高資金 (60%)：</b><br>
+            <span style="font-size: 18px; font-weight: bold; color: {COLORS['gold']};">{max_market_cap:,.0f} 元</span>
         </div>
         <div style="text-align: left;">
-            🛡️ <b style="color: #F8F9FA;">預備部隊 (40%)：</b><br>
-            <span style="font-size: 18px; font-weight: bold; color: #4A90E2;">{total_capital - max_market_cap:,.0f} 元</span><br>
-            <span style="font-size: 14px; color: #A0AEC0;">*(極端避險與股災專用)*</span>
+            🛡️ <b style="color: {COLORS['text_main']};">預備部隊 (40%)：</b><br>
+            <span style="font-size: 18px; font-weight: bold; color: {COLORS['cyan']};">{total_capital - max_market_cap:,.0f} 元</span><br>
+            <span style="font-size: 14px; color: {COLORS['text_sub']};">*(極端避險與股災專用)*</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -83,10 +85,10 @@ with st.sidebar:
         st.success("快取已清除！請重新載入。")
 
 st.markdown("<h1 style='text-align: center;' class='highlight-gold'>💰️ 我要賺大錢 v24.3</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #A0AEC0;'>—— 終極番號 ✕ 交易教練 V2 完全體 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V2 完全體 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
-st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
+st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
 
 # ==============================================================================
 # 【第三區塊：強效大盤診斷與本地產業字典】
@@ -343,12 +345,13 @@ def level2_quant_engine(id_tuple):
             
     return pd.DataFrame(intel_results)
 
+# 👑 評分顏色也改讀字典
 def risk_color(val):
     try:
         v = int(val)
-        if v >= 8: return 'color: #38A169; font-weight: bold;'
-        elif v <= 3: return 'color: #E53E3E; font-weight: bold;'
-        return 'color: #D4AF37; font-weight: bold;'
+        if v >= 8: return f'color: {COLORS["green"]}; font-weight: bold;'
+        elif v <= 3: return f'color: {COLORS["red"]}; font-weight: bold;'
+        return f'color: {COLORS["gold"]}; font-weight: bold;'
     except: return ''
 
 # ==============================================================================
@@ -408,7 +411,8 @@ if len(chip_db) >= 3:
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty:
-                st.dataframe(MACRO_DF.style.set_properties(**{'text-align': 'center'}).map(lambda x: 'color: #38A169;' if '多頭' in str(x) or '安定' in str(x) else ('color: #E53E3E;' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
+                # 大盤紅綠字也吃 COLORS 字典
+                st.dataframe(MACRO_DF.style.set_properties(**{'text-align': 'center'}).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
 
         pool_ids = today_df[today_df['連買'] >= 1]['代號'].tolist() 
         calc_list = tuple(set(pool_ids + top_80_chips))
@@ -548,10 +552,10 @@ if len(chip_db) >= 3:
                 if using_a_tier:
                     st.warning("⚠️ **系統判定：今日無完美 S 級標的。自動啟動【A 級】伏擊備援名單！**", icon="🛡️")
                     st.markdown("#### 🥈 <span class='highlight-cyan'>【A級】伏擊備援</span>", unsafe_allow_html=True)
-                    border_color, title_color = "#4A90E2", "#4A90E2"
+                    border_color, title_color = COLORS['cyan'], COLORS['cyan']
                 else:
                     st.markdown("#### 🥇 <span class='highlight-gold'>【S級】完美狙擊</span>", unsafe_allow_html=True)
-                    border_color, title_color = "#D4AF37", "#D4AF37"
+                    border_color, title_color = COLORS['gold'], COLORS['gold']
 
                 if ui_top.empty:
                     st.info("💡 今日無主戰力標的符合。")
@@ -560,11 +564,12 @@ if len(chip_db) >= 3:
                     for i in range(len(ui_top)):
                         r = ui_top.iloc[i]
                         with cols_s[i]:
+                            # 卡片底色與文字也全部套用 COLORS
                             st.markdown(f"""
                             <div class="tier-card" style="border-top: 5px solid {border_color};">
                                 <h3 style="margin:0; color:{title_color};">{r['名次']}. {r['名稱_x']} ({r['代號']})</h3>
-                                <p style="color:#A0AEC0; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
-                                <div style="background-color: #181A1B; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                                <p style="color:{COLORS['text_sub']}; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
+                                <div style="background-color: {COLORS['bg_main']}; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
                                     📊 <b>職業回測 (隔日進場/-3%損):</b><br>
                                     勝率：<span class="highlight-green">{r['勝率(%)']:.1f}%</span> | 均報：<span class="highlight-cyan">+{r['均報(%)']:.2f}%</span>
                                 </div>
@@ -585,7 +590,7 @@ if len(chip_db) >= 3:
                     styled_b = (b_disp.style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '停損價':'{:.2f}', '勝率(%)':'{:.1f}%', '均報(%)':'{:.2f}%'})
                                     .map(risk_color, subset=['安全指數'])
-                                    .map(lambda x: 'color: #38A169; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
+                                    .map(lambda x: f'color: {COLORS["green"]}; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
                 st.markdown("---")
@@ -670,12 +675,12 @@ if len(chip_db) >= 3:
                     except: continue
                     
                 df_res = pd.DataFrame(res_h)
-                p_color = "#E53E3E" if total_pnl > 0 else "#38A169"
+                p_color = COLORS['red'] if total_pnl > 0 else COLORS['green']
                 st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
                 
                 styled_h = (df_res.style.set_properties(**{'text-align': 'center'})
                             .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
-                            .map(lambda x: 'color: #E53E3E; font-weight: bold;' if x > 0 else ('color: #38A169; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
+                            .map(lambda x: f'color: {COLORS["red"]}; font-weight: bold;' if x > 0 else (f'color: {COLORS["green"]}; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
                 st.dataframe(styled_h, use_container_width=True, hide_index=True)
 
         st.markdown("---")
@@ -705,4 +710,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #A0AEC0;'>© 游擊隊軍火部 - v24.3</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v24.3</p>", unsafe_allow_html=True)
