@@ -9,7 +9,7 @@ import yfinance as yf
 import concurrent.futures
 import ssl
 
-# 👑 解決大將軍環境的 SSL 憑證錯誤 (CERTIFICATE_VERIFY_FAILED)
+# 👑 解決大將軍環境的 SSL 憑證錯誤
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -17,9 +17,10 @@ except AttributeError:
 else:
     ssl._create_default_https_context = _create_unverified_https_context
 
-# 👑 導入您專屬的外部軍火庫與 AAR 獨立模組
+# 👑 導入您專屬的外部軍火庫、AAR 獨立模組，以及全新 UI 模組
 from manual import MANUAL_TEXT, HISTORY_TEXT
-import aar  # 👈 呼叫外掛的 AAR 模組
+import aar  
+import theme  # 👈 呼叫您剛剛建好的 UI 模組
 
 # ==============================================================================
 # 【第一區塊：系統底層與防禦配置】
@@ -34,63 +35,8 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono:wght@400;600&display=swap');
-
-.stApp { background-color: #121417; }
-
-h1, h2, h3, h4, h5, h6, p, div, span, label, li { 
-    color: #E5E7EB !important; 
-    font-family: 'Inter', sans-serif; 
-}
-
-table, [data-testid="stDataFrame"] { 
-    font-family: 'Roboto Mono', monospace !important; 
-}
-
-/* 色彩 */
-.highlight-gold { color: #C9A227 !important; font-weight: 600; }
-.highlight-cyan { color: #3A7CA5 !important; font-weight: 600; }
-.highlight-red { color: #C53030 !important; font-weight: 600; }
-.highlight-green { color: #2F855A !important; font-weight: 600; }
-
-/* Tabs */
-.stTabs [data-baseweb="tab"] { 
-    background-color: #1C1F23; 
-    border: 1px solid #2A2F35; 
-    color: #9CA3AF;
-}
-.stTabs [aria-selected="true"] { 
-    color: #C9A227 !important; 
-    border-bottom: 2px solid #C9A227 !important;
-}
-
-/* 卡片 */
-.tier-card { 
-    background-color: #1C1F23; 
-    border: 1px solid #2A2F35;
-    border-radius: 8px;
-    padding: 20px;
-}
-
-/* Sidebar */
-[data-testid="stSidebar"] { 
-    background-color: #0F1113; 
-}
-
-/* Scroll */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-thumb { background: #2A2F35; }
-
-/* Button */
-.stButton > button {
-    background-color: #1C1F23 !important;
-    color: #C9A227 !important;
-    border: 1px solid #2A2F35 !important;
-}
-</style>
-    """, unsafe_allow_html=True)
+# 👑 套用華爾街黑金貴族 UI
+theme.apply_custom_theme()
 
 # ==============================================================================
 # 【第二區塊：側邊欄 (Sidebar) & 紀律風控】
@@ -118,15 +64,15 @@ with st.sidebar:
     MAX_EXPOSURE_RATE = 0.60
     max_market_cap = total_capital * MAX_EXPOSURE_RATE
     st.markdown(f"""
-    <div style="background-color: #2D2A1A; padding: 15px; border-radius: 8px; border-left: 5px solid #F59E0B; margin-bottom: 15px;">
+    <div style="background-color: #242729; padding: 15px; border-radius: 8px; border-left: 5px solid #D4AF37; margin-bottom: 15px;">
         <div style="margin-bottom: 12px; text-align: left;">
-            ⚔️ <b style="color: #D1D5DB;">最高資金 (60%)：</b><br>
-            <span style="font-size: 18px; font-weight: bold; color: #F59E0B;">{max_market_cap:,.0f} 元</span>
+            ⚔️ <b style="color: #F8F9FA;">最高資金 (60%)：</b><br>
+            <span style="font-size: 18px; font-weight: bold; color: #D4AF37;">{max_market_cap:,.0f} 元</span>
         </div>
         <div style="text-align: left;">
-            🛡️ <b style="color: #D1D5DB;">預備部隊 (40%)：</b><br>
-            <span style="font-size: 18px; font-weight: bold; color: #38BDF8;">{total_capital - max_market_cap:,.0f} 元</span><br>
-            <span style="font-size: 14px; color: #9CA3AF;">*(極端避險與股災專用)*</span>
+            🛡️ <b style="color: #F8F9FA;">預備部隊 (40%)：</b><br>
+            <span style="font-size: 18px; font-weight: bold; color: #4A90E2;">{total_capital - max_market_cap:,.0f} 元</span><br>
+            <span style="font-size: 14px; color: #A0AEC0;">*(極端避險與股災專用)*</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -137,7 +83,7 @@ with st.sidebar:
         st.success("快取已清除！請重新載入。")
 
 st.markdown("<h1 style='text-align: center;' class='highlight-gold'>💰️ 我要賺大錢 v24.3</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 交易教練 V2 完全體 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #A0AEC0;'>—— 終極番號 ✕ 交易教練 V2 完全體 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center; color: #6B7280;'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -400,9 +346,9 @@ def level2_quant_engine(id_tuple):
 def risk_color(val):
     try:
         v = int(val)
-        if v >= 8: return 'color: #10B981; font-weight: bold;'
-        elif v <= 3: return 'color: #EF4444; font-weight: bold;'
-        return 'color: #F59E0B; font-weight: bold;'
+        if v >= 8: return 'color: #38A169; font-weight: bold;'
+        elif v <= 3: return 'color: #E53E3E; font-weight: bold;'
+        return 'color: #D4AF37; font-weight: bold;'
     except: return ''
 
 # ==============================================================================
@@ -417,7 +363,7 @@ elif MACRO_SCORE <= 5:
 with st.spinner('情報兵正在進行職業級波段回測與籌碼精算...'):
     chip_db = fetch_chips_data()
 
-m_df = pd.DataFrame() # 預防未輸入網址時出錯
+m_df = pd.DataFrame() 
 
 if len(chip_db) >= 3:
     dates = sorted(list(chip_db.keys()), reverse=True)
@@ -436,7 +382,6 @@ if len(chip_db) >= 3:
 
     top_80_chips = today_df.sort_values('投信(張)', ascending=False).head(80)['代號'].tolist()
 
-    # 👑 戰略前置：在進入分頁前，提早將「現役持股」結算完畢！(供一鍵下載與總部共用)
     if sheet_url:
         try:
             sheet_df = pd.read_csv(sheet_url, dtype=str)
@@ -463,7 +408,7 @@ if len(chip_db) >= 3:
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty:
-                st.dataframe(MACRO_DF.style.set_properties(**{'text-align': 'center'}).map(lambda x: 'color: #10B981;' if '多頭' in str(x) or '安定' in str(x) else ('color: #EF4444;' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
+                st.dataframe(MACRO_DF.style.set_properties(**{'text-align': 'center'}).map(lambda x: 'color: #38A169;' if '多頭' in str(x) or '安定' in str(x) else ('color: #E53E3E;' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
 
         pool_ids = today_df[today_df['連買'] >= 1]['代號'].tolist() 
         calc_list = tuple(set(pool_ids + top_80_chips))
@@ -524,14 +469,10 @@ if len(chip_db) >= 3:
                 master_list = pd.concat([top_tier, b_tier, c_tier]).reset_index(drop=True).head(20)
                 master_list['名次'] = master_list.index + 1
                 
-                # ==============================================================
-                # 👑 縫合手術：打造手機版【終極作戰地圖 (含持股與狙擊)】
-                # ==============================================================
                 if not master_list.empty:
                     export_rows = []
                     active_fee_rate = 0.001425 * fee_discount
 
-                    # 1. 🛡️ 現役持股
                     if not m_df.empty:
                         for _, r in m_df.iterrows():
                             try:
@@ -566,17 +507,14 @@ if len(chip_db) >= 3:
                                 })
                             except: continue
 
-                    # 👑 插入空白行：如果手上有持股，在持股與狙擊名單中間安插一行空白，方便視覺區隔
                     if not m_df.empty:
                         export_rows.append({
                             "戰區": "", "代號": "", "名稱": "", "戰術行動": "",
                             "現價": "", "防守底線": "", "次要數據": "", "產業": ""
                         })
 
-                    # 2. 🎯 接續排入狙擊兵力 (後進攻，開放 Top 20 包含 C 級潛伏名單)
                     tier_names = {'S': '🥇 S級狙擊', 'A': '🥈 A級狙擊', 'B': '⚔️ B級穩健', 'C': '📡 C級潛伏'}
                     for _, r in master_list.iterrows():
-                        # 👑 C級名單專屬防呆：既然是無聊觀察用，戰術行動就改為「觀察」，避免盤中手癢誤買
                         if r['評級'] == 'C':
                             act_str = "👀 列入觀察"
                         else:
@@ -610,10 +548,10 @@ if len(chip_db) >= 3:
                 if using_a_tier:
                     st.warning("⚠️ **系統判定：今日無完美 S 級標的。自動啟動【A 級】伏擊備援名單！**", icon="🛡️")
                     st.markdown("#### 🥈 <span class='highlight-cyan'>【A級】伏擊備援</span>", unsafe_allow_html=True)
-                    border_color, title_color = "#38BDF8", "#38BDF8"
+                    border_color, title_color = "#4A90E2", "#4A90E2"
                 else:
                     st.markdown("#### 🥇 <span class='highlight-gold'>【S級】完美狙擊</span>", unsafe_allow_html=True)
-                    border_color, title_color = "#F59E0B", "#F59E0B"
+                    border_color, title_color = "#D4AF37", "#D4AF37"
 
                 if ui_top.empty:
                     st.info("💡 今日無主戰力標的符合。")
@@ -625,8 +563,8 @@ if len(chip_db) >= 3:
                             st.markdown(f"""
                             <div class="tier-card" style="border-top: 5px solid {border_color};">
                                 <h3 style="margin:0; color:{title_color};">{r['名次']}. {r['名稱_x']} ({r['代號']})</h3>
-                                <p style="color:#9CA3AF; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
-                                <div style="background-color: #111827; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                                <p style="color:#A0AEC0; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
+                                <div style="background-color: #181A1B; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
                                     📊 <b>職業回測 (隔日進場/-3%損):</b><br>
                                     勝率：<span class="highlight-green">{r['勝率(%)']:.1f}%</span> | 均報：<span class="highlight-cyan">+{r['均報(%)']:.2f}%</span>
                                 </div>
@@ -647,7 +585,7 @@ if len(chip_db) >= 3:
                     styled_b = (b_disp.style.set_properties(**{'text-align': 'center'})
                                     .format({'現價':'{:.2f}', '停損價':'{:.2f}', '勝率(%)':'{:.1f}%', '均報(%)':'{:.2f}%'})
                                     .map(risk_color, subset=['安全指數'])
-                                    .map(lambda x: 'color: #10B981; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
+                                    .map(lambda x: 'color: #38A169; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
                 st.markdown("---")
@@ -732,12 +670,12 @@ if len(chip_db) >= 3:
                     except: continue
                     
                 df_res = pd.DataFrame(res_h)
-                p_color = "#EF4444" if total_pnl > 0 else "#10B981"
+                p_color = "#E53E3E" if total_pnl > 0 else "#38A169"
                 st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
                 
                 styled_h = (df_res.style.set_properties(**{'text-align': 'center'})
                             .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
-                            .map(lambda x: 'color: #EF4444; font-weight: bold;' if x > 0 else ('color: #10B981; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
+                            .map(lambda x: 'color: #E53E3E; font-weight: bold;' if x > 0 else ('color: #38A169; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']))
                 st.dataframe(styled_h, use_container_width=True, hide_index=True)
 
         st.markdown("---")
@@ -767,4 +705,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #9CA3AF;'>© 游擊隊軍火部 - v24.3</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #A0AEC0;'>© 游擊隊軍火部 - v24.3</p>", unsafe_allow_html=True)
