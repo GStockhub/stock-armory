@@ -59,7 +59,6 @@ def get_yf_data(sid, start_date):
         except: continue
     return pd.DataFrame()
 
-# 👑 關鍵：這裡必須有 COLORS 這個參數！
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     if not aar_sheet_url:
         st.info("請在左側邊欄輸入【交易日誌】網址。")
@@ -190,9 +189,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             st.markdown("#### 📜 詳細收割清單")
             display_cols = ["代號", "名稱", "AI診斷", "買", "賣", "天", "淨利", "報酬%", "心魔"]
             display_df = res[display_cols]
+            
+            # 套用與主程式相同的表格背景設定
+            table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
             st.dataframe(
-                display_df.style.format({"淨利":"{:,.0f}", "報酬%":"{:.2f}%"})
+                display_df.style.set_properties(**table_style).format({"淨利":"{:,.0f}", "報酬%":"{:.2f}%"})
                 .map(lambda x: f"color:{COLORS['red']}" if x > 0 else f"color:{COLORS['green']}", subset=["淨利", "報酬%"])
                 .set_properties(subset=["AI診斷"], **{'white-space': 'pre-wrap'}),
                 use_container_width=True, hide_index=True,
