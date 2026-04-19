@@ -36,19 +36,51 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    .stApp { background-color: #121619; }
-    h1, h2, h3, h4, h5, h6, p, div, span, label, li { color: #D1D5DB !important; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-    .highlight-gold { color: #F59E0B !important; font-weight: 900; }
-    .highlight-cyan { color: #38BDF8 !important; font-weight: 800; }
-    .highlight-red { color: #EF4444 !important; font-weight: 900; }
-    .highlight-green { color: #10B981 !important; font-weight: 900; }
+    /* 導入 Google 現代字體 (Inter 處理介面，Roboto Mono 處理數字) */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@400;700&display=swap');
+
+    /* 全局背景與字體設定 (深海藍黑) */
+    .stApp { background-color: #0B0F19; }
+    h1, h2, h3, h4, h5, h6, p, div, span, label, li { 
+        color: #E2E8F0 !important; 
+        font-family: 'Inter', 'Helvetica Neue', sans-serif; 
+    }
+    
+    /* 讓表格數字強制等寬，完美對齊小數點 */
+    table, [data-testid="stDataFrame"] { 
+        font-family: 'Roboto Mono', monospace !important; 
+    }
+
+    /* 戰術色彩庫 (微發光霓虹效果) */
+    .highlight-gold { color: #FFB000 !important; font-weight: 800; text-shadow: 0 0 8px rgba(255, 176, 0, 0.4); }
+    .highlight-cyan { color: #00F0FF !important; font-weight: 800; text-shadow: 0 0 8px rgba(0, 240, 255, 0.4); }
+    .highlight-red { color: #FF3366 !important; font-weight: 800; text-shadow: 0 0 8px rgba(255, 51, 102, 0.4); }
+    .highlight-green { color: #00E676 !important; font-weight: 800; text-shadow: 0 0 8px rgba(0, 230, 118, 0.4); }
+
+    /* 分頁 (Tabs) 戰術化設計 */
     .stTabs [data-baseweb="tab-list"] { display: flex; flex-wrap: wrap; gap: 8px; background-color: transparent; padding-bottom: 10px; }
-    .stTabs [data-baseweb="tab"] { flex-grow: 1; text-align: center; height: auto; min-height: 45px; background-color: #1F2937; border-radius: 8px; color: #9CA3AF; border: 1px solid #374151; font-size: 16px; font-weight: bold; padding: 8px 15px; white-space: nowrap; }
-    .stTabs [aria-selected="true"] { background-color: #374151 !important; color: #F59E0B !important; border-bottom: 4px solid #F59E0B !important; }
-    .tier-card { background-color: #1F2937; padding: 20px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); }
-    [data-testid="stSidebar"] { background-color: #0F1115; border-right: 1px solid #1F2937; }
-    [data-testid="stDataFrame"] { border-radius: 10px !important; overflow: hidden; }
-    .discipline-box { background-color: #2D1A1A; border-left: 5px solid #EF4444; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+    .stTabs [data-baseweb="tab"] { 
+        flex-grow: 1; text-align: center; height: auto; min-height: 45px; 
+        background-color: #151C2C; border-radius: 8px; color: #64748B; 
+        border: 1px solid #1E293B; font-size: 16px; font-weight: bold; 
+        padding: 8px 15px; white-space: nowrap; transition: all 0.3s ease;
+    }
+    .stTabs [data-baseweb="tab"]:hover { border-color: #00F0FF; color: #E2E8F0; }
+    .stTabs [aria-selected="true"] { 
+        background-color: #1E293B !important; color: #FFB000 !important; 
+        border-bottom: 4px solid #FFB000 !important; 
+    }
+
+    /* 戰情報告卡片設計 */
+    .tier-card { 
+        background-color: #151C2C; padding: 20px; border-radius: 12px; 
+        border: 1px solid #1E293B; margin-bottom: 15px; 
+        box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.6); 
+    }
+
+    /* 側邊欄與表格柔化 */
+    [data-testid="stSidebar"] { background-color: #080B13; border-right: 1px solid #151C2C; }
+    [data-testid="stDataFrame"] { border-radius: 12px !important; overflow: hidden; border: 1px solid #1E293B; }
     </style>
     """, unsafe_allow_html=True)
 
