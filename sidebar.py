@@ -6,12 +6,21 @@ def render_sidebar():
         st.markdown("### ⚙️ 紀律設定")
         st.markdown("---")
         
-        # 1. 👑 UI 魔法切換開關 (改為戰術單選鈕，徹底禁止鍵盤輸入)
-        theme_choice = st.radio(
+       # 1. 👑 UI 魔法切換開關 (7大戰情室塗裝)
+        theme_options = {
+            "milktea_tech": "☕ 奶茶科技",
+            "milktea_gold": "🧋 奶茶金",
+            "ocean": "🌊 深海藍",
+            "gold": "👑 黑金專業",
+            "gray": "🧘 極簡炭灰",
+            "milktea_blood": "🩸 奶茶黑紅",
+            "milktea_light": "☀️ 奶茶極簡"
+        }
+        theme_choice = st.selectbox(
             "🎨 戰情室佈景主題", 
-            ["ocean", "gold", "gray"], 
+            list(theme_options.keys()), 
             index=0, 
-            format_func=lambda x: {"ocean":"🌊 深海藍", "gold":"👑 黑金", "gray":"🧘 極簡灰"}.get(x)
+            format_func=lambda x: theme_options.get(x)
         )
         
         # 🛡️ 終極防彈裝甲：防止 theme.py 沒更新導致系統當機
