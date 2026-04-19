@@ -6,8 +6,8 @@ def render_sidebar():
         st.markdown("### ⚙️ 紀律設定")
         st.markdown("---")
         
-        # 1. 👑 UI 魔法切換開關
-        theme_choice = st.selectbox(
+        # 1. 👑 UI 魔法切換開關 (改為戰術單選鈕，徹底禁止鍵盤輸入)
+        theme_choice = st.radio(
             "🎨 戰情室佈景主題", 
             ["ocean", "gold", "gray"], 
             index=0, 
