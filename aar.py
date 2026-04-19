@@ -105,8 +105,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 temp_s = parse_tw_date(row.get('賣出日期'))
                 held_days = (temp_s - b_date).days if pd.notnull(temp_s) else (datetime.now() - b_date).days
                 
-                structure_text = "⚪ 持股中/不明"
-                coach_text = "等待平倉結算"
+                structure_text = "⚪持股中"
+                coach_text = "等待平倉"
                 grade = "⚪ 未評級"
                 roi = 0
                 
@@ -115,7 +115,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 if not is_sold:
                     if not hist.empty:
                         s_price = float(hist['Close'].iloc[-1])
-                        coach_text = "⚪ 仍在戰場中，請堅守紀律"
+                        coach_text = "⚪仍在戰場"
                 else:
                     s_date = temp_s
                     s_price = float(row['賣出價'])
@@ -130,33 +130,34 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             m10_s = hist.loc[s_obj, 'M10']
                             if pd.notna(m5_s) and pd.notna(m10_s):
                                 if s_price > m5_s and m5_s > m10_s:
-                                    structure_text = "📈 多頭排列 (強勢區)"
+                                    structure_text = "📈多頭排列強勢"
                                 elif s_price < m10_s:
-                                    structure_text = "📉 跌破 M10 (轉弱區)"
+                                    structure_text = "📉跌破M10轉弱"
                                 else:
-                                    structure_text = "⏳ 均線糾結 (盤整區)"
+                                    structure_text = "⏳均線糾結盤整"
 
                         f20 = hist[(hist.index > s_obj) & (hist.index <= (s_date + timedelta(days=20)).date())]
                         
                         if f20.empty or f20['High'].isna().all():
-                            coach_text = "⏳ 剛賣出，尚無後續數據"
+                            coach_text = "⏳剛賣出無數據"
                         else:
                             m20 = f20['High'].max()
                             min20 = f20['Low'].min()
                             threshold = 1.03 if held_days <= 3 else 1.05
                             
+                            # 👑 極簡化診斷文字
                             if pd.notna(m20) and m20 > s_price * threshold:
                                 days_to_h = (f20['High'].idxmax() - s_obj).days
                                 missed_profit = (m20 - s_price) * shares * 1000
                                 pct_up = ((m20 / s_price) - 1) * 100
-                                coach_text = f"🔭 第 {days_to_h} 天後見高 (+{pct_up:.1f}%)，潛在少賺 {missed_profit:,.0f} 元"
+                                coach_text = f"🔭{days_to_h}天後見高 (+{pct_up:.1f}%) 🔴潛在+{missed_profit:,.0f}元"
                             elif pd.notna(min20) and min20 < s_price * 0.98:
                                 days_to_l = (f20['Low'].idxmin() - s_obj).days
                                 avoided_loss = (s_price - min20) * shares * 1000
                                 pct_down = ((min20 / s_price) - 1) * 100
-                                coach_text = f"🛡️ 第 {days_to_l} 天後殺低 ({pct_down:.1f}%)，成功避開 {avoided_loss:,.0f} 元損失"
+                                coach_text = f"🛡️{days_to_l}天後殺低 ({pct_down:.1f}%) 🟢避開-{avoided_loss:,.0f}元"
                             else:
-                                coach_text = "⚖️ 賣出後陷入橫盤，資金無效率，撤退合理"
+                                coach_text = "⚖️賣後橫盤 撤退合理"
 
                 b_cost = (b_price * shares * 1000) + int((b_price * shares * 1000) * fee_rate)
                 s_rev = (s_price * shares * 1000) - int((s_price * shares * 1000) * fee_rate) - int((s_price * shares * 1000) * tax_rate)
@@ -166,20 +167,21 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 if is_sold:
                     if roi <= -5:
-                        grade = "💀 D級 (情緒扛損)"
-                    elif structure_text == "📈 多頭排列 (強勢區)" and missed_profit > 0 and roi < 10:
-                        grade = "🤡 C級 (強勢賣飛)"
+                        grade = "💀D級(情緒)"
+                    elif structure_text == "📈多頭排列強勢" and missed_profit > 0 and roi < 10:
+                        grade = "🤡C級(賣飛)"
                     elif roi >= 10:
-                        grade = "👑 S級 (完美收割)"
-                    elif structure_text == "📉 跌破 M10 (轉弱區)" and -5 < roi <= 0:
-                        grade = "🛡️ A級 (紀律停損)"
+                        grade = "👑S級(完美)"
+                    elif structure_text == "📉跌破M10轉弱" and -5 < roi <= 0:
+                        grade = "🛡️A級(紀律)"
                     elif roi > 0:
-                        grade = "🥈 A級 (穩健獲利)"
+                        grade = "🥈A級(穩健)"
                     else:
-                        grade = "⚔️ B級 (普通操作)"
+                        grade = "⚔️B級(普通)"
 
+                # 👑 拔除多餘括號，直接接合文字
                 if is_sold:
-                    final_diagnosis = f"【結構】{structure_text}\n【結果】{coach_text}"
+                    final_diagnosis = f"{structure_text} {coach_text}"
                 else:
                     final_diagnosis = coach_text
 
@@ -256,7 +258,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
             st.markdown("#### 📜 逐筆交易評分清單")
             
-            # 👑 變更順序：將「診斷詳情」移動到「評級」之前
             display_cols = ["代號", "名稱", "診斷詳情", "評級", "買", "賣", "天", "淨利", "報酬%", "心魔"]
             display_df = res[display_cols]
             
