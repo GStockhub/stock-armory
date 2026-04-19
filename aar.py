@@ -77,7 +77,7 @@ def get_yf_data(sid, start_date):
 # =========================
 # 主函數 (完全解耦調色盤版)
 # =========================
-def render_aar_tab(aar_sheet_url, fee_discount, fm_token):
+def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     if not aar_sheet_url:
         st.info("請在左側邊欄輸入【交易日誌】網址。")
         return
