@@ -22,14 +22,14 @@ from manual import MANUAL_TEXT, HISTORY_TEXT
 import aar  # 👈 呼叫外掛的 AAR 模組
 
 # ==============================================================================
-# 【第一區塊：系統底層與現代化防禦配置】
+# 【第一區塊：系統底層與防禦配置】
 # ==============================================================================
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="游擊隊終極軍火庫 v24.3",
-    page_icon="⚔️",
+    page_title="我要賺大錢",
+    page_icon="💰️",
     layout="wide",
     initial_sidebar_state="expanded" 
 )
@@ -53,17 +53,17 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 【第二區塊：側邊欄 (Sidebar) & 總部紀律風控】
+# 【第二區塊：側邊欄 (Sidebar) & 紀律風控】
 # ==============================================================================
 
 with st.sidebar:
-    st.markdown("### ⚙️ 總部紀律設定")
+    st.markdown("### ⚙️ 紀律設定")
     st.markdown("---")
     sheet_url = st.text_input("輸入【持股部位】CSV 網址：", value="", placeholder="貼上持股分頁網址")
     aar_sheet_url = st.text_input("輸入【交易日誌】CSV 網址：", value="", placeholder="貼上日誌分頁網址(供AAR使用)")
     
     st.markdown("---")
-    st.markdown("#### 💰 機構級資金控管")
+    st.markdown("#### 💰 資金控管")
     total_capital = st.number_input("作戰本金 (元)", value=200000, step=10000)
     risk_tolerance_pct = st.slider("單筆最大虧損容忍 (%)", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
     risk_amount = total_capital * (risk_tolerance_pct / 100)
@@ -74,7 +74,7 @@ with st.sidebar:
     fee_discount = st.slider("券商手續費折數 (無折扣=1.0, 五折=0.5)", min_value=0.1, max_value=1.0, value=1.0, step=0.05)
     
     st.markdown("---")
-    st.markdown("#### 🛡️ 總曝險與戰略預備金")
+    st.markdown("#### 🛡️ 總曝險與預備金")
     MAX_EXPOSURE_RATE = 0.60
     max_market_cap = total_capital * MAX_EXPOSURE_RATE
     st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**\n*(雷打不動，極端避險與股災專用)*")
@@ -84,7 +84,7 @@ with st.sidebar:
         st.cache_data.clear()
         st.success("快取已清除！請重新載入。")
 
-st.markdown("<h1 style='text-align: center;' class='highlight-gold'>⚔️ 游擊隊終極軍火庫 v24.3</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;' class='highlight-gold'>💰️ 我要賺大錢 v24.3</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #9CA3AF;'>—— 終極番號 ✕ 交易教練 V2 完全體 ——</p>", unsafe_allow_html=True)
 
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -166,7 +166,7 @@ def get_macro_dashboard():
 MACRO_SCORE, MACRO_DF = get_macro_dashboard()
 
 # ==============================================================================
-# 【第四區塊：實戰量化回測引擎】
+# 【第四區塊：量化回測引擎】
 # ==============================================================================
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -354,11 +354,11 @@ def risk_color(val):
     except: return ''
 
 # ==============================================================================
-# 【第五區塊：軍事化分頁渲染與系統顯示】
+# 【第五區塊：分頁渲染與系統顯示】
 # ==============================================================================
 
 if MACRO_SCORE <= 3:
-    st.error(f"🔴 **最高紅色警戒 (大盤分數 {MACRO_SCORE}/10)**：市場極度恐慌！系統建議：**【全面停止交易】**，保留 100% 現金。", icon="🚨")
+    st.error(f"🔴 **最高紅色警戒 (大盤分數 {MACRO_SCORE}/10)**：市場恐慌！系統建議：**【全面停止交易】**，保留 100% 現金。", icon="🚨")
 elif MACRO_SCORE <= 5:
     st.warning(f"🟡 **黃色警戒 (大盤分數 {MACRO_SCORE}/10)**：大盤偏弱。系統建議：**【只做乖離<3%的股票，且資金減半】**。", icon="⚠️")
 
