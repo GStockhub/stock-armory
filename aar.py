@@ -145,7 +145,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             min20 = f20['Low'].min()
                             threshold = 1.03 if held_days <= 3 else 1.05
                             
-                            # 👑 極簡化診斷文字
                             if pd.notna(m20) and m20 > s_price * threshold:
                                 days_to_h = (f20['High'].idxmax() - s_obj).days
                                 missed_profit = (m20 - s_price) * shares * 1000
@@ -167,19 +166,18 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 if is_sold:
                     if roi <= -5:
-                        grade = "💀D級(情緒)"
+                        grade = "💀 D級(扛損)"
                     elif structure_text == "📈多頭排列強勢" and missed_profit > 0 and roi < 10:
-                        grade = "🤡C級(賣飛)"
+                        grade = "🤡 C級(賣飛)"
                     elif roi >= 10:
-                        grade = "👑S級(完美)"
+                        grade = "👑 S級(完美)"
                     elif structure_text == "📉跌破M10轉弱" and -5 < roi <= 0:
-                        grade = "🛡️A級(紀律)"
+                        grade = "🛡️ A級(停損)"
                     elif roi > 0:
-                        grade = "🥈A級(穩健)"
+                        grade = "🥈 A級(穩健)"
                     else:
-                        grade = "⚔️B級(普通)"
+                        grade = "⚔️ B級(普通)"
 
-                # 👑 拔除多餘括號，直接接合文字
                 if is_sold:
                     final_diagnosis = f"{structure_text} {coach_text}"
                 else:
@@ -248,12 +246,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         </div>
                     </div>
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed {COLORS['border']};">
-                        💡 <b>教練點評：</b> 您高達 <b>{len(missed_df)/len(sold_df)*100:.0f}%</b> 的獲利單提前下車。數據顯示，您最難熬過持股的 <b>第 {freq_day:.0f} 天</b>。下次在多頭結構中，請強迫自己綁住雙手，突破這個天數魔咒！
+                        💡 <b>教練點評：</b> 高達 <b>{len(missed_df)/len(sold_df)*100:.0f}%</b> 獲利單提前下車。最難熬過 <b>第 {freq_day:.0f} 天</b>。下次多頭結構請強迫綁住雙手！
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.success("🎉 太神啦！目前系統判定您沒有任何嚴重的賣飛行為，收割極度精準！")
+                st.success("🎉 完美！目前無嚴重賣飛，收割精準！")
 
             st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
             st.markdown("#### 📜 逐筆交易評分清單")
@@ -274,19 +272,19 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 display_df.style.set_properties(**table_style).format({"淨利":"{:,.0f}", "報酬%":"{:.2f}%"})
                 .map(lambda x: f"color:{COLORS['red']}" if x > 0 else (f"color:{COLORS['green']}" if x < 0 else ""), subset=["淨利", "報酬%"])
                 .map(grade_color, subset=["評級"])
-                .set_properties(subset=["診斷詳情"], **{'white-space': 'pre-wrap', 'text-align': 'left'}),
+                .set_properties(subset=["診斷詳情"], **{'white-space': 'nowrap', 'text-align': 'left'}),
                 use_container_width=True, hide_index=True,
                 column_config={
-                    "代號": st.column_config.TextColumn(width="small"),
-                    "名稱": st.column_config.TextColumn(width="small"),
-                    "診斷詳情": st.column_config.TextColumn(width="large"),
-                    "評級": st.column_config.TextColumn(width="medium"),
-                    "買": st.column_config.TextColumn(width="small"),
-                    "賣": st.column_config.TextColumn(width="small"),
-                    "天": st.column_config.NumberColumn(width="small"),
-                    "淨利": st.column_config.NumberColumn(width="small"),
-                    "報酬%": st.column_config.TextColumn(width="small"),
-                    "心魔": st.column_config.TextColumn(width="small")
+                    "代號": st.column_config.TextColumn(width=50),
+                    "名稱": st.column_config.TextColumn(width=70),
+                    "診斷詳情": st.column_config.TextColumn(width=380),
+                    "評級": st.column_config.TextColumn(width=100),
+                    "買": st.column_config.TextColumn(width=50),
+                    "賣": st.column_config.TextColumn(width=50),
+                    "天": st.column_config.NumberColumn(width=40),
+                    "淨利": st.column_config.NumberColumn(width=60),
+                    "報酬%": st.column_config.TextColumn(width=60),
+                    "心魔": st.column_config.TextColumn(width=80)
                 }
             )
         else: st.warning("尚無資料")
