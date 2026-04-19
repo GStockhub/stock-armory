@@ -77,7 +77,7 @@ with st.sidebar:
     st.markdown("#### 🛡️ 總曝險與預備金")
     MAX_EXPOSURE_RATE = 0.60
     max_market_cap = total_capital * MAX_EXPOSURE_RATE
-    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**\n*(雷打不動，極端避險與股災專用)*")
+    st.warning(f"⚔️ **最高作戰資金 (60%)：{max_market_cap:,.0f} 元**\n\n🛡️ **戰略預備部隊 (40%)：{total_capital - max_market_cap:,.0f} 元**\n*(避險與股災專用)*")
 
     st.markdown("---")
     if st.button("🔄 一鍵清空情報快取"):
@@ -620,7 +620,7 @@ if len(chip_db) >= 3:
         
         surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
         if not surprise_atk.empty:
-            st.markdown("#### 🚨 <span class='highlight-red'>土洋合擊！首日突擊部隊</span>", unsafe_allow_html=True)
+            st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
             st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
             st.markdown("---")
             
