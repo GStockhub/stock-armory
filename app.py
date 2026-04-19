@@ -34,7 +34,7 @@ st.set_page_config(
 with st.sidebar:
     st.markdown("### ⚙️ 紀律設定")
     st.markdown("---")
-    theme_choice = st.selectbox("🎨 戰情室佈景主題", ["ocean", "gold", "gray"], index=0, format_func=lambda x: {"ocean":"🌊 深海藍 (推薦)", "gold":"👑 黑金專業盤手", "gray":"🧘 極簡灰 (冷靜)"}.get(x))
+    theme_choice = st.selectbox("🎨 戰情室佈景主題", ["ocean", "gold", "gray"], index=0, format_func=lambda x: {"ocean":"🌊 深海藍", "gold":"👑 黑金", "gray":"🧘 極簡灰"}.get(x))
     
     # 🛡️ 終極防彈裝甲：防止 theme.py 沒更新導致系統當機
     try:
