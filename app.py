@@ -274,7 +274,6 @@ if len(chip_db) >= 3:
             sheet_df = pd.read_csv(sheet_url, dtype=str)
             sheet_df.columns = sheet_df.columns.str.strip()
             
-            # 👑 終極防呆機制：如果 CSV 沒有「分類」欄位，就預設全部資料都是持股部位
             if '分類' in sheet_df.columns:
                 h_df = sheet_df[sheet_df['分類'] == '持股'].copy()
             else:
@@ -355,7 +354,7 @@ if len(chip_db) >= 3:
 
                     tier_names = {'S': '🥇 S級狙擊', 'A': '🥈 A級狙擊', 'B': '⚔️ B級穩健', 'C': '📡 C級潛伏'}
                     for _, r in master_list.iterrows():
-                        export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "戰術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "現價": round(r['現價'], 2), "防守底線": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
+                        export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "战術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "現價": round(r['現價'], 2), "防守底線": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
 
                     st.download_button(label="📱 明日目標下載", data=pd.DataFrame(export_rows).to_csv(index=False).encode('utf-8-sig'), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
                 
@@ -460,9 +459,14 @@ if len(chip_db) >= 3:
                     
                 p_color = COLORS['red'] if total_pnl > 0 else COLORS['green']
                 st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
-                st.dataframe(pd.DataFrame(res_h).style.set_properties(**table_style)
-                            .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
-                            .map(lambda x: f'color: {COLORS["red"]}; font-weight: bold;' if x > 0 else (f'color: {COLORS["green"]}; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']), use_container_width=True, hide_index=True)
+                
+                # 👑 終極防呆：檢查是否有成功抓到任何資料，避免空表引發 KeyError
+                if res_h:
+                    st.dataframe(pd.DataFrame(res_h).style.set_properties(**table_style)
+                                .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
+                                .map(lambda x: f'color: {COLORS["red"]}; font-weight: bold;' if x > 0 else (f'color: {COLORS["green"]}; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']), use_container_width=True, hide_index=True)
+                else:
+                    st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
 
         st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
         st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
