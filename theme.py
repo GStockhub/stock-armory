@@ -27,9 +27,7 @@ THEMES = {
     "milktea_light": { 
         "bg": "#F5F2ED", "card": "#FFFFFF", "border": "#E0D8D0",
         "text": "#2C2A29", "subtext": "#8A827B", "primary": "#A68A75",
-        # 👑 修復 1：把瞎眼的淺灰色，改為極具質感的「深石板灰」，保證白底黑底都清晰！
-        "accent": "#6C7A89", 
-        "green": "#2E8B57", "red": "#D64040"
+        "accent": "#6C7A89", "green": "#2E8B57", "red": "#D64040"
     }
 }
 
@@ -70,20 +68,13 @@ def apply_custom_theme(mode="navy"):
     }}
     div[data-baseweb="select"] span {{ color: {t['text']} !important; }}
     
-    /* 👑 修復 2：無死角制霸下拉選單，強制抹除暗黑模式遺毒！ */
     div[data-baseweb="popover"], div[data-baseweb="popover"] > div, div[data-baseweb="popover"] ul {{
         background-color: {t['card']} !important;
         border-color: {t['border']} !important;
     }}
-    div[data-baseweb="popover"] li {{
-        background-color: transparent !important;
-    }}
-    div[data-baseweb="popover"] li span {{
-        color: {t['text']} !important;
-    }}
-    div[data-baseweb="popover"] li:hover {{
-        background-color: {t['bg']} !important;
-    }}
+    div[data-baseweb="popover"] li {{ background-color: transparent !important; }}
+    div[data-baseweb="popover"] li span {{ color: {t['text']} !important; }}
+    div[data-baseweb="popover"] li:hover {{ background-color: {t['bg']} !important; }}
 
     div[data-testid="stAlert"] {{
         background-color: {t['card']} !important;
@@ -91,11 +82,25 @@ def apply_custom_theme(mode="navy"):
         border-left: 4px solid {t['primary']} !important; 
         color: {t['text']} !important;
     }}
-    div[data-testid="stAlert"] > div {{
-        background-color: transparent !important;
+    div[data-testid="stAlert"] > div {{ background-color: transparent !important; }}
+    div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {{ color: {t['text']} !important; }}
+
+    /* 👑 終極修復：強制剝奪 Expander (折疊面板) 的黑暗遺毒 */
+    [data-testid="stExpander"] details {{
+        background-color: {t['card']} !important;
+        border: 1px solid {t['border']} !important;
+        border-radius: 8px;
     }}
-    div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {{
+    [data-testid="stExpander"] summary {{
+        background-color: {t['card']} !important;
         color: {t['text']} !important;
+    }}
+    [data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {{
+        color: {t['text']} !important;
+        font-weight: 600 !important;
+    }}
+    [data-testid="stExpander"] summary svg {{
+        fill: {t['text']} !important; /* 連旁邊的箭頭都強制跟著字體變色！ */
     }}
 
     /* =========================
@@ -105,7 +110,9 @@ def apply_custom_theme(mode="navy"):
     .stTabs [data-baseweb="tab"] {{ flex-grow: 1; text-align: center; background-color: {t['card']}; border: 1px solid {t['border']}; color: {t['subtext']}; border-radius: 6px; padding: 8px 15px; transition: 0.2s; font-weight: 600; }}
     .stTabs [data-baseweb="tab"]:hover {{ border-color: {t['primary']}; color: {t['text']}; }}
     .stTabs [aria-selected="true"] {{ background-color: {t['card']} !important; color: {t['primary']} !important; border-bottom: 3px solid {t['primary']} !important; }}
-    .stTabs [data-baseweb="tab-highlight"] {{ display: none; }}
+    
+    /* 👑 抹除 Tabs 原生紅線 */
+    .stTabs [data-baseweb="tab-highlight"] {{ background-color: transparent !important; display: none !important; }}
 
     /* =========================
        🧾 卡片與表格
