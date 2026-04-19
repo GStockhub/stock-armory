@@ -4,27 +4,27 @@ import streamlit as st
 # 🎨 戰情室專屬調色盤庫
 # =========================
 THEMES = {
-    "gold": { # 👑 黑金專業盤手
+    "gold": {
         "bg": "#121212", "card": "#1E1E1E", "border": "#333333",
         "text": "#F8F9FA", "subtext": "#A0AEC0", "primary": "#D4AF37",
         "accent": "#5A8DEE", "green": "#2F855A", "red": "#E53E3E"
     },
-    "gray": { # 🧘 極簡灰 (冷靜)
+    "gray": {
         "bg": "#181A1B", "card": "#242526", "border": "#3A3D41",
         "text": "#E5E7EB", "subtext": "#9CA3AF", "primary": "#9CA3AF",
         "accent": "#D1D5DB", "green": "#22C55E", "red": "#EF4444"
     },
-    "navy": { # 🦈 鯊魚海軍藍 (藍灰質感，絕非藍屏)
+    "navy": {
         "bg": "#0D1117", "card": "#161B22", "border": "#30363D",
         "text": "#C9D1D9", "subtext": "#8B949E", "primary": "#58A6FF",
         "accent": "#79C0FF", "green": "#3FB950", "red": "#FF7B72"
     },
-    "milktea_tech": { # ☕ 奶茶科技 (量化溫暖)
+    "milktea_tech": { 
         "bg": "#191614", "card": "#26211D", "border": "#3B342E",
         "text": "#F1E9E0", "subtext": "#8FA3B0", "primary": "#D8B08C",
         "accent": "#8FA3B0", "green": "#59C9A5", "red": "#E57373"
     },
-    "milktea_light": { # ☀️ 奶茶極簡 (日戰護目鏡)
+    "milktea_light": { 
         "bg": "#F5F2ED", "card": "#FFFFFF", "border": "#E0D8D0",
         "text": "#2C2A29", "subtext": "#8A827B", "primary": "#A68A75",
         "accent": "#D1C7BD", "green": "#2E8B57", "red": "#D64040"
@@ -39,13 +39,14 @@ def apply_custom_theme(mode="navy"):
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
 
     /* =========================
-       🌑 全局背景與字體
+       🌑 全局
     ========================= */
     .stApp {{ background-color: {t['bg']}; }}
     h1, h2, h3, h4, h5, h6, p, div, span, label, li {{ color: {t['text']} !important; font-family: 'Inter', sans-serif; }}
+    table, [data-testid="stDataFrame"] {{ font-family: 'Roboto Mono', monospace !important; }}
 
     /* =========================
-       🎯 戰術高亮色 
+       🎯 高亮色 
     ========================= */
     .highlight-primary {{ color: {t['primary']} !important; font-weight: 700; }}
     .highlight-accent {{ color: {t['accent']} !important; font-weight: 700; }}
@@ -54,33 +55,38 @@ def apply_custom_theme(mode="navy"):
     .text-sub {{ color: {t['subtext']} !important; }}
 
     /* =========================
-       🎛️ 強制覆蓋：終極防瞎眼裝甲 (修復輸入框白底白字)
+       🎛️ 強制覆蓋 Streamlit 原生元件
     ========================= */
-    /* 輸入框本體 */
     input[type="text"], input[type="number"], div[data-baseweb="input"] input {{
         color: {t['text']} !important;
-        -webkit-text-fill-color: {t['text']} !important; /* 強制 Chrome 渲染字體顏色 */
+        -webkit-text-fill-color: {t['text']} !important;
         background-color: {t['card']} !important;
     }}
-    /* 輸入框外框與下拉選單 */
     div[data-baseweb="base-input"], div[data-baseweb="select"] > div {{
         background-color: {t['card']} !important;
         border-color: {t['border']} !important;
     }}
-    /* 下拉選單的文字 */
     div[data-baseweb="select"] span {{ color: {t['text']} !important; }}
-    /* 彈出選單底色 */
     div[data-baseweb="popover"] {{ background-color: {t['card']} !important; border: 1px solid {t['border']} !important; }}
     ul[role="listbox"] li {{ background-color: {t['card']} !important; color: {t['text']} !important; }}
-    /* 提示框 (st.info / st.warning) 去除原本的藍黃色 */
+    
+    /* 👑 終極修復：將 st.info/st.warning 的內部預設背景色徹底抹除 */
     div[data-testid="stAlert"] {{
-        background-color: {t['card']} !important; 
-        border: 1px solid {t['primary']} !important; 
-        color: {t['text']} !important; 
+        background-color: {t['card']} !important;
+        border: 1px solid {t['border']} !important;
+        border-left: 4px solid {t['primary']} !important; /* 加上高質感的左側高亮邊框 */
+        color: {t['text']} !important;
+    }}
+    /* 強制將原生半透明色改成透明 */
+    div[data-testid="stAlert"] > div {{
+        background-color: transparent !important;
+    }}
+    div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {{
+        color: {t['text']} !important;
     }}
 
     /* =========================
-       📊 Tabs 分頁自適應
+       📊 Tabs
     ========================= */
     .stTabs [data-baseweb="tab-list"] {{ display: flex; flex-wrap: wrap; gap: 8px; background-color: transparent; padding-bottom: 10px; }}
     .stTabs [data-baseweb="tab"] {{ flex-grow: 1; text-align: center; background-color: {t['card']}; border: 1px solid {t['border']}; color: {t['subtext']}; border-radius: 6px; padding: 8px 15px; transition: 0.2s; font-weight: 600; }}
