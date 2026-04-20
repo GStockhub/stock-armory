@@ -85,23 +85,14 @@ def apply_custom_theme(mode="navy"):
     div[data-testid="stAlert"] > div {{ background-color: transparent !important; }}
     div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {{ color: {t['text']} !important; }}
 
-    /* 👑 終極修復：強制剝奪 Expander (折疊面板) 的黑暗遺毒 */
     [data-testid="stExpander"] details {{
         background-color: {t['card']} !important;
         border: 1px solid {t['border']} !important;
         border-radius: 8px;
     }}
-    [data-testid="stExpander"] summary {{
-        background-color: {t['card']} !important;
-        color: {t['text']} !important;
-    }}
-    [data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {{
-        color: {t['text']} !important;
-        font-weight: 600 !important;
-    }}
-    [data-testid="stExpander"] summary svg {{
-        fill: {t['text']} !important; /* 連旁邊的箭頭都強制跟著字體變色！ */
-    }}
+    [data-testid="stExpander"] summary {{ background-color: {t['card']} !important; color: {t['text']} !important; }}
+    [data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {{ color: {t['text']} !important; font-weight: 600 !important; }}
+    [data-testid="stExpander"] summary svg {{ fill: {t['text']} !important; }}
 
     /* =========================
        📊 Tabs
@@ -110,8 +101,6 @@ def apply_custom_theme(mode="navy"):
     .stTabs [data-baseweb="tab"] {{ flex-grow: 1; text-align: center; background-color: {t['card']}; border: 1px solid {t['border']}; color: {t['subtext']}; border-radius: 6px; padding: 8px 15px; transition: 0.2s; font-weight: 600; }}
     .stTabs [data-baseweb="tab"]:hover {{ border-color: {t['primary']}; color: {t['text']}; }}
     .stTabs [aria-selected="true"] {{ background-color: {t['card']} !important; color: {t['primary']} !important; border-bottom: 3px solid {t['primary']} !important; }}
-    
-    /* 👑 抹除 Tabs 原生紅線 */
     .stTabs [data-baseweb="tab-highlight"] {{ background-color: transparent !important; display: none !important; }}
 
     /* =========================
@@ -119,6 +108,24 @@ def apply_custom_theme(mode="navy"):
     ========================= */
     .tier-card {{ background-color: {t['card']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
     [data-testid="stDataFrame"] {{ border-radius: 8px !important; border: 1px solid {t['border']}; overflow: hidden; }}
+
+    /* 👑 V3 核心：持股動態發光裝甲 */
+    @keyframes pulse-glow {{
+        0% {{ box-shadow: 0 0 5px {t['bg']}; border-color: {t['border']}; }}
+        50% {{ box-shadow: 0 0 15px {t['primary']}; border-color: {t['primary']}; }}
+        100% {{ box-shadow: 0 0 5px {t['bg']}; border-color: {t['border']}; }}
+    }}
+    .glow-s-tier {{
+        animation: pulse-glow 2s infinite ease-in-out;
+    }}
+    .holding-card {{
+        background-color: {t['card']};
+        border: 1px solid {t['border']};
+        border-radius: 8px;
+        padding: 15px;
+        transition: 0.3s;
+    }}
+    .holding-card:hover {{ border-color: {t['primary']} !important; }}
 
     /* =========================
        📌 Sidebar & 滾輪
