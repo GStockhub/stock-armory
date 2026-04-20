@@ -39,7 +39,7 @@ fee_discount = configs["fee_discount"]
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 我要賺大錢 v24.3</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V2 完全體 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V3 完全體 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
 
@@ -67,7 +67,6 @@ def safe_download(sid, retries=2):
             except: time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
-# 👑 V3 新增：持股專屬雷達 (絕對不過濾任何股票)
 @st.cache_data(ttl=300, show_spinner=False)
 def get_holding_intel(id_tuple):
     id_list = list(id_tuple)
@@ -292,6 +291,8 @@ with st.spinner('情報兵正在進行職業級波段回測與籌碼精算...'):
     chip_db = fetch_chips_data()
 
 m_df = pd.DataFrame() 
+h_df_debug = pd.DataFrame()
+h_intel_debug = pd.DataFrame()
 
 if len(chip_db) >= 3:
     dates = sorted(list(chip_db.keys()), reverse=True)
@@ -318,13 +319,14 @@ if len(chip_db) >= 3:
                 h_df = sheet_df.copy()
                 
             if not h_df.empty and '代號' in h_df.columns:
-                # 👑 修復：切斷選股雷達的聯繫，改用持股專屬雷達
-                h_df['代號'] = h_df['代號'].astype(str).str.strip() # 清除多餘空白防呆
+                h_df['代號'] = h_df['代號'].astype(str).str.strip()
+                h_df_debug = h_df.copy() # 給除錯中心看
+                
                 h_intel = get_holding_intel(tuple(h_df['代號'].tolist()))
+                h_intel_debug = h_intel.copy() # 給除錯中心看
                 
                 if not h_intel.empty:
                     m_df = pd.merge(h_df, h_intel, on='代號', how='inner')
-                    # 直接從全域字典抓名稱，不再依賴當日籌碼表
                     m_df['名稱'] = m_df['代號'].map(TWSE_NAME_MAP).fillna('未知')
         except Exception as e: st.error(f"❌ 讀取持股部位失敗：{e}")
     
@@ -385,7 +387,12 @@ if len(chip_db) >= 3:
                     if not m_df.empty:
                         for _, r in m_df.iterrows():
                             try:
-                                p_now, p_cost, qty = float(r['現價']), float(r['成本價']) if pd.notna(r['成本價']) else 0, float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
+                                p_now = float(r.get('現價', 0))
+                                p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
+                                qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
+                                p_cost = float(p_cost_raw) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0
+                                qty = float(qty_raw) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0
+                                
                                 buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
                                 sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
                                 ret = ((sell_revenue_net - buy_cost_total) / buy_cost_total) * 100 if buy_cost_total > 0 else 0
@@ -482,6 +489,7 @@ if len(chip_db) >= 3:
     with t_cmd:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
         st.caption("💡 **資金風控**：個人現役持股盈虧計算機與 V3 防賣飛火控雷達。")
+        
         if not sheet_url: 
             st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
         else:
@@ -493,9 +501,13 @@ if len(chip_db) >= 3:
                 
                 for _, r in m_df.iterrows():
                     try:
-                        p_now = float(r['現價'])
-                        p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
-                        qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
+                        p_now = float(r.get('現價', 0))
+                        # 👑 V3：全自動抓取您 CSV 裡的任何命名習慣！
+                        p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
+                        qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
+                        
+                        p_cost = float(p_cost_raw) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0
+                        qty = float(qty_raw) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0
                         
                         buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
                         sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
@@ -512,13 +524,11 @@ if len(chip_db) >= 3:
                         
                         if p_now > m5 and m5 > m10:
                             struct = f"🚀 多頭排列 (現價 > M5: {m5:.1f})"
-                            if ret >= 10:
-                                coach = "👑 <b>【S級金雞母】</b> 趨勢極強！已啟動防賣飛裝甲，強烈建議波段抱緊 8~15 天，絕對不准現在賣！"
+                            if ret >= 10: coach = "👑 <b>【S級金雞母】</b> 趨勢極強！強烈建議波段抱緊 8~15 天，絕對不准現在賣！"
                             elif ret > 0:
                                 coach = "⚠️ <b>【防賣飛警告】</b> 處於主升段，現在賣出極易賣飛！請綁住雙手讓利潤奔跑。"
                                 border_col = COLORS['accent']
-                            else:
-                                coach = "⏳ 剛發動起漲或強勢洗盤，請耐心抱緊，防守底線設於 M10。"
+                            else: coach = "⏳ 剛發動起漲或強勢洗盤，請耐心抱緊，防守底線設於 M10。"
                         elif p_now >= m10:
                             struct = f"⏳ 均線收斂 (守住 M10: {m10:.1f})"
                             coach = "🛡️ 洗盤震盪中，尚未跌破防守線，請給予耐心與空間。"
@@ -526,12 +536,9 @@ if len(chip_db) >= 3:
                         else:
                             struct = f"📉 跌破防守線 (現價 < M10: {m10:.1f})"
                             border_col = COLORS['red'] if ret < 0 else COLORS['green']
-                            if ret > 0:
-                                coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼一半，鎖住獲利！"
-                            else:
-                                coach = f"💀 <b>【情緒殺預警】</b> 破線硬停損！請立刻無情砍單，收回現金保命，絕不攤平！"
+                            if ret > 0: coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼一半，鎖住獲利！"
+                            else: coach = f"💀 <b>【情緒殺預警】</b> 破線硬停損！請立刻無情砍單，收回現金保命，絕不攤平！"
                         
-                        # 👑 變更為直接拿新的對應名稱
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         
                         html_cards += f'''
@@ -553,6 +560,7 @@ if len(chip_db) >= 3:
                         </div>
                         '''
                     except Exception as e:
+                        st.error(f"⚠️ 卡片渲染錯誤: {r.get('代號', '未知')} - {e}")
                         continue
                 
                 html_cards += '</div>'
@@ -564,8 +572,15 @@ if len(chip_db) >= 3:
                     st.markdown(html_cards, unsafe_allow_html=True)
                 else:
                     st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
+                    
             else:
                 st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
+            
+            # 🛠️ 終極防護盾：系統除錯中心 (藏在最底下)
+            with st.expander("🛠️ 系統除錯中心 (若上方無卡片請點開)"):
+                st.write("1. 您的 Google Sheet 原始讀取狀況:", h_df_debug if 'h_df_debug' in locals() else "無法讀取")
+                st.write("2. 雷達抓取的現價與均線資料:", h_intel_debug if 'h_intel_debug' in locals() else "抓取失敗")
+                st.write("3. 最終合併結果 (若為空代表代號對不上):", m_df if 'm_df' in locals() else "合併失敗")
 
         st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
         st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
