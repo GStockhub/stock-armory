@@ -347,14 +347,16 @@ if len(chip_db) >= 3:
                                 buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
                                 sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
                                 ret = ((sell_revenue_net - buy_cost_total) / buy_cost_total) * 100 if buy_cost_total > 0 else 0
-                                act = "💰 +10% 強制全出" if ret >= 10 else ("🛡️ +6% 一半鎖利" if ret >= 6 else ("💀 破線硬停損" if p_now < r['M10'] or ret <= -3 else "✅ 續抱"))
+                                
+                                # V3 匯出報表邏輯升級
+                                act = "👑 S級抱緊(防賣飛)" if (ret >= 10 and p_now > r['M5']) else ("💀 破線硬停損" if p_now < r['M10'] else "⏳ 守線續抱")
                                 export_rows.append({"戰區": "🛡️ 現役持股", "代號": r['代號'], "名稱": r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), "戰術行動": act, "現價": round(p_now, 2), "防守底線": round(r['停損價'], 2), "次要數據": f"帳面 {ret:.2f}%", "產業": r['產業']})
                             except: continue
                         export_rows.append({"戰區": "", "代號": "", "名稱": "", "戰術行動": "", "現價": "", "防守底線": "", "次要數據": "", "產業": ""})
 
                     tier_names = {'S': '🥇 S級狙擊', 'A': '🥈 A級狙擊', 'B': '⚔️ B級穩健', 'C': '📡 C級潛伏'}
                     for _, r in master_list.iterrows():
-                        export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "战術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "現價": round(r['現價'], 2), "防守底線": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
+                        export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "戰術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "現價": round(r['現價'], 2), "防守底線": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
 
                     st.download_button(label="📱 明日目標下載", data=pd.DataFrame(export_rows).to_csv(index=False).encode('utf-8-sig'), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
                 
@@ -438,33 +440,88 @@ if len(chip_db) >= 3:
 
     with t_cmd:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
-        st.caption("💡 **資金風控**：個人現役持股盈虧計算機。")
-        if not sheet_url: st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
+        st.caption("💡 **資金風控**：個人現役持股盈虧計算機與 V3 防賣飛火控雷達。")
+        if not sheet_url: 
+            st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
         else:
             if not m_df.empty:
-                res_h, total_pnl, current_exposure = [], 0, 0
+                total_pnl, current_exposure = 0, 0
                 active_fee_rate = 0.001425 * fee_discount
+                
+                # 👑 V3 核心：HTML 智能卡片牆
+                html_cards = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; margin-bottom: 20px;">'
+                
                 for _, r in m_df.iterrows():
                     try:
-                        p_now, p_cost, qty = float(r['現價']), float(r['成本價']) if pd.notna(r['成本價']) else 0, float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
+                        p_now = float(r['現價'])
+                        p_cost = float(r['成本價']) if pd.notna(r['成本價']) else 0
+                        qty = float(r['庫存張數']) if pd.notna(r['庫存張數']) else 0
+                        
                         buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
                         sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
                         pnl = sell_revenue_net - buy_cost_total
                         ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0
+                        
                         current_exposure += (p_now * qty * 1000)
                         total_pnl += pnl
-                        act = "💰 +10% 達標 (強制全出)" if ret >= 10 else ("🛡️ +6% 達標 (賣出一半鎖利)" if ret >= 6 else ("💀 破線硬停損" if p_now < r['M10'] or ret <= -3 else "✅ 抱緊處理"))
-                        res_h.append({'代號': r['代號'], '名稱': r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), '現價': p_now, '成本': p_cost, '張數': format_lots(qty * 1000), '真實淨報酬(%)': ret, '淨損益(元)': pnl, '作戰指示': act})
-                    except: continue
-                    
+                        
+                        # 🧠 V3 實時火控引擎 (防賣飛與紀律停損)
+                        m5, m10 = float(r['M5']), float(r['M10'])
+                        glow_class = "glow-s-tier" if (ret >= 10 and p_now > m5) else ""
+                        border_col = COLORS['primary'] if glow_class else COLORS['border']
+                        ret_col = COLORS['red'] if pnl > 0 else (COLORS['green'] if pnl < 0 else COLORS['text'])
+                        
+                        if p_now > m5 and m5 > m10:
+                            struct = f"🚀 多頭排列 (現價 > M5: {m5:.1f})"
+                            if ret >= 10:
+                                coach = "👑 <b>【S級金雞母】</b> 趨勢極強！已啟動防賣飛裝甲，強烈建議波段抱緊 8~15 天，絕對不准現在賣！"
+                            elif ret > 0:
+                                coach = "⚠️ <b>【防賣飛警告】</b> 處於主升段，現在賣出極易賣飛！請綁住雙手讓利潤奔跑。"
+                                border_col = COLORS['accent']
+                            else:
+                                coach = "⏳ 剛發動起漲或強勢洗盤，請耐心抱緊，防守底線設於 M10。"
+                        elif p_now >= m10:
+                            struct = f"⏳ 均線收斂 (守住 M10: {m10:.1f})"
+                            coach = "🛡️ 洗盤震盪中，尚未跌破防守線，請給予耐心與空間。"
+                            border_col = COLORS['accent'] if ret > 0 else COLORS['border']
+                        else:
+                            struct = f"📉 跌破防守線 (現價 < M10: {m10:.1f})"
+                            border_col = COLORS['red'] if ret < 0 else COLORS['green']
+                            if ret > 0:
+                                coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼一半，鎖住獲利！"
+                            else:
+                                coach = f"💀 <b>【情緒殺預警】</b> 破線硬停損！請立刻無情砍單，收回現金保命，絕不攤平！"
+                        
+                        name_display = r['名稱_y'] if '名稱_y' in r else r.get('名稱','')
+                        
+                        html_cards += f'''
+                        <div class="holding-card {glow_class}" style="border-left: 5px solid {border_col};">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h3 style="margin: 0; font-size: 18px; color: {COLORS['text']};">{name_display} ({r['代號']})</h3>
+                                <div style="text-align: right;">
+                                    <span style="font-size: 18px; font-weight: bold; color: {ret_col};">{ret:.2f}%</span><br>
+                                    <span style="font-size: 14px; color: {ret_col};">{pnl:,.0f} 元</span>
+                                </div>
+                            </div>
+                            <div style="font-size: 14px; color: {COLORS['subtext']}; margin-bottom: 12px;">
+                                現價: <strong style="color:{COLORS['text']}">{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}
+                            </div>
+                            <div style="background-color: {COLORS['bg']}; padding: 10px; border-radius: 6px; font-size: 14px; line-height: 1.5;">
+                                <div style="margin-bottom: 5px;"><span style="color:{COLORS['subtext']}">📊 結構：</span><span style="color:{COLORS['text']}; font-weight:500;">{struct}</span></div>
+                                <div><span style="color:{COLORS['subtext']}">💡 教練：</span><span style="color:{COLORS['text']}">{coach}</span></div>
+                            </div>
+                        </div>
+                        '''
+                    except Exception as e:
+                        continue
+                
+                html_cards += '</div>'
+                
                 p_color = COLORS['red'] if total_pnl > 0 else COLORS['green']
                 st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
                 
-                # 👑 終極防呆：檢查是否有成功抓到任何資料，避免空表引發 KeyError
-                if res_h:
-                    st.dataframe(pd.DataFrame(res_h).style.set_properties(**table_style)
-                                .format({'現價':'{:.2f}', '成本':'{:.2f}', '真實淨報酬(%)':'{:.2f}%', '淨損益(元)':'{:,.0f}'})
-                                .map(lambda x: f'color: {COLORS["red"]}; font-weight: bold;' if x > 0 else (f'color: {COLORS["green"]}; font-weight: bold;' if x < 0 else ''), subset=['真實淨報酬(%)', '淨損益(元)']), use_container_width=True, hide_index=True)
+                if total_pnl != 0 or current_exposure != 0:
+                    st.markdown(html_cards, unsafe_allow_html=True)
                 else:
                     st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
 
