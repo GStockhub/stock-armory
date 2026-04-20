@@ -320,10 +320,10 @@ if len(chip_db) >= 3:
                 
             if not h_df.empty and '代號' in h_df.columns:
                 h_df['代號'] = h_df['代號'].astype(str).str.strip()
-                h_df_debug = h_df.copy() # 給除錯中心看
+                h_df_debug = h_df.copy() 
                 
                 h_intel = get_holding_intel(tuple(h_df['代號'].tolist()))
-                h_intel_debug = h_intel.copy() # 給除錯中心看
+                h_intel_debug = h_intel.copy() 
                 
                 if not h_intel.empty:
                     m_df = pd.merge(h_df, h_intel, on='代號', how='inner')
@@ -502,7 +502,6 @@ if len(chip_db) >= 3:
                 for _, r in m_df.iterrows():
                     try:
                         p_now = float(r.get('現價', 0))
-                        # 👑 V3：全自動抓取您 CSV 裡的任何命名習慣！
                         p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
                         qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
                         
@@ -541,24 +540,9 @@ if len(chip_db) >= 3:
                         
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         
-                        html_cards += f'''
-                        <div class="holding-card {glow_class}" style="border-left: 5px solid {border_col};">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <h3 style="margin: 0; font-size: 18px; color: {COLORS['text']};">{name_display} ({r['代號']})</h3>
-                                <div style="text-align: right;">
-                                    <span style="font-size: 18px; font-weight: bold; color: {ret_col};">{ret:.2f}%</span><br>
-                                    <span style="font-size: 14px; color: {ret_col};">{pnl:,.0f} 元</span>
-                                </div>
-                            </div>
-                            <div style="font-size: 14px; color: {COLORS['subtext']}; margin-bottom: 12px;">
-                                現價: <strong style="color:{COLORS['text']}">{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}
-                            </div>
-                            <div style="background-color: {COLORS['bg']}; padding: 10px; border-radius: 6px; font-size: 14px; line-height: 1.5;">
-                                <div style="margin-bottom: 5px;"><span style="color:{COLORS['subtext']}">📊 結構：</span><span style="color:{COLORS['text']}; font-weight:500;">{struct}</span></div>
-                                <div><span style="color:{COLORS['subtext']}">💡 教練：</span><span style="color:{COLORS['text']}">{coach}</span></div>
-                            </div>
-                        </div>
-                        '''
+                        # 👑 V3 終極防護：把 HTML 壓成一行，絕不讓 Streamlit 把它當成程式碼區塊！
+                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col};'><div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'><h3 style='margin: 0; font-size: 18px; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='text-align: right;'><span style='font-size: 18px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><br><span style='font-size: 14px; color: {ret_col};'>{pnl:,.0f} 元</span></div></div><div style='font-size: 14px; color: {COLORS['subtext']}; margin-bottom: 12px;'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div><div style='background-color: {COLORS['bg']}; padding: 10px; border-radius: 6px; font-size: 14px; line-height: 1.5;'><div style='margin-bottom: 5px;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
+                    
                     except Exception as e:
                         st.error(f"⚠️ 卡片渲染錯誤: {r.get('代號', '未知')} - {e}")
                         continue
@@ -576,7 +560,6 @@ if len(chip_db) >= 3:
             else:
                 st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
             
-            # 🛠️ 終極防護盾：系統除錯中心 (藏在最底下)
             with st.expander("🛠️ 系統除錯中心 (若上方無卡片請點開)"):
                 st.write("1. 您的 Google Sheet 原始讀取狀況:", h_df_debug if 'h_df_debug' in locals() else "無法讀取")
                 st.write("2. 雷達抓取的現價與均線資料:", h_intel_debug if 'h_intel_debug' in locals() else "抓取失敗")
