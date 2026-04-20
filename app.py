@@ -493,8 +493,8 @@ if len(chip_db) >= 3:
                 total_pnl, current_exposure = 0, 0
                 active_fee_rate = 0.001425 * fee_discount
                 
-                # 👑 V3 更新：改為 flex-direction: column，呈現一層一層長條形排版
-                html_cards = '<div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">'
+                # 👑 V3 微調：加入 max-width 控制卡片寬度，讓列表更精緻
+                html_cards = '<div style="display: flex; flex-direction: column; gap: 15px; max-width: 800px; margin-bottom: 20px;">'
                 
                 for _, r in m_df.iterrows():
                     try:
@@ -537,7 +537,8 @@ if len(chip_db) >= 3:
                         
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         
-                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col};'><div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'><h3 style='margin: 0; font-size: 18px; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='text-align: right;'><span style='font-size: 18px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><br><span style='font-size: 14px; color: {ret_col};'>{pnl:,.0f} 元</span></div></div><div style='font-size: 14px; color: {COLORS['subtext']}; margin-bottom: 12px;'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div><div style='background-color: {COLORS['bg']}; padding: 10px; border-radius: 6px; font-size: 14px; line-height: 1.5;'><div style='margin-bottom: 5px;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
+                        # 👑 V3 微調：字體從 18px 提升至 24px，並保持單行壓縮
+                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col};'><div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'><h3 style='margin: 0; font-size: 24px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='text-align: right;'><span style='font-size: 18px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><br><span style='font-size: 14px; color: {ret_col};'>{pnl:,.0f} 元</span></div></div><div style='font-size: 14px; color: {COLORS['subtext']}; margin-bottom: 12px;'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div><div style='background-color: {COLORS['bg']}; padding: 10px; border-radius: 6px; font-size: 14px; line-height: 1.5;'><div style='margin-bottom: 5px;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                     
                     except Exception as e:
                         st.error(f"⚠️ 卡片渲染錯誤: {r.get('代號', '未知')} - {e}")
@@ -556,11 +557,12 @@ if len(chip_db) >= 3:
             else:
                 st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
             
-            with st.expander("🛠️ 系統除錯中心 (若上方無卡片請點開)"):
-                st.write("最終合併結果 (若為空代表代號對不上):")
+            with st.expander("🛠️ 系統除錯中心"):
+                st.write("最終合併結果:")
                 if 'm_df' in locals() and not m_df.empty:
-                    # 👑 V3 更新：隱藏最前面的 Index 數字
-                    st.dataframe(m_df, hide_index=True)
+                    # 👑 V3 微調：拔除「分類」欄位，讓表格更乾淨
+                    display_df = m_df.drop(columns=['分類'], errors='ignore')
+                    st.dataframe(display_df, hide_index=True)
                 else:
                     st.write("合併失敗或無資料")
 
