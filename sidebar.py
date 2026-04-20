@@ -6,13 +6,13 @@ def render_sidebar():
         st.markdown("### ⚙️ 紀律設定")
         st.markdown("---")
         
-        # 1. 👑 拔除囉唆括號，清爽俐落！
+        # 1. 👑 拔除囉唆括號，清爽俐落！(預設奶茶極簡)
         theme_options = {
+            "milktea_light": "☀️ 奶茶極簡",
+            "gold": "👑 皇家黑金",
             "navy": "🦈 鯊魚海軍藍",
-            "gold": "👑 黑金專業",
             "gray": "🧘 極簡炭灰",
-            "milktea_tech": "☕ 奶茶科技",
-            "milktea_light": "☀️ 奶茶極簡"
+            "milktea_tech": "☕ 奶茶科技"
         }
         
         theme_choice = st.selectbox(
