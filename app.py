@@ -21,7 +21,7 @@ import sidebar
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(
-    page_title="賺錢買大房",
+    page_title="我要賺大錢",
     page_icon="💰️",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -38,7 +38,7 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 賺錢買大房 v24.3</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 我要賺大錢 v24.3</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V3 完全體 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -390,10 +390,10 @@ if len(chip_db) >= 3:
 
     with t_rank:
         # 🔮 新增：戰神沙盤推演 (買進前防呆體檢)
-        st.markdown("### 🔮 <span class='highlight-primary'>戰神沙盤推演</span>", unsafe_allow_html=True)
+        st.markdown("### 🔮 <span class='highlight-primary'>戰神沙盤推演 (買進前體檢)</span>", unsafe_allow_html=True)
         col_s1, col_s2 = st.columns([1, 3])
         with col_s1:
-            st.caption("💡 輸入代號，預防接刀")
+            st.caption("💡 輸入代號，預防手殘接刀")
             sim_id = st.text_input("股票代號", placeholder="例: 2330 或 2337", label_visibility="collapsed")
             sim_btn = st.button("⚡ 執行體檢", use_container_width=True)
         with col_s2:
