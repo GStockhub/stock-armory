@@ -67,6 +67,66 @@ def safe_download(sid, retries=2):
             except: time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
+# 🔮 V3 新兵器：沙盤推演專用獨立引擎
+@st.cache_data(ttl=300, show_spinner=False)
+def run_sandbox_sim(sid):
+    df = safe_download(sid)
+    if df is None or df.empty or len(df) < 20: return None
+    close_s, open_s, vol_s = df['Close'], df['Open'], df['Volume']
+    p_now = float(close_s.iloc[-1])
+    m5 = float(close_s.rolling(5).mean().iloc[-1])
+    m10 = float(close_s.rolling(10).mean().iloc[-1])
+    m20 = float(close_s.rolling(20).mean().iloc[-1])
+    bias = ((p_now - m20) / m20) * 100
+
+    df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s})
+    df_bt['MA5'] = df_bt['Close'].rolling(5).mean()
+    df_bt['MA10'] = df_bt['Close'].rolling(10).mean()
+    df_bt['MA20'] = df_bt['Close'].rolling(20).mean()
+    df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
+
+    sig_mask = ((df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20']) & (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98))
+    signals_idx = df_bt[sig_mask].index
+
+    sim_returns = []
+    for i in range(len(signals_idx)):
+        loc_idx = df_bt.index.get_loc(signals_idx[i])
+        if loc_idx + 1 >= len(df_bt): continue
+        entry_p, prev_close = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
+        if entry_p > prev_close * 1.02: continue
+
+        future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 11]
+        if future_data.empty: continue
+
+        stop_loss, sold_half, ret = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97), False, 0.0
+        for f_idx, row in future_data.iterrows():
+            curr_p = row['Close']
+            if curr_p > entry_p * 1.05: stop_loss = max(stop_loss, entry_p)
+            if curr_p < stop_loss:
+                ret = 0.5 * 0.06 + 0.5 * ((stop_loss - entry_p) / entry_p) if sold_half else (stop_loss - entry_p) / entry_p
+                break
+            if not sold_half and curr_p >= entry_p * 1.06:
+                sold_half = True
+                if curr_p >= entry_p * 1.10:
+                    ret = 0.5 * 0.06 + 0.5 * 0.10
+                    break
+            elif sold_half and curr_p >= entry_p * 1.10:
+                ret = 0.5 * 0.06 + 0.5 * 0.10
+                break
+        else:
+            final_p = future_data['Close'].iloc[-1]
+            ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p) if sold_half else (final_p - entry_p) / entry_p
+        sim_returns.append(ret)
+
+    win_rate = (np.array(sim_returns) > 0).mean() * 100 if sim_returns else 50.0
+    name = TWSE_NAME_MAP.get(sid, sid)
+
+    return {
+        '代號': sid, '名稱': name, '現價': p_now,
+        'M5': m5, 'M10': m10, 'M20': m20, '乖離': bias,
+        '勝率': win_rate, '停損價': max(m10, p_now * 0.97)
+    }
+
 @st.cache_data(ttl=300, show_spinner=False)
 def get_holding_intel(id_tuple):
     id_list = list(id_tuple)
@@ -329,6 +389,63 @@ if len(chip_db) >= 3:
     t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (S/A/B/C)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
 
     with t_rank:
+        # 🔮 新增：戰神沙盤推演 (買進前防呆體檢)
+        st.markdown("### 🔮 <span class='highlight-primary'>戰神沙盤推演 (買進前體檢)</span>", unsafe_allow_html=True)
+        col_s1, col_s2 = st.columns([1, 3])
+        with col_s1:
+            st.caption("💡 輸入代號，預防手殘接刀")
+            sim_id = st.text_input("股票代號", placeholder="例: 2330 或 2337", label_visibility="collapsed")
+            sim_btn = st.button("⚡ 執行體檢", use_container_width=True)
+        with col_s2:
+            if sim_btn and sim_id:
+                with st.spinner("🧠 正在呼叫量化引擎掃描..."):
+                    sid_clean = str(sim_id).strip()
+                    res = run_sandbox_sim(sid_clean)
+                    if res:
+                        p_now = res['現價']
+                        m5, m10, m20 = res['M5'], res['M10'], res['M20']
+                        bias = res['乖離']
+                        win_rate = res['勝率']
+                        sl_price = res['停損價']
+
+                        # 🧠 沙盤推演教練判定邏輯
+                        if p_now < m10:
+                            grade_color = COLORS['red']
+                            grade_text = "🛑 嚴禁接刀 (D級)"
+                            advice = f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底，以免被套牢！"
+                        elif bias > 10:
+                            grade_color = COLORS['accent']
+                            grade_text = "⚠️ 追高警告 (C級)"
+                            advice = f"乖離率高達 {bias:.1f}%。現在進場極易買在短線最高點，請耐心等它拉回 M5 附近。"
+                        elif p_now > m5 and win_rate >= 50:
+                            grade_color = COLORS['primary']
+                            grade_text = "👑 准許出兵 (S/A級)"
+                            advice = f"多頭排列且歷史回測勝率達 {win_rate:.0f}%！防守底線設在 {sl_price:.1f}，可果斷建倉。"
+                        else:
+                            grade_color = COLORS['green']
+                            grade_text = "⚖️ 穩健觀察 (B級)"
+                            advice = f"結構普通 (勝率 {win_rate:.0f}%)。若資金充裕可小量試單，防守底線嚴格設於 {sl_price:.1f}。"
+
+                        st.markdown(f"""
+                        <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:6px; margin-bottom:10px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                                <h4 style="margin:0; font-size:20px; color:{COLORS['text']};">{res['名稱']} ({res['代號']})</h4>
+                                <span style="font-weight:bold; color:{grade_color}; font-size:18px;">{grade_text}</span>
+                            </div>
+                            <div style="font-size:14px; color:{COLORS['subtext']}; margin-bottom:10px;">
+                                現價: <span style="color:{COLORS['text']}; font-weight:bold;">{p_now:.2f}</span> |
+                                月線乖離: <span style="color:{COLORS['text']}; font-weight:bold;">{bias:.1f}%</span> |
+                                波段勝率: <span style="color:{COLORS['text']}; font-weight:bold;">{win_rate:.0f}%</span>
+                            </div>
+                            <div style="background-color:{COLORS['bg']}; padding:10px; border-radius:4px; font-size:14px; color:{COLORS['text']};">
+                                💡 <b>教練指示：</b>{advice}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.error("❌ 查無此股票或歷史資料不足，請確認代號是否正確。")
+        st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS['border'] + ";'>", unsafe_allow_html=True)
+
         st.markdown("### 🎯 <span class='highlight-primary'>前線狙擊目標清單</span>", unsafe_allow_html=True)
         st.caption("💡 **盤前鐵律**：跳空>2%不買、9:05前不下單、單日限3筆、未達+6%不賣。")
 
@@ -493,7 +610,6 @@ if len(chip_db) >= 3:
                 total_pnl, current_exposure = 0, 0
                 active_fee_rate = 0.001425 * fee_discount
                 
-                # 👑 拔除寬度限制，滿版展開長條列
                 html_cards = '<div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">'
                 
                 for _, r in m_df.iterrows():
@@ -537,7 +653,6 @@ if len(chip_db) >= 3:
                         
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         
-                        # 👑 V3 終極扁平長條列 (將高度壓到最薄，字體放大到 24px)
                         html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px;'><div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'><div style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 24px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 14px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div style='text-align: right;'><span style='font-size: 18px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 12px;'>{pnl:,.0f} 元</span></div></div><div style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                     
                     except Exception as e:
