@@ -67,6 +67,44 @@ def safe_download(sid, retries=2):
             except: time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
+# 👑 V3 新增：持股專屬雷達 (絕對不過濾任何股票)
+@st.cache_data(ttl=300, show_spinner=False)
+def get_holding_intel(id_tuple):
+    id_list = list(id_tuple)
+    intel_results = []
+    if not id_list: return pd.DataFrame()
+    
+    bulk_data = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(fetch_single_stock_batch, sid): sid for sid in id_list}
+        for future in concurrent.futures.as_completed(futures):
+            sid, df = future.result()
+            if df is not None and not df.empty: 
+                bulk_data[sid] = df
+                
+    for sid in id_list:
+        try:
+            df_stock = bulk_data.get(sid)
+            if df_stock is None or df_stock.empty: continue
+            close_s = df_stock['Close']
+            if len(close_s) < 20: continue
+            
+            p_now = float(close_s.iloc[-1])
+            m5 = float(close_s.rolling(5).mean().iloc[-1])
+            m10 = float(close_s.rolling(10).mean().iloc[-1])
+            m20 = float(close_s.rolling(20).mean().iloc[-1])
+            
+            ind = TWSE_IND_MAP.get(sid) or "其他"
+            if sid.startswith('00'): ind = "ETF"
+            
+            intel_results.append({
+                '代號': sid, '產業': ind, '現價': p_now,
+                'M5': m5, 'M10': m10, 'M20': m20,
+                '停損價': max(m10, p_now * 0.97)
+            })
+        except: continue
+    return pd.DataFrame(intel_results)
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_macro_dashboard():
     score = 5.0
@@ -280,10 +318,14 @@ if len(chip_db) >= 3:
                 h_df = sheet_df.copy()
                 
             if not h_df.empty and '代號' in h_df.columns:
-                h_intel = level2_quant_engine(tuple(h_df['代號'].tolist()))
+                # 👑 修復：切斷選股雷達的聯繫，改用持股專屬雷達
+                h_df['代號'] = h_df['代號'].astype(str).str.strip() # 清除多餘空白防呆
+                h_intel = get_holding_intel(tuple(h_df['代號'].tolist()))
+                
                 if not h_intel.empty:
                     m_df = pd.merge(h_df, h_intel, on='代號', how='inner')
-                    m_df = pd.merge(m_df, today_df[['代號', '名稱']], on='代號', how='left').fillna('未知')
+                    # 直接從全域字典抓名稱，不再依賴當日籌碼表
+                    m_df['名稱'] = m_df['代號'].map(TWSE_NAME_MAP).fillna('未知')
         except Exception as e: st.error(f"❌ 讀取持股部位失敗：{e}")
     
     t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (S/A/B/C)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
@@ -348,9 +390,8 @@ if len(chip_db) >= 3:
                                 sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
                                 ret = ((sell_revenue_net - buy_cost_total) / buy_cost_total) * 100 if buy_cost_total > 0 else 0
                                 
-                                # V3 匯出報表邏輯升級
                                 act = "👑 S級抱緊(防賣飛)" if (ret >= 10 and p_now > r['M5']) else ("💀 破線硬停損" if p_now < r['M10'] else "⏳ 守線續抱")
-                                export_rows.append({"戰區": "🛡️ 現役持股", "代號": r['代號'], "名稱": r['名稱_y'] if '名稱_y' in r else r.get('名稱',''), "戰術行動": act, "現價": round(p_now, 2), "防守底線": round(r['停損價'], 2), "次要數據": f"帳面 {ret:.2f}%", "產業": r['產業']})
+                                export_rows.append({"戰區": "🛡️ 現役持股", "代號": r['代號'], "名稱": r['名稱'] if '名稱' in r else r.get('代號',''), "戰術行動": act, "現價": round(p_now, 2), "防守底線": round(r['停損價'], 2), "次要數據": f"帳面 {ret:.2f}%", "產業": r['產業']})
                             except: continue
                         export_rows.append({"戰區": "", "代號": "", "名稱": "", "戰術行動": "", "現價": "", "防守底線": "", "次要數據": "", "產業": ""})
 
@@ -448,7 +489,6 @@ if len(chip_db) >= 3:
                 total_pnl, current_exposure = 0, 0
                 active_fee_rate = 0.001425 * fee_discount
                 
-                # 👑 V3 核心：HTML 智能卡片牆
                 html_cards = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; margin-bottom: 20px;">'
                 
                 for _, r in m_df.iterrows():
@@ -465,7 +505,6 @@ if len(chip_db) >= 3:
                         current_exposure += (p_now * qty * 1000)
                         total_pnl += pnl
                         
-                        # 🧠 V3 實時火控引擎 (防賣飛與紀律停損)
                         m5, m10 = float(r['M5']), float(r['M10'])
                         glow_class = "glow-s-tier" if (ret >= 10 and p_now > m5) else ""
                         border_col = COLORS['primary'] if glow_class else COLORS['border']
@@ -492,7 +531,8 @@ if len(chip_db) >= 3:
                             else:
                                 coach = f"💀 <b>【情緒殺預警】</b> 破線硬停損！請立刻無情砍單，收回現金保命，絕不攤平！"
                         
-                        name_display = r['名稱_y'] if '名稱_y' in r else r.get('名稱','')
+                        # 👑 變更為直接拿新的對應名稱
+                        name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         
                         html_cards += f'''
                         <div class="holding-card {glow_class}" style="border-left: 5px solid {border_col};">
@@ -524,6 +564,8 @@ if len(chip_db) >= 3:
                     st.markdown(html_cards, unsafe_allow_html=True)
                 else:
                     st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
+            else:
+                st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
 
         st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
         st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
