@@ -493,8 +493,8 @@ if len(chip_db) >= 3:
                 total_pnl, current_exposure = 0, 0
                 active_fee_rate = 0.001425 * fee_discount
                 
-                # 👑 V3 微調：加入 max-width 控制卡片寬度，讓列表更精緻
-                html_cards = '<div style="display: flex; flex-direction: column; gap: 15px; max-width: 800px; margin-bottom: 20px;">'
+                # 👑 拔除寬度限制，滿版展開長條列
+                html_cards = '<div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">'
                 
                 for _, r in m_df.iterrows():
                     try:
@@ -520,25 +520,25 @@ if len(chip_db) >= 3:
                         
                         if p_now > m5 and m5 > m10:
                             struct = f"🚀 多頭排列 (現價 > M5: {m5:.1f})"
-                            if ret >= 10: coach = "👑 <b>【S級金雞母】</b> 趨勢極強！強烈建議波段抱緊 8~15 天，絕對不准現在賣！"
+                            if ret >= 10: coach = "👑 <b>【S級金雞母】</b> 趨勢極強！強烈建議抱緊 8~15 天！"
                             elif ret > 0:
-                                coach = "⚠️ <b>【防賣飛警告】</b> 處於主升段，現在賣出極易賣飛！請綁住雙手讓利潤奔跑。"
+                                coach = "⚠️ <b>【防賣飛警告】</b> 處於主升段，極易賣飛！請綁住雙手！"
                                 border_col = COLORS['accent']
-                            else: coach = "⏳ 剛發動起漲或強勢洗盤，請耐心抱緊，防守底線設於 M10。"
+                            else: coach = "⏳ 強勢洗盤，請耐心抱緊，防守底線設於 M10。"
                         elif p_now >= m10:
                             struct = f"⏳ 均線收斂 (守住 M10: {m10:.1f})"
-                            coach = "🛡️ 洗盤震盪中，尚未跌破防守線，請給予耐心與空間。"
+                            coach = "🛡️ 洗盤震盪中，尚未破線，請給予耐心與空間。"
                             border_col = COLORS['accent'] if ret > 0 else COLORS['border']
                         else:
                             struct = f"📉 跌破防守線 (現價 < M10: {m10:.1f})"
                             border_col = COLORS['red'] if ret < 0 else COLORS['green']
-                            if ret > 0: coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼一半，鎖住獲利！"
-                            else: coach = f"💀 <b>【情緒殺預警】</b> 破線硬停損！請立刻無情砍單，收回現金保命，絕不攤平！"
+                            if ret > 0: coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼鎖住獲利！"
+                            else: coach = f"💀 <b>【情緒殺預警】</b> 破線硬停損！請無情砍單保命，絕不攤平！"
                         
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         
-                        # 👑 V3 微調：字體從 18px 提升至 24px，並保持單行壓縮
-                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col};'><div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'><h3 style='margin: 0; font-size: 24px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='text-align: right;'><span style='font-size: 18px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><br><span style='font-size: 14px; color: {ret_col};'>{pnl:,.0f} 元</span></div></div><div style='font-size: 14px; color: {COLORS['subtext']}; margin-bottom: 12px;'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div><div style='background-color: {COLORS['bg']}; padding: 10px; border-radius: 6px; font-size: 14px; line-height: 1.5;'><div style='margin-bottom: 5px;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
+                        # 👑 V3 終極扁平長條列 (將高度壓到最薄，字體放大到 24px)
+                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px;'><div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'><div style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 24px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 14px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div style='text-align: right;'><span style='font-size: 18px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 12px;'>{pnl:,.0f} 元</span></div></div><div style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                     
                     except Exception as e:
                         st.error(f"⚠️ 卡片渲染錯誤: {r.get('代號', '未知')} - {e}")
@@ -558,9 +558,8 @@ if len(chip_db) >= 3:
                 st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
             
             with st.expander("🛠️ 系統除錯中心"):
-                st.write("最終合併結果:")
+                st.write("最終合併結果 (若為空代表代號對不上):")
                 if 'm_df' in locals() and not m_df.empty:
-                    # 👑 V3 微調：拔除「分類」欄位，讓表格更乾淨
                     display_df = m_df.drop(columns=['分類'], errors='ignore')
                     st.dataframe(display_df, hide_index=True)
                 else:
