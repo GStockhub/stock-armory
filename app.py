@@ -36,7 +36,7 @@ auth_status = controller.get('v3_auth_token')
 
 if auth_status != 'verified_1023':
     st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V3 - 軍事管制區</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray;'>偵測到未授權裝置，請出示大將軍專屬通行碼。</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: gray;'>偵測到未授權裝置，請出示專屬通行碼。</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -45,7 +45,7 @@ if auth_status != 'verified_1023':
             if pwd == "1023":
                 # 發放通行證，保存 30 天 (2592000 秒)
                 controller.set('v3_auth_token', 'verified_1023', max_age=2592000)
-                st.success("✅ 身分確認：大將軍！正在為您開啟戰情室...")
+                st.success("✅ 身分確認：...正在為您開啟戰情室...")
                 time.sleep(1.5)
                 st.rerun()
             elif pwd != "":
@@ -81,7 +81,7 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 我要賺大錢 v24.3</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v24.3</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V3 完全體 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
@@ -431,12 +431,12 @@ if len(chip_db) >= 1:
     t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (S/A/B/C)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
 
     with t_rank:
-        st.markdown("### 🔮 <span class='highlight-primary'>戰神沙盤推演 (買進前體檢)</span>", unsafe_allow_html=True)
+        st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演(買前體檢)</span>", unsafe_allow_html=True)
         col_s1, col_s2 = st.columns([1, 3])
         with col_s1:
             st.caption("💡 輸入代號，預防手殘接刀")
-            sim_id = st.text_input("股票代號", placeholder="例: 2330 或 2337", label_visibility="collapsed")
-            sim_btn = st.button("⚡ 執行體檢", use_container_width=True)
+            sim_id = st.text_input("股票代號", placeholder="例: 2330 或 0050", label_visibility="collapsed")
+            sim_btn = st.button("⚡執行體檢", use_container_width=True)
         with col_s2:
             if sim_btn and sim_id:
                 with st.spinner("🧠 正在呼叫量化引擎掃描..."):
@@ -693,25 +693,8 @@ if len(chip_db) >= 1:
                         
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         
-                        # 👉 替換為套用 CSS 類別的「變形裝甲」HTML
-                        html_cards += f"""
-                        <div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px; background-color: {COLORS['card']}; border-radius: 4px;'>
-                            <div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
-                                <div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'>
-                                    <h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3>
-                                    <div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div>
-                                </div>
-                                <div class='rwd-flex-profit' style='text-align: right;'>
-                                    <span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span>
-                                    <span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span>
-                                </div>
-                            </div>
-                            <div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 8px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'>
-                                <div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div>
-                                <div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div>
-                            </div>
-                        </div>
-                        """
+                        # 👉 這裡已經將多行 HTML 壓縮成一行，徹底消滅 Markdown 縮排錯誤！
+                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px; background-color: {COLORS['card']}; border-radius: 4px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 8px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                     
                     except Exception as e:
                         st.error(f"⚠️ 卡片渲染錯誤: {r.get('代號', '未知')} - {e}")
