@@ -148,10 +148,28 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             elif tactic_b: tactic_label = "🛡️ 穩健回踩"
             else: tactic_label = "⏳ 觀望盤整"
             
+            # 🚨 修復點：把歷史回測陣列全部加回來！
             df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': high_s, 'Low': low_s, 'Volume': vol_s})
-            df_bt['MA5'], df_bt['MA10'] = df_bt['Close'].rolling(5).mean(), df_bt['Close'].rolling(10).mean()
+            df_bt['MA5'] = df_bt['Close'].rolling(5).mean()
+            df_bt['MA10'] = df_bt['Close'].rolling(10).mean()
+            df_bt['MA20'] = df_bt['Close'].rolling(20).mean()
+            df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
+            df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
             
-            sig_mask = sig_trend & (is_breakout_base | tactic_b)
+            df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
+            df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
+            df_bt['D'] = df_bt['K'].ewm(alpha=1/3, adjust=False).mean()
+            df_bt['RedK'] = df_bt['Close'] > df_bt['Open']
+            df_bt['ClosePos'] = np.where((df_bt['High'] - df_bt['Low']) > 0, (df_bt['Close'] - df_bt['Low']) / (df_bt['High'] - df_bt['Low']), 0)
+            
+            sig_trend = (df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20'])
+            sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98) & (df_bt['ClosePos'] > 0.7)
+            bt_on_m5 = (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] <= df_bt['MA5'] * 1.03)
+            bt_on_m10 = (df_bt['Close'] >= df_bt['MA10']) & (df_bt['Close'] <= df_bt['MA10'] * 1.03)
+            bias_col = (df_bt['Close'] - df_bt['MA20']) / df_bt['MA20'] * 100
+            sig_b = (bias_col < 7) & df_bt['RedK'] & (bt_on_m5 | bt_on_m10) & (df_bt['K'] > df_bt['D'])
+            
+            sig_mask = sig_trend & (sig_a | sig_b)
             signals_idx = df_bt[sig_mask].index
             
             sim_returns = []
