@@ -35,7 +35,7 @@ controller = CookieController()
 auth_status = controller.get('v3_auth_token')
 
 if auth_status != 'verified_1023':
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V4 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V5 - 軍事管制區</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: gray;'>偵測到未授權裝置，請出示專屬通行碼。</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -77,10 +77,10 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v24.4</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V4.1 獵殺主升段版 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v25.0</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V5 大波段進化版 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
-st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
+st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
@@ -106,6 +106,7 @@ def safe_download(sid, retries=2):
             except: time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
+# 🔮 沙盤推演 (買前體檢)
 @st.cache_data(ttl=60, show_spinner=False)
 def run_sandbox_sim(sid):
     df = safe_download(sid)
@@ -129,8 +130,11 @@ def run_sandbox_sim(sid):
     df_bt['D'] = df_bt['K'].ewm(alpha=1/3, adjust=False).mean()
     df_bt['RedK'] = df_bt['Close'] > df_bt['Open']
     
+    # 收盤強度 (Close Position) 計算
+    df_bt['ClosePos'] = np.where((df_bt['High'] - df_bt['Low']) > 0, (df_bt['Close'] - df_bt['Low']) / (df_bt['High'] - df_bt['Low']), 0)
+    
     sig_trend = (df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20'])
-    sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98)
+    sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98) & (df_bt['ClosePos'] > 0.7)
     on_m5 = (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] <= df_bt['MA5'] * 1.03)
     on_m10 = (df_bt['Close'] >= df_bt['MA10']) & (df_bt['Close'] <= df_bt['MA10'] * 1.03)
     bias_col = (df_bt['Close'] - df_bt['MA20']) / df_bt['MA20'] * 100
@@ -144,7 +148,7 @@ def run_sandbox_sim(sid):
         loc_idx = df_bt.index.get_loc(signals_idx[i])
         if loc_idx + 1 >= len(df_bt): continue
         entry_p, prev_close = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
-        if entry_p > prev_close * 1.02: continue # 🛡️ 回測防呆：過濾跳空大於2%
+        if entry_p > prev_close * 1.02: continue # 🛡️ 回測防護：跳空大於2%放棄
 
         future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 11]
         if future_data.empty: continue
@@ -152,21 +156,28 @@ def run_sandbox_sim(sid):
         stop_loss, sold_half, ret = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97), False, 0.0
         for f_idx, row in future_data.iterrows():
             curr_p = row['Close']
-            if curr_p > entry_p * 1.05: stop_loss = max(stop_loss, entry_p)
-            if curr_p < stop_loss:
-                ret = 0.5 * 0.06 + 0.5 * ((stop_loss - entry_p) / entry_p) if sold_half else (stop_loss - entry_p) / entry_p
-                break
+            curr_m5 = row['MA5']
+            
+            if curr_p > entry_p * 1.05: stop_loss = max(stop_loss, entry_p) 
+            
             if not sold_half and curr_p >= entry_p * 1.06:
                 sold_half = True
-                if curr_p >= entry_p * 1.10:
-                    ret = 0.5 * 0.06 + 0.5 * 0.10
+            
+            if sold_half:
+                # 🚀 V5: 跌破 M5 移動停利出場 (不再死板 10% 全出)
+                if curr_p < curr_m5:
+                    ret = 0.5 * 0.06 + 0.5 * ((curr_m5 - entry_p) / entry_p)
                     break
-            elif sold_half and curr_p >= entry_p * 1.10:
-                ret = 0.5 * 0.06 + 0.5 * 0.10
-                break
+            else:
+                if curr_p < stop_loss:
+                    ret = (stop_loss - entry_p) / entry_p
+                    break
         else:
             final_p = future_data['Close'].iloc[-1]
-            ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p) if sold_half else (final_p - entry_p) / entry_p
+            if sold_half:
+                ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p)
+            else:
+                ret = (final_p - entry_p) / entry_p
         sim_returns.append(ret)
 
     win_rate = (np.array(sim_returns) > 0).mean() * 100 if sim_returns else 50.0
@@ -296,6 +307,7 @@ def fetch_single_stock_batch(sid):
     if not df.empty: return sid, df
     return sid, None
 
+# 🎯 V5 量化引擎：大波段基因植入
 @st.cache_data(ttl=1800, show_spinner=False)
 def level2_quant_engine(id_tuple):
     id_list = list(id_tuple)
@@ -320,10 +332,12 @@ def level2_quant_engine(id_tuple):
             close_s, open_s, high_s, low_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['High'], df_stock['Low'], df_stock['Volume']
             p_now = float(close_s.iloc[-1])
             open_now = float(open_s.iloc[-1])
+            high_now = float(high_s.iloc[-1])
+            low_now = float(low_s.iloc[-1])
             prev_close = float(close_s.iloc[-2]) if len(close_s) > 1 else open_now
             vol_now = float(vol_s.iloc[-1]) / 1000
             
-            # 🛑 V4.1 防禦網：過濾今日跳空開高 > 2% 的標的，絕不隔日送死
+            # 🛑 V5：過濾今日跳空開高 > 2% 的標的，絕不追高送死
             if ((open_now - prev_close) / prev_close * 100) > 2.0:
                 continue
                 
@@ -340,13 +354,18 @@ def level2_quant_engine(id_tuple):
             k_now, d_now = float(k_s.iloc[-1]), float(d_s.iloc[-1])
             red_k = p_now > open_now
             
+            # 🧠 V5：計算收盤強度 (防避雷針) 與大紅K (飆股基因)
+            close_position = (p_now - low_now) / (high_now - low_now) if high_now > low_now else 0
+            is_strong_candle = ((p_now - open_now) / open_now) > 0.04
+            
             trend_strength = (m5 > m10) and (m10 > m20)
             
-            # 🔥 V4.1 雙重火力鑑定 (過濾假突破)
+            # 🔥 V5：真假突破過濾網 (收盤強度必須 > 0.7)
             vol_ratio = vol_now / vol_ma5 if vol_ma5 > 0 else 0
             is_breakout_base = (vol_ratio > 1.5) and (k_now > 80) and (p_now >= close_s.iloc[-20:].max() * 0.98)
-            tactic_a_strong = is_breakout_base and (vol_ratio >= 1.8) # 真突破：爆量 1.8 倍以上
-            tactic_a_weak = is_breakout_base and (vol_ratio < 1.8)  # 假突破嫌疑：量能不足
+            
+            tactic_a_strong = is_breakout_base and (vol_ratio >= 1.8) and (close_position > 0.7)
+            tactic_a_weak = is_breakout_base and (not tactic_a_strong)
             
             on_m5 = (p_now >= m5) and (p_now <= m5 * 1.03)
             on_m10 = (p_now >= m10) and (p_now <= m10 * 1.03)
@@ -355,12 +374,12 @@ def level2_quant_engine(id_tuple):
             is_candidate = trend_strength and (is_breakout_base or tactic_b)
             
             if tactic_a_strong and tactic_b: tactic_label = "🔥 雙戰術共振"
-            elif tactic_a_strong: tactic_label = "🚀 主升段 (重擊)"
-            elif tactic_a_weak: tactic_label = "⚠️ 弱突破 (試單)"
+            elif tactic_a_strong: tactic_label = "🚀 S級主升段 (重擊)"
+            elif tactic_a_weak: tactic_label = "⚠️ 降級弱突破 (避雷)"
             elif tactic_b: tactic_label = "🛡️ 穩健回踩"
             else: tactic_label = "⏳ 觀望盤整"
             
-            # 回測引擎 (與沙盤邏輯對齊)
+            # 🛡️ 回測引擎 (同步動態停利邏輯)
             df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': high_s, 'Low': low_s, 'Volume': vol_s})
             df_bt['MA5'], df_bt['MA10'], df_bt['MA20'], df_bt['RollMax20'] = df_bt['Close'].rolling(5).mean(), df_bt['Close'].rolling(10).mean(), df_bt['Close'].rolling(20).mean(), df_bt['Close'].rolling(20).max()
             df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
@@ -368,9 +387,10 @@ def level2_quant_engine(id_tuple):
             df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
             df_bt['D'] = df_bt['K'].ewm(alpha=1/3, adjust=False).mean()
             df_bt['RedK'] = df_bt['Close'] > df_bt['Open']
+            df_bt['ClosePos'] = np.where((df_bt['High'] - df_bt['Low']) > 0, (df_bt['Close'] - df_bt['Low']) / (df_bt['High'] - df_bt['Low']), 0)
             
             sig_trend = (df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20'])
-            sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98)
+            sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98) & (df_bt['ClosePos'] > 0.7)
             bt_on_m5 = (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] <= df_bt['MA5'] * 1.03)
             bt_on_m10 = (df_bt['Close'] >= df_bt['MA10']) & (df_bt['Close'] <= df_bt['MA10'] * 1.03)
             bias_col = (df_bt['Close'] - df_bt['MA20']) / df_bt['MA20'] * 100
@@ -392,21 +412,26 @@ def level2_quant_engine(id_tuple):
                 stop_loss, sold_half, ret = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97), False, 0.0
                 for f_idx, row in future_data.iterrows():
                     curr_p = row['Close']
+                    curr_m5 = row['MA5']
                     if curr_p > entry_p * 1.05: stop_loss = max(stop_loss, entry_p) 
-                    if curr_p < stop_loss:
-                        ret = 0.5 * 0.06 + 0.5 * ((stop_loss - entry_p) / entry_p) if sold_half else (stop_loss - entry_p) / entry_p
-                        break
+                    
                     if not sold_half and curr_p >= entry_p * 1.06:
                         sold_half = True
-                        if curr_p >= entry_p * 1.10: 
-                            ret = 0.5 * 0.06 + 0.5 * 0.10
+                    
+                    if sold_half:
+                        if curr_p < curr_m5: 
+                            ret = 0.5 * 0.06 + 0.5 * ((curr_m5 - entry_p) / entry_p)
                             break
-                    elif sold_half and curr_p >= entry_p * 1.10:
-                        ret = 0.5 * 0.06 + 0.5 * 0.10
-                        break
+                    else:
+                        if curr_p < stop_loss:
+                            ret = (stop_loss - entry_p) / entry_p
+                            break
                 else: 
                     final_p = future_data['Close'].iloc[-1]
-                    ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p) if sold_half else (final_p - entry_p) / entry_p
+                    if sold_half:
+                        ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p)
+                    else:
+                        ret = (final_p - entry_p) / entry_p
                 sim_returns.append(ret)
                 
             win_rate, avg_ret = ((np.array(sim_returns) > 0).mean() * 100, np.array(sim_returns).mean() * 100) if sim_returns else (50.0, 0.0)
@@ -416,19 +441,21 @@ def level2_quant_engine(id_tuple):
             if p_now > m20: s_score += 1
             else: s_score -= 2
             
-            # 🔥 V4.1 主流族群加分 buff (AI 資金鎖定)
+            # 🔥 V5：實體大紅K 動能加分
+            if is_strong_candle: s_score += 1
+            
+            # 🔥 V5：熱門族群加分 buff
             hot_industries = ["半導體", "電腦及週邊設備業", "電子零組件業", "其他電子業"]
             if any(h_ind in ind for h_ind in hot_industries):
                 s_score += 1
             
-            # 🔥 V4.1 突破戰術解放乖離封印
-            is_strong_breakout_label = tactic_label in ["🔥 雙戰術共振", "🚀 主升段 (重擊)"]
+            is_strong_breakout_label = tactic_label in ["🔥 雙戰術共振", "🚀 S級主升段 (重擊)"]
             if not is_strong_breakout_label:
-                # 一般穩健戰術：嚴格執行 7% 扣分
+                # 穩健回踩或弱突破：嚴格執行 7% 乖離扣分
                 if bias > 7: s_score -= 2
                 elif 0 <= bias <= 5: s_score += 2
             else:
-                # 強勢突破：在天上飛是正常的，不扣分！若剛好在黃金區間則獎勵。
+                # 真突破：解放天性不扣分，剛好在黃金區間則獎勵
                 if 0 <= bias <= 5: s_score += 2
 
             intel_results.append({
@@ -516,7 +543,7 @@ if len(chip_db) >= 1:
                         elif bias > 7:
                             grade_color = COLORS['accent']
                             grade_text = "⚠️ 追高警告 (C級)"
-                            advice = f"乖離率高達 {bias:.1f}%。超過 7% 極易買在短線最高點，除非爆量突破，否則請等它拉回 M5 附近。"
+                            advice = f"乖離率高達 {bias:.1f}%。極易買在短線最高點，除非爆量真突破，否則等回拉 M5。"
                         elif p_now > m5 and win_rate >= 50:
                             grade_color = COLORS['primary']
                             grade_text = "👑 准許出兵 (S/A級)"
@@ -546,8 +573,9 @@ if len(chip_db) >= 1:
                         st.error("❌ 查無此股票或歷史資料不足，請確認代號是否正確。")
         st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS['border'] + ";'>", unsafe_allow_html=True)
 
-        st.markdown("### 🎯 <span class='highlight-primary'>前線狙擊目標清單</span>", unsafe_allow_html=True)
-        st.caption("💡 **盤前鐵律**：跳空>2%不買、9:05前不下單、單日限3筆、未達+6%不賣。")
+        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊 (EOD 決策系統)</span>", unsafe_allow_html=True)
+        # 💡 V5: 加入 EOD 盤中操作提示
+        st.info("⏱️ **EOD 操盤時鐘** 👉 09:00~09:30 觀察不買 (過濾大跳空) | 09:30 突擊突破股(S/A) | 13:00 佈署回踩股(B)")
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty:
@@ -573,8 +601,7 @@ if len(chip_db) >= 1:
                 final_rank.loc[final_rank['今日放量'] == True, 'Score'] += 100 
                 rank_sorted = final_rank.sort_values('Score', ascending=False).reset_index(drop=True)
                 
-                # 🔥 V4.1 嚴格 S 級門禁 (GPT與微臣防線聯集)
-                is_strong_breakout = rank_sorted['戰術型態'].isin(["🔥 雙戰術共振", "🚀 主升段 (重擊)"])
+                is_strong_breakout = rank_sorted['戰術型態'].isin(["🔥 雙戰術共振", "🚀 S級主升段 (重擊)"])
                 
                 s_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 50) & (
                     (is_strong_breakout) | 
@@ -587,27 +614,22 @@ if len(chip_db) >= 1:
                 c_mask = (~s_mask) & (~a_mask) & (~b_mask) & (rank_sorted['現價'] >= rank_sorted['M10']) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1)
 
                 if MACRO_SCORE <= 5:
-                    # 🛡️ 大盤 <= 5 時防禦網啟動：
-                    # 突破股：強迫要求有大人顧 (投信連買 >= 2天) 否則不買
-                    # 回踩股：強制乖離率必須 < 3%
                     s_mask_macro_defense = (is_strong_breakout & (rank_sorted['連買'] >= 2)) | (~is_strong_breakout & (rank_sorted['乖離(%)'] < 3))
                     s_mask = s_mask & s_mask_macro_defense
-                    
                     a_mask = a_mask & (rank_sorted['乖離(%)'] < 3)
                     b_mask = b_mask & (rank_sorted['乖離(%)'] < 3)
 
-                s_tier, a_tier, b_tier, c_tier = rank_sorted[s_mask].head(3).copy(), rank_sorted[a_mask].head(3).copy(), rank_sorted[b_mask].head(7).copy(), rank_sorted[c_mask].copy()
+                s_tier = rank_sorted[s_mask].head(3).copy()
+                a_tier = rank_sorted[a_mask].head(3).copy()
+                b_tier = rank_sorted[b_mask].head(7).copy()
+                c_tier = rank_sorted[c_mask].copy()
 
-                using_a_tier = False
-                if s_tier.empty:
-                    using_a_tier, top_tier = True, a_tier
-                    top_tier['評級'] = 'A'
-                else:
-                    top_tier = s_tier
-                    top_tier['評級'] = 'S'
+                s_tier['評級'] = 'S'
+                a_tier['評級'] = 'A'
+                b_tier['評級'] = 'B'
+                c_tier['評級'] = 'C'
                 
-                b_tier['評級'], c_tier['評級'] = 'B', 'C'
-                master_list = pd.concat([top_tier, b_tier, c_tier]).reset_index(drop=True).head(20)
+                master_list = pd.concat([s_tier, a_tier, b_tier, c_tier]).reset_index(drop=True).head(20)
                 master_list['名次'] = master_list.index + 1
                 
                 if not master_list.empty:
@@ -617,7 +639,6 @@ if len(chip_db) >= 1:
                             try:
                                 p_now_raw = r.get('現價', 0)
                                 p_now = float(p_now_raw) if pd.notna(p_now_raw) and str(p_now_raw).strip() != '' else 0.0
-                                
                                 p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
                                 qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
                                 p_cost = float(str(p_cost_raw).replace(',', '').strip()) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0.0
@@ -629,11 +650,7 @@ if len(chip_db) >= 1:
                                     ret = ((sell_revenue_net - buy_cost_total) / buy_cost_total) * 100 if buy_cost_total > 0 else 0
                                 else: ret = 0.0
                                 
-                                m5_raw = r.get('M5', 0)
-                                m5 = float(m5_raw) if pd.notna(m5_raw) else 0.0
-                                m10_raw = r.get('M10', 0)
-                                m10 = float(m10_raw) if pd.notna(m10_raw) else 0.0
-                                
+                                m5, m10 = float(r.get('M5', 0)) if pd.notna(r.get('M5', 0)) else 0.0, float(r.get('M10', 0)) if pd.notna(r.get('M10', 0)) else 0.0
                                 act = "👑 S級抱緊(防賣飛)" if (ret >= 10 and p_now > m5) else ("💀 破線硬停損" if (p_now > 0 and p_now < m10) else "⏳ 守線續抱")
                                 export_rows.append({"戰區": "🛡️ 現役持股", "代號": r['代號'], "名稱": r['名稱'] if '名稱' in r else r.get('代號',''), "戰術行動": act, "現價": round(p_now, 2) if p_now > 0 else "無資料", "防守底線": round(m10, 2) if m10 > 0 else "無資料", "次要數據": f"帳面 {ret:.2f}%", "產業": r['產業']})
                             except: continue
@@ -645,38 +662,40 @@ if len(chip_db) >= 1:
 
                     st.download_button(label="📱 明日目標下載", data=pd.DataFrame(export_rows).to_csv(index=False).encode('utf-8-sig'), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
                 
-                ui_top, ui_b, ui_c = master_list[master_list['評級'].isin(['S', 'A'])], master_list[master_list['評級'] == 'B'], master_list[master_list['評級'] == 'C']
+                ui_top = master_list[master_list['評級'].isin(['S', 'A'])]
+                ui_b = master_list[master_list['評級'] == 'B']
+                ui_c = master_list[master_list['評級'] == 'C']
 
-                if using_a_tier:
-                    st.warning("⚠️ **系統判定：今日無完美 S 級標的。自動啟動【A 級】伏擊備援名單！**", icon="🛡️")
-                    st.markdown("#### 🥈 <span class='highlight-primary'>【A級】伏擊備援</span>", unsafe_allow_html=True)
-                    border_color, title_color = COLORS['accent'], COLORS['primary']
+                st.markdown("#### 🥇 <span class='highlight-primary'>【S / A 級】主力狙擊區</span>", unsafe_allow_html=True)
+                
+                if ui_top.empty: 
+                    st.info("💡 今日無主戰力標的符合。")
                 else:
-                    st.markdown("#### 🥇 <span class='highlight-primary'>【S級】完美狙擊</span>", unsafe_allow_html=True)
-                    border_color, title_color = COLORS['primary'], COLORS['primary']
-
-                if ui_top.empty: st.info("💡 今日無主戰力標的符合。")
-                else:
-                    cols_s = st.columns(3)
-                    for i in range(len(ui_top)):
-                        r = ui_top.iloc[i]
-                        with cols_s[i]:
-                            st.markdown(f"""
-                            <div class="tier-card" style="border-top: 5px solid {border_color};">
-                                <h3 style="margin:0; color:{title_color};">{r['名次']}. {r['名稱_x']} ({r['代號']})</h3>
-                                <p style="color:{COLORS['subtext']}; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
-                                <div style="background-color: {COLORS['bg']}; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
-                                    <b>{r['戰術型態']}</b><br>
-                                    勝率：<span class="highlight-green">{r['勝率(%)']:.1f}%</span> | 均報：<span class="highlight-accent">+{r['均報(%)']:.2f}%</span>
+                    for i in range(0, len(ui_top), 3):
+                        cols_s = st.columns(3)
+                        for j in range(3):
+                            if i + j < len(ui_top):
+                                r = ui_top.iloc[i + j]
+                                border_color = COLORS['primary'] if r['評級'] == 'S' else COLORS['accent']
+                                title_color = COLORS['primary'] if r['評級'] == 'S' else COLORS['accent']
+                                icon_label = "🥇 S級" if r['評級'] == 'S' else "🥈 A級"
+                                
+                                st.markdown(f"""
+                                <div class="tier-card" style="border-top: 5px solid {border_color}; margin-bottom: 15px;">
+                                    <h3 style="margin:0; color:{title_color};">{icon_label} | {r['名稱_x']} ({r['代號']})</h3>
+                                    <p style="color:{COLORS['subtext']}; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
+                                    <div style="background-color: {COLORS['bg']}; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                                        <b>{r['戰術型態']}</b><br>
+                                        勝率：<span class="highlight-green">{r['勝率(%)']:.1f}%</span> | 均報：<span class="highlight-accent">+{r['均報(%)']:.2f}%</span>
+                                    </div>
+                                    <div style="font-size: 15px; line-height: 1.6;">
+                                        🛡️ <b>安全指數：</b> {r['安全指數']} 分<br>
+                                        💰 <b>現價(進場)：</b> <span class="highlight-primary">{r['現價']:.2f}</span> (乖離 {r['乖離(%)']:.1f}%)<br>
+                                        🚨 <b>防爆停損：</b> <span class="highlight-red">{r['停損價']:.2f}</span><br>
+                                        ⚖️ <b>AI 建議買量：</b> <span class="highlight-accent">{r['建議買量(張)']}</span> 張
+                                    </div>
                                 </div>
-                                <div style="font-size: 15px; line-height: 1.6;">
-                                    🛡️ <b>安全指數：</b> {r['安全指數']} 分<br>
-                                    💰 <b>現價(進場)：</b> <span class="highlight-primary">{r['現價']:.2f}</span> (乖離 {r['乖離(%)']:.1f}%)<br>
-                                    🚨 <b>防爆停損：</b> <span class="highlight-red">{r['停損價']:.2f}</span><br>
-                                    ⚖️ <b>AI 建議買量：</b> <span class="highlight-accent">{r['建議買量(張)']}</span> 張
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                                """, unsafe_allow_html=True)
 
                 st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
                 st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (勝率 > 50%)</span>", unsafe_allow_html=True)
@@ -724,7 +743,7 @@ if len(chip_db) >= 1:
 
     with t_cmd:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
-        st.caption("💡 **資金風控**：個人現役持股盈虧計算機與 V3 防賣飛火控雷達。")
+        st.caption("💡 **資金風控**：個人現役持股盈虧計算機與 V5 防賣飛火控雷達。")
         
         if not sheet_url: 
             st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
@@ -773,9 +792,9 @@ if len(chip_db) >= 1:
                             glow_class = ""
                         elif p_now > m5 and m5 > m10:
                             struct = f"🚀 多頭排列 (現價 > M5: {m5:.1f})"
-                            if ret >= 10: coach = "👑 <b>【S級金雞母】</b> 趨勢極強！強烈建議抱緊 8~15 天！"
+                            if ret >= 10: coach = "👑 <b>【S級金雞母】</b> 趨勢極強！<b>跌破 M5 前絕對不賣！</b>"
                             elif ret > 0:
-                                coach = "⚠️ <b>【防賣飛警告】</b> 處於主升段，極易賣飛！請綁住雙手！"
+                                coach = "⚠️ <b>【防賣飛警告】</b> 主升段啟動！獲利達6%先出一半，剩下死抱 M5！"
                                 border_col = COLORS['accent']
                             else: coach = "⏳ 強勢洗盤，請耐心抱緊，防守底線設於 M10。"
                         elif p_now >= m10:
@@ -834,4 +853,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v24.4 (V4.1完全體)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v25.0 (V5 完全體)</p>", unsafe_allow_html=True)
