@@ -424,7 +424,8 @@ if len(chip_db) >= 1:
                 h_intel = get_holding_intel(tuple(h_df['代號'].tolist()))
                 
                 if not h_intel.empty:
-                    m_df = pd.merge(h_df, h_intel, on='代號', how='inner')
+                    # 👉 修復地雷三：改成 how='left'，保證剛上市的持股不會蒸發！
+                    m_df = pd.merge(h_df, h_intel, on='代號', how='left')
                     m_df['名稱'] = m_df['代號'].map(TWSE_NAME_MAP).fillna('未知')
         except Exception as e: st.error(f"❌ 讀取持股部位失敗：{e}")
     
@@ -516,7 +517,7 @@ if len(chip_db) >= 1:
                 s_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 55) & (rank_sorted['均報(%)'] >= 1.5) & (rank_sorted['今日放量'] == True) & (rank_sorted['連買'] >= 2)
                 a_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 50) & (rank_sorted['均報(%)'] >= 1.0) & (rank_sorted['連買'] >= 1)
                 
-                # 👉 V3.1 熱修復：B級與C級強制加上 (現價 >= M10) 的破線防呆濾網，徹底消滅「停損價高於現價」的荒謬標的！
+                # 👉 (保留您已修復的地雷一)
                 b_mask = (~s_mask) & (~a_mask) & (rank_sorted['現價'] >= rank_sorted['M10']) & (rank_sorted['勝率(%)'] > 50) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1) & (rank_sorted['乖離(%)'] < 10)
                 c_mask = (~s_mask) & (~a_mask) & (~b_mask) & (rank_sorted['現價'] >= rank_sorted['M10']) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1)
 
@@ -542,18 +543,30 @@ if len(chip_db) >= 1:
                     if not m_df.empty:
                         for _, r in m_df.iterrows():
                             try:
-                                p_now = float(r.get('現價', 0))
+                                p_now_raw = r.get('現價', 0)
+                                p_now = float(p_now_raw) if pd.notna(p_now_raw) and str(p_now_raw).strip() != '' else 0.0
+                                
                                 p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
                                 qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
-                                p_cost = float(p_cost_raw) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0
-                                qty = float(qty_raw) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0
                                 
-                                buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
-                                sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
-                                ret = ((sell_revenue_net - buy_cost_total) / buy_cost_total) * 100 if buy_cost_total > 0 else 0
+                                # 👉 修復地雷二：加上 .replace(',', '') 防止千分位核爆
+                                p_cost = float(str(p_cost_raw).replace(',', '').strip()) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0.0
+                                qty = float(str(qty_raw).replace(',', '').strip()) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0.0
                                 
-                                act = "👑 S級抱緊(防賣飛)" if (ret >= 10 and p_now > r['M5']) else ("💀 破線硬停損" if p_now < r['M10'] else "⏳ 守線續抱")
-                                export_rows.append({"戰區": "🛡️ 現役持股", "代號": r['代號'], "名稱": r['名稱'] if '名稱' in r else r.get('代號',''), "戰術行動": act, "現價": round(p_now, 2), "防守底線": round(r['停損價'], 2), "次要數據": f"帳面 {ret:.2f}%", "產業": r['產業']})
+                                if p_now > 0:
+                                    buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
+                                    sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
+                                    ret = ((sell_revenue_net - buy_cost_total) / buy_cost_total) * 100 if buy_cost_total > 0 else 0
+                                else:
+                                    ret = 0.0
+                                
+                                m5_raw = r.get('M5', 0)
+                                m5 = float(m5_raw) if pd.notna(m5_raw) else 0.0
+                                m10_raw = r.get('M10', 0)
+                                m10 = float(m10_raw) if pd.notna(m10_raw) else 0.0
+                                
+                                act = "👑 S級抱緊(防賣飛)" if (ret >= 10 and p_now > m5) else ("💀 破線硬停損" if (p_now > 0 and p_now < m10) else "⏳ 守線續抱")
+                                export_rows.append({"戰區": "🛡️ 現役持股", "代號": r['代號'], "名稱": r['名稱'] if '名稱' in r else r.get('代號',''), "戰術行動": act, "現價": round(p_now, 2) if p_now > 0 else "無資料", "防守底線": round(m10, 2) if m10 > 0 else "無資料", "次要數據": f"帳面 {ret:.2f}%", "產業": r['產業']})
                             except: continue
                         export_rows.append({"戰區": "", "代號": "", "名稱": "", "戰術行動": "", "現價": "", "防守底線": "", "次要數據": "", "產業": ""})
 
@@ -656,27 +669,44 @@ if len(chip_db) >= 1:
                 
                 for _, r in m_df.iterrows():
                     try:
-                        p_now = float(r.get('現價', 0))
+                        p_now_raw = r.get('現價', 0)
+                        p_now = float(p_now_raw) if pd.notna(p_now_raw) and str(p_now_raw).strip() != '' else 0.0
+                        
                         p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
                         qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
                         
-                        p_cost = float(p_cost_raw) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0
-                        qty = float(qty_raw) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0
+                        # 👉 修復地雷二：加上 .replace(',', '') 防止千分位核爆
+                        p_cost = float(str(p_cost_raw).replace(',', '').strip()) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0.0
+                        qty = float(str(qty_raw).replace(',', '').strip()) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0.0
                         
-                        buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
-                        sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
-                        pnl = sell_revenue_net - buy_cost_total
-                        ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0
+                        # 👉 修復地雷三引發的計算錯誤：確保沒有報價時不會算出負無限大的虧損
+                        if p_now > 0:
+                            buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
+                            sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
+                            pnl = sell_revenue_net - buy_cost_total
+                            ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0
+                            current_exposure += (p_now * qty * 1000)
+                            total_pnl += pnl
+                        else:
+                            pnl = 0
+                            ret = 0.0
                         
-                        current_exposure += (p_now * qty * 1000)
-                        total_pnl += pnl
+                        m5_raw = r.get('M5', 0)
+                        m5 = float(m5_raw) if pd.notna(m5_raw) else 0.0
+                        m10_raw = r.get('M10', 0)
+                        m10 = float(m10_raw) if pd.notna(m10_raw) else 0.0
                         
-                        m5, m10 = float(r['M5']), float(r['M10'])
                         glow_class = "glow-s-tier" if (ret >= 10 and p_now > m5) else ""
                         border_col = COLORS['primary'] if glow_class else COLORS['border']
                         ret_col = COLORS['red'] if pnl > 0 else (COLORS['green'] if pnl < 0 else COLORS['text'])
                         
-                        if p_now > m5 and m5 > m10:
+                        # 👉 修復地雷三的卡片顯示狀態：如果剛上市沒有均線資料，給予專屬提示
+                        if p_now == 0.0 or m10 == 0.0:
+                            struct = "⚪ 訊號不足 (無有效報價/剛上市)"
+                            coach = "無法取得完整均線數據，請手動確認走勢。"
+                            border_col = COLORS['border']
+                            glow_class = ""
+                        elif p_now > m5 and m5 > m10:
                             struct = f"🚀 多頭排列 (現價 > M5: {m5:.1f})"
                             if ret >= 10: coach = "👑 <b>【S級金雞母】</b> 趨勢極強！強烈建議抱緊 8~15 天！"
                             elif ret > 0:
@@ -694,9 +724,9 @@ if len(chip_db) >= 1:
                             else: coach = f"💀 <b>【情緒殺預警】</b> 破線硬停損！請無情砍單保命，絕不攤平！"
                         
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
+                        display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
                         
-                        # 👉 這裡已經將多行 HTML 壓縮成一行，徹底消滅 Markdown 縮排錯誤！
-                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px; background-color: {COLORS['card']}; border-radius: 4px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{p_now:.2f}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 8px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
+                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px; background-color: {COLORS['card']}; border-radius: 4px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 8px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                     
                     except Exception as e:
                         st.error(f"⚠️ 卡片渲染錯誤: {r.get('代號', '未知')} - {e}")
@@ -707,7 +737,7 @@ if len(chip_db) >= 1:
                 p_color = COLORS['red'] if total_pnl > 0 else COLORS['green']
                 st.markdown(f"#### 💰 目前總淨損益：<span style='color:{p_color}; font-size:24px;'>{total_pnl:,.0f} 元</span>", unsafe_allow_html=True)
                 
-                if total_pnl != 0 or current_exposure != 0:
+                if total_pnl != 0 or current_exposure != 0 or len(m_df) > 0:
                     st.markdown(html_cards, unsafe_allow_html=True)
                 else:
                     st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
