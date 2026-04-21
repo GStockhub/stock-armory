@@ -67,8 +67,8 @@ def safe_download(sid, retries=2):
             except: time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
-# 🔮 V3 新兵器：沙盤推演專用獨立引擎
-@st.cache_data(ttl=300, show_spinner=False)
+# 🔮 戰神沙盤推演：維持極短的 60 秒快取，確保防呆資料最新！
+@st.cache_data(ttl=60, show_spinner=False)
 def run_sandbox_sim(sid):
     df = safe_download(sid)
     if df is None or df.empty or len(df) < 20: return None
@@ -127,7 +127,8 @@ def run_sandbox_sim(sid):
         '勝率': win_rate, '停損價': max(m10, p_now * 0.97)
     }
 
-@st.cache_data(ttl=300, show_spinner=False)
+# 📡 持股雷達：放寬至 30 分鐘 (1800秒)，減輕手機負載
+@st.cache_data(ttl=1800, show_spinner=False)
 def get_holding_intel(id_tuple):
     id_list = list(id_tuple)
     intel_results = []
@@ -164,7 +165,8 @@ def get_holding_intel(id_tuple):
         except: continue
     return pd.DataFrame(intel_results)
 
-@st.cache_data(ttl=3600, show_spinner=False)
+# 🌍 大盤指標：延長至 4 小時 (14400秒)
+@st.cache_data(ttl=14400, show_spinner=False)
 def get_macro_dashboard():
     score = 5.0
     macro_data = []
@@ -203,7 +205,8 @@ def get_macro_dashboard():
 
 MACRO_SCORE, MACRO_DF = get_macro_dashboard()
 
-@st.cache_data(ttl=3600, show_spinner=False)
+# 📡 法人籌碼：延長至 4 小時 (14400秒)
+@st.cache_data(ttl=14400, show_spinner=False)
 def fetch_chips_data():
     chip_dict = {}
     date_ptr = datetime.now()
@@ -245,6 +248,7 @@ def fetch_single_stock_batch(sid):
     if not df.empty: return sid, df
     return sid, None
 
+# 🎯 狙擊引擎：放寬至 30 分鐘 (1800秒)
 @st.cache_data(ttl=1800, show_spinner=False)
 def level2_quant_engine(id_tuple):
     id_list = list(id_tuple)
@@ -347,12 +351,12 @@ def risk_color(val):
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
 
-with st.spinner('情報兵正在進行職業級波段回測與籌碼精算...'):
+with st.spinner('情報兵正在部署防線...'):
     chip_db = fetch_chips_data()
 
 m_df = pd.DataFrame() 
 
-if len(chip_db) >= 3:
+if len(chip_db) >= 1:
     dates = sorted(list(chip_db.keys()), reverse=True)
     today_df = chip_db[dates[0]].copy()
     for i, d in enumerate(dates): today_df = pd.merge(today_df, chip_db[d][['代號', '投信(張)']].rename(columns={'投信(張)': f'D{i}'}), on='代號', how='left').fillna(0)
@@ -389,7 +393,6 @@ if len(chip_db) >= 3:
     t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (S/A/B/C)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
 
     with t_rank:
-        # 🔮 新增：戰神沙盤推演 (買進前防呆體檢)
         st.markdown("### 🔮 <span class='highlight-primary'>戰神沙盤推演 (買進前體檢)</span>", unsafe_allow_html=True)
         col_s1, col_s2 = st.columns([1, 3])
         with col_s1:
@@ -408,7 +411,6 @@ if len(chip_db) >= 3:
                         win_rate = res['勝率']
                         sl_price = res['停損價']
 
-                        # 🧠 沙盤推演教練判定邏輯
                         if p_now < m10:
                             grade_color = COLORS['red']
                             grade_text = "🛑 嚴禁接刀 (D級)"
