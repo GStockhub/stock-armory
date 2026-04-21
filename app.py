@@ -29,21 +29,24 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 🔒 專屬門禁系統
+# 🔒 專屬門禁系統 (V6: 導入 st.secrets 資安保險箱)
 # ---------------------------------------------------------
 controller = CookieController()
 auth_status = controller.get('v3_auth_token')
 
-if auth_status != 'verified_1023':
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V5 - 軍事管制區</h1>", unsafe_allow_html=True)
+# 從保險箱讀取密碼，若未設定則預設為 1023
+SYS_PWD = st.secrets.get("sys_pwd", "1023")
+
+if auth_status != 'verified_auth':
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V6 - 軍事管制區</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: gray;'>偵測到未授權裝置，請出示專屬通行碼。</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
         if st.button("🔓 驗證並解鎖", use_container_width=True) or pwd:
-            if pwd == "1023":
-                controller.set('v3_auth_token', 'verified_1023', max_age=2592000)
+            if pwd == SYS_PWD:
+                controller.set('v3_auth_token', 'verified_auth', max_age=2592000)
                 st.success("✅ 身分確認：...正在為您開啟戰情室...")
                 time.sleep(1.5)
                 st.rerun()
@@ -77,8 +80,8 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v25.0</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V5 大波段進化版 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.0</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V6 (高效能引擎版) ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
@@ -106,7 +109,8 @@ def safe_download(sid, retries=2):
             except: time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
-@st.cache_data(ttl=60, show_spinner=False)
+# 🔮 沙盤推演 (買前體檢)
+@st.cache_data(ttl=3600, show_spinner=False) # V6: 統一快取為 1 小時
 def run_sandbox_sim(sid):
     df = safe_download(sid)
     if df is None or df.empty or len(df) < 20: return None
@@ -128,7 +132,6 @@ def run_sandbox_sim(sid):
     df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
     df_bt['D'] = df_bt['K'].ewm(alpha=1/3, adjust=False).mean()
     df_bt['RedK'] = df_bt['Close'] > df_bt['Open']
-    
     df_bt['ClosePos'] = np.where((df_bt['High'] - df_bt['Low']) > 0, (df_bt['Close'] - df_bt['Low']) / (df_bt['High'] - df_bt['Low']), 0)
     
     sig_trend = (df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20'])
@@ -148,7 +151,8 @@ def run_sandbox_sim(sid):
         entry_p, prev_close = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
         if entry_p > prev_close * 1.02: continue 
 
-        future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 11]
+        # V6: 放寬視野，回測向未來推進 20 天！
+        future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21]
         if future_data.empty: continue
 
         stop_loss, sold_half, ret = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97), False, 0.0
@@ -177,7 +181,12 @@ def run_sandbox_sim(sid):
                 ret = (final_p - entry_p) / entry_p
         sim_returns.append(ret)
 
-    win_rate = (np.array(sim_returns) > 0).mean() * 100 if sim_returns else 50.0
+    # V6: 勝率失真防呆
+    if len(sim_returns) < 5:
+        win_rate = 50.0
+    else:
+        win_rate = (np.array(sim_returns) > 0).mean() * 100
+        
     name = TWSE_NAME_MAP.get(sid, sid)
 
     return {
@@ -186,7 +195,7 @@ def run_sandbox_sim(sid):
         '勝率': win_rate, '停損價': max(m10, p_now * 0.97)
     }
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_holding_intel(id_tuple):
     id_list = list(id_tuple)
     intel_results = []
@@ -304,7 +313,8 @@ def fetch_single_stock_batch(sid):
     if not df.empty: return sid, df
     return sid, None
 
-@st.cache_data(ttl=1800, show_spinner=False)
+# 🎯 V6 量化引擎：漏斗過濾光速引擎
+@st.cache_data(ttl=3600, show_spinner=False)
 def level2_quant_engine(id_tuple):
     id_list = list(id_tuple)
     intel_results = []
@@ -333,12 +343,18 @@ def level2_quant_engine(id_tuple):
             prev_close = float(close_s.iloc[-2]) if len(close_s) > 1 else open_now
             vol_now = float(vol_s.iloc[-1]) / 1000
             
+            # 🛑 V5：過濾今日跳空開高 > 2% 的標的
             if ((open_now - prev_close) / prev_close * 100) > 2.0:
                 continue
                 
             if p_now < 20 or vol_now < 1.5: continue
             
             m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
+            
+            # 🏎️ V6 Layer 1 光速快篩：如果連 10 日線都站不穩，直接無情踢出！(省去後續 60% 回測算力)
+            if p_now < m10:
+                continue
+                
             vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1]) / 1000
             bias = ((p_now - m20) / m20) * 100
             
@@ -371,6 +387,7 @@ def level2_quant_engine(id_tuple):
             elif tactic_b: tactic_label = "🛡️ 穩健回踩"
             else: tactic_label = "⏳ 觀望盤整"
             
+            # 🏎️ V6 Layer 2 精銳回測
             df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': high_s, 'Low': low_s, 'Volume': vol_s})
             df_bt['MA5'], df_bt['MA10'], df_bt['MA20'], df_bt['RollMax20'] = df_bt['Close'].rolling(5).mean(), df_bt['Close'].rolling(10).mean(), df_bt['Close'].rolling(20).mean(), df_bt['Close'].rolling(20).max()
             df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
@@ -397,7 +414,8 @@ def level2_quant_engine(id_tuple):
                 entry_p, prev_close_bt = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
                 if entry_p > prev_close_bt * 1.02: continue
                 
-                future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 11] 
+                # V6: 拉長至 20 天探測視野
+                future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21] 
                 if future_data.empty: continue
                 
                 stop_loss, sold_half, ret = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97), False, 0.0
@@ -425,7 +443,11 @@ def level2_quant_engine(id_tuple):
                         ret = (final_p - entry_p) / entry_p
                 sim_returns.append(ret)
                 
-            win_rate, avg_ret = ((np.array(sim_returns) > 0).mean() * 100, np.array(sim_returns).mean() * 100) if sim_returns else (50.0, 0.0)
+            # V6: 勝率失真防呆
+            if len(sim_returns) < 5:
+                win_rate, avg_ret = 50.0, 0.0
+            else:
+                win_rate, avg_ret = ((np.array(sim_returns) > 0).mean() * 100, np.array(sim_returns).mean() * 100)
 
             s_score = MACRO_SCORE
             if p_now > m5: s_score += 1
@@ -657,7 +679,6 @@ if len(chip_db) >= 1:
                 if ui_top.empty: 
                     st.info("💡 今日無主戰力標的符合。")
                 else:
-                    # 👉 微臣已修正：確保卡片被正確裝進 st.columns() 裡，恢復完美的方塊卡片陣列！
                     for i in range(0, len(ui_top), 3):
                         cols_s = st.columns(3)
                         for j in range(3):
@@ -798,7 +819,7 @@ if len(chip_db) >= 1:
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
                         
-                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px; background-color: {COLORS['card']}; border-radius: 4px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 5px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
+                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px; background-color: {COLORS['card']}; border-radius: 4px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                     
                     except Exception as e:
                         st.error(f"⚠️ 卡片渲染錯誤: {r.get('代號', '未知')} - {e}")
@@ -827,8 +848,9 @@ if len(chip_db) >= 1:
 
         st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
         st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
-        fm_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiZGVraTEwMjMiLCJlbWFpbCI6ImRla2kxMDIzQGdtYWlsLmNvbSJ9.-wVo_6BD8ac8cGCOi8C3J58KUGZ1c0CMwTU9lYPltNM"
-        aar.render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS)
+        # 從 secrets 讀取 FinMind Token
+        FM_TOKEN = st.secrets.get("fm_token", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiZGVraTEwMjMiLCJlbWFpbCI6ImRla2kxMDIzQGdtYWlsLmNvbSJ9.-wVo_6BD8ac8cGCOi8C3J58KUGZ1c0CMwTU9lYPltNM")
+        aar.render_aar_tab(aar_sheet_url, fee_discount, FM_TOKEN, COLORS)
 
     with t_book:
         st.markdown("### 📖 <span class='highlight-primary'>實戰準則與系統圖示教範</span>", unsafe_allow_html=True)
@@ -841,4 +863,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v25.0 (V5 完全體)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.0 (V6 引擎升級版)</p>", unsafe_allow_html=True)
