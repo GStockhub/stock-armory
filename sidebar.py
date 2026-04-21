@@ -10,13 +10,13 @@ def render_sidebar():
         theme_options = {
             "milktea_light": "☀️ 奶茶極簡",
             "gold": "👑 皇家黑金",
-            "navy": "🦈 鯊魚海軍藍",
+            "navy": "🦈 鯊魚淺藍",
             "gray": "🧘 極簡炭灰",
             "milktea_tech": "☕ 奶茶科技"
         }
         
         theme_choice = st.selectbox(
-            "🎨 戰情室佈景主題", 
+            "🎨 主題色系", 
             list(theme_options.keys()), 
             index=0, 
             format_func=lambda x: theme_options.get(x)
