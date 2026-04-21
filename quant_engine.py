@@ -4,7 +4,7 @@ import streamlit as st
 import concurrent.futures
 from data_center import fetch_single_stock_batch, safe_download
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df = safe_download(sid, fm_token)
     if df is None or df.empty or len(df) < 20: return None
