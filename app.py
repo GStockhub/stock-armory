@@ -8,7 +8,7 @@ import time
 import yfinance as yf
 import concurrent.futures
 import ssl
-from streamlit_cookies_controller import CookieController # 🍪 引入餅乾哨兵
+from streamlit_cookies_controller import CookieController
 
 try:
     _create_unverified_https_context = ssl._create_unverified_context
@@ -29,7 +29,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 🔒 專屬門禁系統：密碼 1023
+# 🔒 專屬門禁系統
 # ---------------------------------------------------------
 controller = CookieController()
 auth_status = controller.get('v3_auth_token')
@@ -43,21 +43,19 @@ if auth_status != 'verified_1023':
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
         if st.button("🔓 驗證並解鎖", use_container_width=True) or pwd:
             if pwd == "1023":
-                # 發放通行證，保存 30 天 (2592000 秒)
                 controller.set('v3_auth_token', 'verified_1023', max_age=2592000)
                 st.success("✅ 身分確認：...正在為您開啟戰情室...")
                 time.sleep(1.5)
                 st.rerun()
             elif pwd != "":
                 st.error("❌ 密碼錯誤！防禦系統已啟動。")
-    st.stop() # 🛑 沒通過密碼，程式到此終止，絕對看不到下面的資料！
+    st.stop()
 
 # ---------------------------------------------------------
-# 📱 注入 RWD 防跑版變形裝甲 (手機版專用 CSS)
+# 📱 注入 RWD 防跑版變形裝甲
 # ---------------------------------------------------------
 st.markdown("""
 <style>
-/* 手機螢幕寬度小於 768px 時，強制轉換為垂直排列 */
 @media (max-width: 768px) {
     .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
     .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
@@ -67,8 +65,6 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
-# ----- 以下是原本的戰情室主程式碼 -----
 
 configs = sidebar.render_sidebar()
 
@@ -81,8 +77,8 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v24.3</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V3 完全體 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v24.4</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V4 進場強化版 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time}</div>", unsafe_allow_html=True)
 
@@ -110,6 +106,7 @@ def safe_download(sid, retries=2):
             except: time.sleep(0.5 + np.random.rand())
     return pd.DataFrame()
 
+# 👉 V4：沙盤推演同步升級，回測邏輯對齊「雙軌戰術」
 @st.cache_data(ttl=60, show_spinner=False)
 def run_sandbox_sim(sid):
     df = safe_download(sid)
@@ -121,13 +118,28 @@ def run_sandbox_sim(sid):
     m20 = float(close_s.rolling(20).mean().iloc[-1])
     bias = ((p_now - m20) / m20) * 100
 
-    df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s})
+    df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': df['High'], 'Low': df['Low'], 'Volume': df['Volume']})
     df_bt['MA5'] = df_bt['Close'].rolling(5).mean()
     df_bt['MA10'] = df_bt['Close'].rolling(10).mean()
     df_bt['MA20'] = df_bt['Close'].rolling(20).mean()
     df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
+    df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
+    
+    # 植入 KD 與 K線型態運算
+    df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
+    df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
+    df_bt['D'] = df_bt['K'].ewm(alpha=1/3, adjust=False).mean()
+    df_bt['RedK'] = df_bt['Close'] > df_bt['Open']
+    
+    # 雙軌進場訊號判定
+    sig_trend = (df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20'])
+    sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98)
+    on_m5 = (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] <= df_bt['MA5'] * 1.03)
+    on_m10 = (df_bt['Close'] >= df_bt['MA10']) & (df_bt['Close'] <= df_bt['MA10'] * 1.03)
+    bias_col = (df_bt['Close'] - df_bt['MA20']) / df_bt['MA20'] * 100
+    sig_b = (bias_col < 7) & df_bt['RedK'] & (on_m5 | on_m10) & (df_bt['K'] > df_bt['D'])
 
-    sig_mask = ((df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20']) & (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98))
+    sig_mask = sig_trend & (sig_a | sig_b)
     signals_idx = df_bt[sig_mask].index
 
     sim_returns = []
@@ -287,6 +299,7 @@ def fetch_single_stock_batch(sid):
     if not df.empty: return sid, df
     return sid, None
 
+# 👉 V4：量化引擎全面改寫，實裝 KD 與 雙軌戰術！
 @st.cache_data(ttl=1800, show_spinner=False)
 def level2_quant_engine(id_tuple):
     id_list = list(id_tuple)
@@ -308,8 +321,9 @@ def level2_quant_engine(id_tuple):
             df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
             
-            close_s, open_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['Volume']
+            close_s, open_s, high_s, low_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['High'], df_stock['Low'], df_stock['Volume']
             p_now = float(close_s.iloc[-1])
+            open_now = float(open_s.iloc[-1])
             vol_now = float(vol_s.iloc[-1]) / 1000
             
             if p_now < 20 or vol_now < 1.5: continue
@@ -318,17 +332,45 @@ def level2_quant_engine(id_tuple):
             vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1]) / 1000
             bias = ((p_now - m20) / m20) * 100
             
+            # 計算 KD 指標
+            rsv_s = (close_s - low_s.rolling(9).min()) / (high_s.rolling(9).max() - low_s.rolling(9).min()) * 100
+            k_s = rsv_s.ewm(alpha=1/3, adjust=False).mean()
+            d_s = k_s.ewm(alpha=1/3, adjust=False).mean()
+            k_now, d_now = float(k_s.iloc[-1]), float(d_s.iloc[-1])
+            red_k = p_now > open_now
+            
             trend_strength = (m5 > m10) and (m10 > m20)
-            recent_high = (close_s.iloc[-10:].max() >= close_s.iloc[-20:].max()) 
-            pullback_stand = (p_now >= m5) and (p_now <= m5 * 1.03) 
             
-            is_candidate = trend_strength and recent_high and pullback_stand
-            is_volume_breakout = (vol_now > 1.5) and (vol_now > vol_ma5 * 1.2) 
+            # 🔥 雙軌戰術邏輯
+            tactic_a = (vol_now > vol_ma5 * 1.5) and (k_now > 80) and (p_now >= close_s.iloc[-20:].max() * 0.98)
+            on_m5 = (p_now >= m5) and (p_now <= m5 * 1.03)
+            on_m10 = (p_now >= m10) and (p_now <= m10 * 1.03)
+            tactic_b = (bias < 7) and red_k and (on_m5 or on_m10) and (k_now > d_now)
             
-            df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s})
+            is_candidate = trend_strength and (tactic_a or tactic_b)
+            
+            if tactic_a and tactic_b: tactic_label = "🔥 雙戰術共振"
+            elif tactic_a: tactic_label = "🚀 主升段突破"
+            elif tactic_b: tactic_label = "🛡️ 穩健回踩"
+            else: tactic_label = "⏳ 觀望盤整"
+            
+            # 回測引擎 (與沙盤邏輯對齊)
+            df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': high_s, 'Low': low_s, 'Volume': vol_s})
             df_bt['MA5'], df_bt['MA10'], df_bt['MA20'], df_bt['RollMax20'] = df_bt['Close'].rolling(5).mean(), df_bt['Close'].rolling(10).mean(), df_bt['Close'].rolling(20).mean(), df_bt['Close'].rolling(20).max()
+            df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
+            df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
+            df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
+            df_bt['D'] = df_bt['K'].ewm(alpha=1/3, adjust=False).mean()
+            df_bt['RedK'] = df_bt['Close'] > df_bt['Open']
             
-            sig_mask = ((df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20']) & (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98))
+            sig_trend = (df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20'])
+            sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98)
+            bt_on_m5 = (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] <= df_bt['MA5'] * 1.03)
+            bt_on_m10 = (df_bt['Close'] >= df_bt['MA10']) & (df_bt['Close'] <= df_bt['MA10'] * 1.03)
+            bias_col = (df_bt['Close'] - df_bt['MA20']) / df_bt['MA20'] * 100
+            sig_b = (bias_col < 7) & df_bt['RedK'] & (bt_on_m5 | bt_on_m10) & (df_bt['K'] > df_bt['D'])
+            
+            sig_mask = sig_trend & (sig_a | sig_b)
             signals_idx = df_bt[sig_mask].index
             
             sim_returns = []
@@ -367,13 +409,16 @@ def level2_quant_engine(id_tuple):
             if p_now > m5: s_score += 1
             if p_now > m20: s_score += 1
             else: s_score -= 2
-            if bias > 10: s_score -= 2
+            
+            # 👉 V4：嚴格化乖離防禦，7% 成為警戒線！
+            if bias > 7: s_score -= 2
             elif 0 <= bias <= 5: s_score += 2
 
             intel_results.append({
-                '代號': sid, '名稱': TWSE_NAME_MAP.get(sid, sid), '產業': ind, '現價': p_now, '成交量': vol_now, '今日放量': is_volume_breakout,
+                '代號': sid, '名稱': TWSE_NAME_MAP.get(sid, sid), '產業': ind, '現價': p_now, '成交量': vol_now, '今日放量': (vol_now > vol_ma5 * 1.5),
                 'M5': m5, 'M10': m10, 'M20': m20, '乖離(%)': bias, '基本達標': is_candidate, '安全指數': max(1, min(10, int(s_score))),
-                '勝率(%)': win_rate, '均報(%)': avg_ret, '停損價': max(m10, p_now * 0.97), '停利價': p_now * 1.10, '原始風險差額': p_now - max(m10, p_now * 0.97)
+                '勝率(%)': win_rate, '均報(%)': avg_ret, '停損價': max(m10, p_now * 0.97), '停利價': p_now * 1.10, '原始風險差額': p_now - max(m10, p_now * 0.97),
+                '戰術型態': tactic_label
             })
         except: continue
     return pd.DataFrame(intel_results)
@@ -420,11 +465,8 @@ if len(chip_db) >= 1:
                 
             if not h_df.empty and '代號' in h_df.columns:
                 h_df['代號'] = h_df['代號'].astype(str).str.strip()
-                
                 h_intel = get_holding_intel(tuple(h_df['代號'].tolist()))
-                
                 if not h_intel.empty:
-                    # 👉 修復地雷三：改成 how='left'，保證剛上市的持股不會蒸發！
                     m_df = pd.merge(h_df, h_intel, on='代號', how='left')
                     m_df['名稱'] = m_df['代號'].map(TWSE_NAME_MAP).fillna('未知')
         except Exception as e: st.error(f"❌ 讀取持股部位失敗：{e}")
@@ -454,14 +496,14 @@ if len(chip_db) >= 1:
                             grade_color = COLORS['red']
                             grade_text = "🛑 嚴禁接刀 (D級)"
                             advice = f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底，以免被套牢！"
-                        elif bias > 10:
+                        elif bias > 7: # 👉 V4：沙盤推演同步改為 7% 警告
                             grade_color = COLORS['accent']
                             grade_text = "⚠️ 追高警告 (C級)"
-                            advice = f"乖離率高達 {bias:.1f}%。現在進場極易買在短線最高點，請耐心等它拉回 M5 附近。"
+                            advice = f"乖離率高達 {bias:.1f}%。超過 7% 極易買在短線最高點，除非爆量突破，否則請等它拉回 M5 附近。"
                         elif p_now > m5 and win_rate >= 50:
                             grade_color = COLORS['primary']
                             grade_text = "👑 准許出兵 (S/A級)"
-                            advice = f"多頭排列且歷史回測勝率達 {win_rate:.0f}%！防守底線設在 {sl_price:.1f}，可果斷建倉。"
+                            advice = f"多頭結構且回測勝率達 {win_rate:.0f}%！防守底線嚴格設於 {sl_price:.1f}，可依戰術進場。"
                         else:
                             grade_color = COLORS['green']
                             grade_text = "⚖️ 穩健觀察 (B級)"
@@ -514,10 +556,9 @@ if len(chip_db) >= 1:
                 final_rank.loc[final_rank['今日放量'] == True, 'Score'] += 100 
                 rank_sorted = final_rank.sort_values('Score', ascending=False).reset_index(drop=True)
                 
-                s_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 55) & (rank_sorted['均報(%)'] >= 1.5) & (rank_sorted['今日放量'] == True) & (rank_sorted['連買'] >= 2)
+                s_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 55) & (rank_sorted['均報(%)'] >= 1.5) & (rank_sorted['連買'] >= 2)
                 a_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 50) & (rank_sorted['均報(%)'] >= 1.0) & (rank_sorted['連買'] >= 1)
                 
-                # 👉 (保留您已修復的地雷一)
                 b_mask = (~s_mask) & (~a_mask) & (rank_sorted['現價'] >= rank_sorted['M10']) & (rank_sorted['勝率(%)'] > 50) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1) & (rank_sorted['乖離(%)'] < 10)
                 c_mask = (~s_mask) & (~a_mask) & (~b_mask) & (rank_sorted['現價'] >= rank_sorted['M10']) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1)
 
@@ -548,8 +589,6 @@ if len(chip_db) >= 1:
                                 
                                 p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
                                 qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
-                                
-                                # 👉 修復地雷二：加上 .replace(',', '') 防止千分位核爆
                                 p_cost = float(str(p_cost_raw).replace(',', '').strip()) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0.0
                                 qty = float(str(qty_raw).replace(',', '').strip()) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0.0
                                 
@@ -557,8 +596,7 @@ if len(chip_db) >= 1:
                                     buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
                                     sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
                                     ret = ((sell_revenue_net - buy_cost_total) / buy_cost_total) * 100 if buy_cost_total > 0 else 0
-                                else:
-                                    ret = 0.0
+                                else: ret = 0.0
                                 
                                 m5_raw = r.get('M5', 0)
                                 m5 = float(m5_raw) if pd.notna(m5_raw) else 0.0
@@ -592,12 +630,13 @@ if len(chip_db) >= 1:
                     for i in range(len(ui_top)):
                         r = ui_top.iloc[i]
                         with cols_s[i]:
+                            # 👉 V4：卡片植入「戰術型態」標籤
                             st.markdown(f"""
                             <div class="tier-card" style="border-top: 5px solid {border_color};">
                                 <h3 style="margin:0; color:{title_color};">{r['名次']}. {r['名稱_x']} ({r['代號']})</h3>
                                 <p style="color:{COLORS['subtext']}; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
                                 <div style="background-color: {COLORS['bg']}; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
-                                    📊 <b>職業回測 (隔日進場/-3%損):</b><br>
+                                    <b>{r['戰術型態']}</b><br>
                                     勝率：<span class="highlight-green">{r['勝率(%)']:.1f}%</span> | 均報：<span class="highlight-accent">+{r['均報(%)']:.2f}%</span>
                                 </div>
                                 <div style="font-size: 15px; line-height: 1.6;">
@@ -614,7 +653,7 @@ if len(chip_db) >= 1:
                 
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
-                    styled_b = (ui_b[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','均報(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱'})
+                    styled_b = (ui_b[['名次','評級','代號','名稱_x','產業','戰術型態','安全指數','勝率(%)','均報(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱'})
                                     .style.set_properties(**table_style)
                                     .format({'現價':'{:.2f}', '停損價':'{:.2f}', '勝率(%)':'{:.1f}%', '均報(%)':'{:.2f}%'})
                                     .map(risk_color, subset=['安全指數'])
@@ -626,8 +665,8 @@ if len(chip_db) >= 1:
                 
                 if ui_c.empty: st.info("💡 今日無 C 級潛伏標的。")
                 else:
-                    ui_c['戰術'] = ui_c.apply(lambda r: "💎 低檔潛伏" if r['乖離(%)'] < 3 else ("🚀 突破點火" if r['今日放量'] else "⏳ 盤整"), axis=1)
-                    styled_c = (ui_c[['名次','評級','代號','名稱_x','產業','安全指數','勝率(%)','現價','乖離(%)','連買','戰術']].rename(columns={'名稱_x':'名稱'})
+                    # C級不再用舊版標籤，直接繼承量化引擎的戰術
+                    styled_c = (ui_c[['名次','評級','代號','名稱_x','產業','戰術型態','安全指數','勝率(%)','現價','乖離(%)','連買']].rename(columns={'名稱_x':'名稱'})
                                     .style.set_properties(**table_style)
                                     .format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%'})
                                     .map(risk_color, subset=['安全指數']))
@@ -675,11 +714,9 @@ if len(chip_db) >= 1:
                         p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
                         qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
                         
-                        # 👉 修復地雷二：加上 .replace(',', '') 防止千分位核爆
                         p_cost = float(str(p_cost_raw).replace(',', '').strip()) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0.0
                         qty = float(str(qty_raw).replace(',', '').strip()) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0.0
                         
-                        # 👉 修復地雷三引發的計算錯誤：確保沒有報價時不會算出負無限大的虧損
                         if p_now > 0:
                             buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
                             sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
@@ -700,7 +737,6 @@ if len(chip_db) >= 1:
                         border_col = COLORS['primary'] if glow_class else COLORS['border']
                         ret_col = COLORS['red'] if pnl > 0 else (COLORS['green'] if pnl < 0 else COLORS['text'])
                         
-                        # 👉 修復地雷三的卡片顯示狀態：如果剛上市沒有均線資料，給予專屬提示
                         if p_now == 0.0 or m10 == 0.0:
                             struct = "⚪ 訊號不足 (無有效報價/剛上市)"
                             coach = "無法取得完整均線數據，請手動確認走勢。"
@@ -769,4 +805,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v24.3</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v24.4</p>", unsafe_allow_html=True)
