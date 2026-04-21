@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
-import urllib3
-from datetime import datetime, timedelta
+from datetime import datetime
 import time
-import yfinance as yf
-import concurrent.futures
 import ssl
 from streamlit_cookies_controller import CookieController
+
+# 👉 V6：載入全新拆分的後勤大腦與雷達模組
+from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel
+from quant_engine import run_sandbox_sim, level2_quant_engine
 
 try:
     _create_unverified_https_context = ssl._create_unverified_context
@@ -19,8 +19,6 @@ from manual import MANUAL_TEXT, HISTORY_TEXT
 import aar  
 import sidebar 
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 st.set_page_config(
     page_title="我要賺大錢",
     page_icon="💰️",
@@ -29,12 +27,10 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 🔒 專屬門禁系統 (V6: 導入 st.secrets 資安保險箱)
+# 🔒 專屬門禁系統 (st.secrets 資安保險箱)
 # ---------------------------------------------------------
 controller = CookieController()
 auth_status = controller.get('v3_auth_token')
-
-# 從保險箱讀取密碼，若未設定則預設為 1023
 SYS_PWD = st.secrets.get("sys_pwd", "1023")
 
 if auth_status != 'verified_auth':
@@ -81,400 +77,19 @@ fee_discount = configs["fee_discount"]
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.0</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V6 (高效能引擎版) ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V6 (機構級中台架構) ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
-@st.cache_data(ttl=86400, show_spinner=False)
-def load_industry_map():
-    ind_map, name_map = {}, {}
-    try:
-        df = pd.read_csv("industry_map.csv", dtype=str)
-        for _, row in df.iterrows():
-            cid = str(row['代號']).strip()
-            ind_map[cid] = str(row['產業']).strip()
-            name_map[cid] = str(row['名稱']).strip()
-    except: pass 
-    return ind_map, name_map
-
+# 📡 呼叫 Data Center 取得基礎資料
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
-
-def safe_download(sid, retries=2):
-    for suffix in [".TW", ".TWO"]:
-        for _ in range(retries):
-            try:
-                sym = f"{sid}{suffix}"
-                df = yf.Ticker(sym).history(period="3mo")
-                if not df.empty and len(df) > 5: return df
-            except: time.sleep(0.5 + np.random.rand())
-    return pd.DataFrame()
-
-# 🔮 沙盤推演 (買前體檢)
-@st.cache_data(ttl=3600, show_spinner=False) # V6: 統一快取為 1 小時
-def run_sandbox_sim(sid):
-    df = safe_download(sid)
-    if df is None or df.empty or len(df) < 20: return None
-    close_s, open_s, vol_s = df['Close'], df['Open'], df['Volume']
-    p_now = float(close_s.iloc[-1])
-    m5 = float(close_s.rolling(5).mean().iloc[-1])
-    m10 = float(close_s.rolling(10).mean().iloc[-1])
-    m20 = float(close_s.rolling(20).mean().iloc[-1])
-    bias = ((p_now - m20) / m20) * 100
-
-    df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': df['High'], 'Low': df['Low'], 'Volume': df['Volume']})
-    df_bt['MA5'] = df_bt['Close'].rolling(5).mean()
-    df_bt['MA10'] = df_bt['Close'].rolling(10).mean()
-    df_bt['MA20'] = df_bt['Close'].rolling(20).mean()
-    df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
-    df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
-    
-    df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
-    df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
-    df_bt['D'] = df_bt['K'].ewm(alpha=1/3, adjust=False).mean()
-    df_bt['RedK'] = df_bt['Close'] > df_bt['Open']
-    df_bt['ClosePos'] = np.where((df_bt['High'] - df_bt['Low']) > 0, (df_bt['Close'] - df_bt['Low']) / (df_bt['High'] - df_bt['Low']), 0)
-    
-    sig_trend = (df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20'])
-    sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98) & (df_bt['ClosePos'] > 0.7)
-    on_m5 = (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] <= df_bt['MA5'] * 1.03)
-    on_m10 = (df_bt['Close'] >= df_bt['MA10']) & (df_bt['Close'] <= df_bt['MA10'] * 1.03)
-    bias_col = (df_bt['Close'] - df_bt['MA20']) / df_bt['MA20'] * 100
-    sig_b = (bias_col < 7) & df_bt['RedK'] & (on_m5 | on_m10) & (df_bt['K'] > df_bt['D'])
-
-    sig_mask = sig_trend & (sig_a | sig_b)
-    signals_idx = df_bt[sig_mask].index
-
-    sim_returns = []
-    for i in range(len(signals_idx)):
-        loc_idx = df_bt.index.get_loc(signals_idx[i])
-        if loc_idx + 1 >= len(df_bt): continue
-        entry_p, prev_close = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
-        if entry_p > prev_close * 1.02: continue 
-
-        # V6: 放寬視野，回測向未來推進 20 天！
-        future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21]
-        if future_data.empty: continue
-
-        stop_loss, sold_half, ret = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97), False, 0.0
-        for f_idx, row in future_data.iterrows():
-            curr_p = row['Close']
-            curr_m5 = row['MA5']
-            
-            if curr_p > entry_p * 1.05: stop_loss = max(stop_loss, entry_p) 
-            
-            if not sold_half and curr_p >= entry_p * 1.06:
-                sold_half = True
-            
-            if sold_half:
-                if curr_p < curr_m5:
-                    ret = 0.5 * 0.06 + 0.5 * ((curr_m5 - entry_p) / entry_p)
-                    break
-            else:
-                if curr_p < stop_loss:
-                    ret = (stop_loss - entry_p) / entry_p
-                    break
-        else:
-            final_p = future_data['Close'].iloc[-1]
-            if sold_half:
-                ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p)
-            else:
-                ret = (final_p - entry_p) / entry_p
-        sim_returns.append(ret)
-
-    # V6: 勝率失真防呆
-    if len(sim_returns) < 5:
-        win_rate = 50.0
-    else:
-        win_rate = (np.array(sim_returns) > 0).mean() * 100
-        
-    name = TWSE_NAME_MAP.get(sid, sid)
-
-    return {
-        '代號': sid, '名稱': name, '現價': p_now,
-        'M5': m5, 'M10': m10, 'M20': m20, '乖離': bias,
-        '勝率': win_rate, '停損價': max(m10, p_now * 0.97)
-    }
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_holding_intel(id_tuple):
-    id_list = list(id_tuple)
-    intel_results = []
-    if not id_list: return pd.DataFrame()
-    
-    bulk_data = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, sid): sid for sid in id_list}
-        for future in concurrent.futures.as_completed(futures):
-            sid, df = future.result()
-            if df is not None and not df.empty: 
-                bulk_data[sid] = df
-                
-    for sid in id_list:
-        try:
-            df_stock = bulk_data.get(sid)
-            if df_stock is None or df_stock.empty: continue
-            close_s = df_stock['Close']
-            if len(close_s) < 20: continue
-            
-            p_now = float(close_s.iloc[-1])
-            m5 = float(close_s.rolling(5).mean().iloc[-1])
-            m10 = float(close_s.rolling(10).mean().iloc[-1])
-            m20 = float(close_s.rolling(20).mean().iloc[-1])
-            
-            ind = TWSE_IND_MAP.get(sid) or "其他"
-            if sid.startswith('00'): ind = "ETF"
-            
-            intel_results.append({
-                '代號': sid, '產業': ind, '現價': p_now,
-                'M5': m5, 'M10': m10, 'M20': m20,
-                '停損價': max(m10, p_now * 0.97)
-            })
-        except: continue
-    return pd.DataFrame(intel_results)
-
-@st.cache_data(ttl=14400, show_spinner=False)
-def get_macro_dashboard():
-    score = 5.0
-    macro_data = []
-    indices = {"^TWII": ("台股加權", "2330.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
-    
-    for main_sym, (base_name, fallback_sym) in indices.items():
-        display_name = base_name
-        hist = safe_download(main_sym.replace('^','')) 
-        if hist.empty:
-            hist = yf.Ticker(fallback_sym).history(period="3mo")
-            if not hist.empty: display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
-        
-        if hist.empty:
-            macro_data.append({"戰區": display_name, "現值": "抓取失敗", "月線": "-", "狀態": "⚪ 斷線"})
-            continue
-            
-        try:
-            close_s = hist['Close']
-            last_p = float(close_s.iloc[-1])
-            ma20 = float(close_s.rolling(20).mean().iloc[-1])
-            status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
-            
-            if base_name == "恐慌指數":
-                status = "🔴 恐慌" if last_p > 25 else ("🟡 警戒" if last_p > 18 else "🟢 安定")
-                if last_p > 25: score -= 2
-                elif last_p < 18: score += 1
-            else:
-                if last_p > ma20: score += 1
-                else: score -= 1
-                
-            macro_data.append({"戰區": display_name, "現值": f"{last_p:.2f}", "月線": f"{ma20:.2f}", "狀態": status})
-        except: 
-            macro_data.append({"戰區": display_name, "現值": "計算失敗", "月線": "-", "狀態": "⚪ 斷線"})
-            continue
-    return max(1, min(10, int(score))), pd.DataFrame(macro_data)
-
 MACRO_SCORE, MACRO_DF = get_macro_dashboard()
-
-@st.cache_data(ttl=14400, show_spinner=False)
-def fetch_chips_data():
-    chip_dict = {}
-    date_ptr = datetime.now()
-    attempts = 0
-    while len(chip_dict) < 10 and attempts < 15:
-        if date_ptr.weekday() < 5:
-            d_str = date_ptr.strftime("%Y%m%d")
-            url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={d_str}&selectType=ALLBUT0999&response=json"
-            try:
-                res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5, verify=False).json()
-                if res.get('stat') == 'OK':
-                    df = pd.DataFrame(res['data'], columns=res['fields'])
-                    tru_cols = [c for c in df.columns if '投信' in c and '買賣超' in c]
-                    for_cols = [c for c in df.columns if '外資' in c and '買賣超' in c]
-                    self_cols = [c for c in df.columns if '自營' in c and '買賣超' in c]
-                    def parse_col(col_name): return pd.to_numeric(df[col_name].astype(str).str.replace(',', ''), errors='coerce').fillna(0) / 1000
-                    clean = pd.DataFrame()
-                    clean['代號'] = df[[c for c in df.columns if '代號' in c][0]]
-                    clean['名稱'] = df[[c for c in df.columns if '名稱' in c][0]]
-                    clean['投信(張)'] = parse_col(tru_cols[0]) if tru_cols else 0
-                    clean['外資(張)'] = sum(parse_col(c) for c in for_cols)
-                    clean['自營(張)'] = sum(parse_col(c) for c in self_cols)
-                    clean['三大法人合計'] = clean['投信(張)'] + clean['外資(張)'] + clean['自營(張)']
-                    chip_dict[d_str] = clean
-                    time.sleep(0.2)
-            except: pass
-        date_ptr -= timedelta(days=1)
-        attempts += 1
-    return chip_dict
 
 def format_lots(shares):
     shares = int(shares)
     lots = shares / 1000
     if lots <= 0: return "0"
     return f"{lots:.3f}".rstrip('0').rstrip('.')
-
-def fetch_single_stock_batch(sid):
-    df = safe_download(sid)
-    if not df.empty: return sid, df
-    return sid, None
-
-# 🎯 V6 量化引擎：漏斗過濾光速引擎
-@st.cache_data(ttl=3600, show_spinner=False)
-def level2_quant_engine(id_tuple):
-    id_list = list(id_tuple)
-    intel_results = []
-    if not id_list: return pd.DataFrame()
-    bulk_data = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, sid): sid for sid in id_list}
-        for future in concurrent.futures.as_completed(futures):
-            sid, df = future.result()
-            if df is not None: bulk_data[sid] = df
-            
-    for sid in id_list:
-        try:
-            if not sid.startswith('00') and not sid.isdigit(): continue
-            ind = TWSE_IND_MAP.get(sid) or "其他"
-            if sid.startswith('00'): ind = "ETF"
-            if "金融" in ind or "保險" in ind: continue
-            df_stock = bulk_data.get(sid)
-            if df_stock is None or df_stock.empty: continue
-            
-            close_s, open_s, high_s, low_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['High'], df_stock['Low'], df_stock['Volume']
-            p_now = float(close_s.iloc[-1])
-            open_now = float(open_s.iloc[-1])
-            high_now = float(high_s.iloc[-1])
-            low_now = float(low_s.iloc[-1])
-            prev_close = float(close_s.iloc[-2]) if len(close_s) > 1 else open_now
-            vol_now = float(vol_s.iloc[-1]) / 1000
-            
-            # 🛑 V5：過濾今日跳空開高 > 2% 的標的
-            if ((open_now - prev_close) / prev_close * 100) > 2.0:
-                continue
-                
-            if p_now < 20 or vol_now < 1.5: continue
-            
-            m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
-            
-            # 🏎️ V6 Layer 1 光速快篩：如果連 10 日線都站不穩，直接無情踢出！(省去後續 60% 回測算力)
-            if p_now < m10:
-                continue
-                
-            vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1]) / 1000
-            bias = ((p_now - m20) / m20) * 100
-            
-            rsv_s = (close_s - low_s.rolling(9).min()) / (high_s.rolling(9).max() - low_s.rolling(9).min()) * 100
-            k_s = rsv_s.ewm(alpha=1/3, adjust=False).mean()
-            d_s = k_s.ewm(alpha=1/3, adjust=False).mean()
-            k_now, d_now = float(k_s.iloc[-1]), float(d_s.iloc[-1])
-            red_k = p_now > open_now
-            
-            close_position = (p_now - low_now) / (high_now - low_now) if high_now > low_now else 0
-            is_strong_candle = ((p_now - open_now) / open_now) > 0.04
-            
-            trend_strength = (m5 > m10) and (m10 > m20)
-            
-            vol_ratio = vol_now / vol_ma5 if vol_ma5 > 0 else 0
-            is_breakout_base = (vol_ratio > 1.5) and (k_now > 80) and (p_now >= close_s.iloc[-20:].max() * 0.98)
-            
-            tactic_a_strong = is_breakout_base and (vol_ratio >= 1.8) and (close_position > 0.7)
-            tactic_a_weak = is_breakout_base and (not tactic_a_strong)
-            
-            on_m5 = (p_now >= m5) and (p_now <= m5 * 1.03)
-            on_m10 = (p_now >= m10) and (p_now <= m10 * 1.03)
-            tactic_b = (bias < 7) and red_k and (on_m5 or on_m10) and (k_now > d_now)
-            
-            is_candidate = trend_strength and (is_breakout_base or tactic_b)
-            
-            if tactic_a_strong and tactic_b: tactic_label = "🔥 雙戰術共振"
-            elif tactic_a_strong: tactic_label = "🚀 S級主升段 (重擊)"
-            elif tactic_a_weak: tactic_label = "⚠️ 降級弱突破 (避雷)"
-            elif tactic_b: tactic_label = "🛡️ 穩健回踩"
-            else: tactic_label = "⏳ 觀望盤整"
-            
-            # 🏎️ V6 Layer 2 精銳回測
-            df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': high_s, 'Low': low_s, 'Volume': vol_s})
-            df_bt['MA5'], df_bt['MA10'], df_bt['MA20'], df_bt['RollMax20'] = df_bt['Close'].rolling(5).mean(), df_bt['Close'].rolling(10).mean(), df_bt['Close'].rolling(20).mean(), df_bt['Close'].rolling(20).max()
-            df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
-            df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
-            df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
-            df_bt['D'] = df_bt['K'].ewm(alpha=1/3, adjust=False).mean()
-            df_bt['RedK'] = df_bt['Close'] > df_bt['Open']
-            df_bt['ClosePos'] = np.where((df_bt['High'] - df_bt['Low']) > 0, (df_bt['Close'] - df_bt['Low']) / (df_bt['High'] - df_bt['Low']), 0)
-            
-            sig_trend = (df_bt['MA5'] > df_bt['MA10']) & (df_bt['MA10'] > df_bt['MA20'])
-            sig_a = (df_bt['Volume'] > df_bt['Vol_MA5'] * 1.5) & (df_bt['K'] > 80) & (df_bt['Close'] >= df_bt['RollMax20'] * 0.98) & (df_bt['ClosePos'] > 0.7)
-            bt_on_m5 = (df_bt['Close'] >= df_bt['MA5']) & (df_bt['Close'] <= df_bt['MA5'] * 1.03)
-            bt_on_m10 = (df_bt['Close'] >= df_bt['MA10']) & (df_bt['Close'] <= df_bt['MA10'] * 1.03)
-            bias_col = (df_bt['Close'] - df_bt['MA20']) / df_bt['MA20'] * 100
-            sig_b = (bias_col < 7) & df_bt['RedK'] & (bt_on_m5 | bt_on_m10) & (df_bt['K'] > df_bt['D'])
-            
-            sig_mask = sig_trend & (sig_a | sig_b)
-            signals_idx = df_bt[sig_mask].index
-            
-            sim_returns = []
-            for i in range(len(signals_idx)):
-                loc_idx = df_bt.index.get_loc(signals_idx[i])
-                if loc_idx + 1 >= len(df_bt): continue 
-                entry_p, prev_close_bt = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
-                if entry_p > prev_close_bt * 1.02: continue
-                
-                # V6: 拉長至 20 天探測視野
-                future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21] 
-                if future_data.empty: continue
-                
-                stop_loss, sold_half, ret = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97), False, 0.0
-                for f_idx, row in future_data.iterrows():
-                    curr_p = row['Close']
-                    curr_m5 = row['MA5']
-                    if curr_p > entry_p * 1.05: stop_loss = max(stop_loss, entry_p) 
-                    
-                    if not sold_half and curr_p >= entry_p * 1.06:
-                        sold_half = True
-                    
-                    if sold_half:
-                        if curr_p < curr_m5: 
-                            ret = 0.5 * 0.06 + 0.5 * ((curr_m5 - entry_p) / entry_p)
-                            break
-                    else:
-                        if curr_p < stop_loss:
-                            ret = (stop_loss - entry_p) / entry_p
-                            break
-                else: 
-                    final_p = future_data['Close'].iloc[-1]
-                    if sold_half:
-                        ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p)
-                    else:
-                        ret = (final_p - entry_p) / entry_p
-                sim_returns.append(ret)
-                
-            # V6: 勝率失真防呆
-            if len(sim_returns) < 5:
-                win_rate, avg_ret = 50.0, 0.0
-            else:
-                win_rate, avg_ret = ((np.array(sim_returns) > 0).mean() * 100, np.array(sim_returns).mean() * 100)
-
-            s_score = MACRO_SCORE
-            if p_now > m5: s_score += 1
-            if p_now > m20: s_score += 1
-            else: s_score -= 2
-            
-            if is_strong_candle: s_score += 1
-            
-            hot_industries = ["半導體", "電腦及週邊設備業", "電子零組件業", "其他電子業"]
-            if any(h_ind in ind for h_ind in hot_industries):
-                s_score += 1
-            
-            is_strong_breakout_label = tactic_label in ["🔥 雙戰術共振", "🚀 S級主升段 (重擊)"]
-            if not is_strong_breakout_label:
-                if bias > 7: s_score -= 2
-                elif 0 <= bias <= 5: s_score += 2
-            else:
-                if 0 <= bias <= 5: s_score += 2
-
-            intel_results.append({
-                '代號': sid, '名稱': TWSE_NAME_MAP.get(sid, sid), '產業': ind, '現價': p_now, '成交量': vol_now, '今日放量': (vol_now > vol_ma5 * 1.5),
-                'M5': m5, 'M10': m10, 'M20': m20, '乖離(%)': bias, '基本達標': is_candidate, '安全指數': max(1, min(10, int(s_score))),
-                '勝率(%)': win_rate, '均報(%)': avg_ret, '停損價': max(m10, p_now * 0.97), '停利價': p_now * 1.10, '原始風險差額': p_now - max(m10, p_now * 0.97),
-                '戰術型態': tactic_label
-            })
-        except: continue
-    return pd.DataFrame(intel_results)
 
 def risk_color(val):
     try:
@@ -518,7 +133,8 @@ if len(chip_db) >= 1:
                 
             if not h_df.empty and '代號' in h_df.columns:
                 h_df['代號'] = h_df['代號'].astype(str).str.strip()
-                h_intel = get_holding_intel(tuple(h_df['代號'].tolist()))
+                # 📡 呼叫 Data Center 取得持股現況
+                h_intel = get_holding_intel(tuple(h_df['代號'].tolist()), TWSE_IND_MAP)
                 if not h_intel.empty:
                     m_df = pd.merge(h_df, h_intel, on='代號', how='left')
                     m_df['名稱'] = m_df['代號'].map(TWSE_NAME_MAP).fillna('未知')
@@ -537,7 +153,8 @@ if len(chip_db) >= 1:
             if sim_btn and sim_id:
                 with st.spinner("🧠 正在呼叫量化引擎掃描..."):
                     sid_clean = str(sim_id).strip()
-                    res = run_sandbox_sim(sid_clean)
+                    # 🧠 呼叫 Quant Engine 進行沙盤推演
+                    res = run_sandbox_sim(sid_clean, TWSE_NAME_MAP)
                     if res:
                         p_now = res['現價']
                         m5, m10, m20 = res['M5'], res['M10'], res['M20']
@@ -593,8 +210,10 @@ if len(chip_db) >= 1:
         calc_list = tuple(set(pool_ids + top_80_chips))
         
         if calc_list and MACRO_SCORE > 3: 
-            intel_df = level2_quant_engine(calc_list).copy() 
-            if not intel_df.empty:
+            # 🧠 呼叫 Quant Engine 進行大部隊篩選
+            intel_df = level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE)
+            
+            if intel_df is not None and not intel_df.empty:
                 def calc_suggested_lots(row):
                     if row['原始風險差額'] > 0:
                         suggested_shares = min(risk_amount / row['原始風險差額'], (total_capital * 0.15) / row['現價'])
@@ -740,7 +359,7 @@ if len(chip_db) >= 1:
             
         st.markdown("#### <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
         main_chips = today_df.sort_values('三大法人合計', ascending=False).head(200)
-        if 'intel_df' in locals() and not intel_df.empty:
+        if 'intel_df' in locals() and intel_df is not None and not intel_df.empty:
             main_chips = pd.merge(main_chips, intel_df[['代號', '安全指數']], on='代號', how='left')
             main_chips['安全指數'] = main_chips['安全指數'].apply(lambda x: f"{int(x)}" if pd.notna(x) else "-")
         else: main_chips['安全指數'] = '-'
@@ -819,6 +438,7 @@ if len(chip_db) >= 1:
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
                         
+                        # 👉 UI 修復：將 margin-bottom 調短為 4px，padding 壓扁為 6px 12px，卡片更俐落！
                         html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px; background-color: {COLORS['card']}; border-radius: 4px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                     
                     except Exception as e:
@@ -848,7 +468,6 @@ if len(chip_db) >= 1:
 
         st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
         st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
-        # 從 secrets 讀取 FinMind Token
         FM_TOKEN = st.secrets.get("fm_token", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiZGVraTEwMjMiLCJlbWFpbCI6ImRla2kxMDIzQGdtYWlsLmNvbSJ9.-wVo_6BD8ac8cGCOi8C3J58KUGZ1c0CMwTU9lYPltNM")
         aar.render_aar_tab(aar_sheet_url, fee_discount, FM_TOKEN, COLORS)
 
