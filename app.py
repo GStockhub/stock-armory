@@ -393,12 +393,12 @@ if len(chip_db) >= 1:
     t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (S/A/B/C)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
 
     with t_rank:
-        st.markdown("### 🔮 <span class='highlight-primary'>戰神沙盤推演 (買進前體檢)</span>", unsafe_allow_html=True)
+        st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演(買前體檢)</span>", unsafe_allow_html=True)
         col_s1, col_s2 = st.columns([1, 3])
         with col_s1:
-            st.caption("💡 輸入代號，預防手殘接刀")
-            sim_id = st.text_input("股票代號", placeholder="例: 2330 或 2337", label_visibility="collapsed")
-            sim_btn = st.button("⚡ 執行體檢", use_container_width=True)
+            st.caption("💡 輸入代號，防手殘接刀")
+            sim_id = st.text_input("股票代號", placeholder="例: 2330 ", label_visibility="collapsed")
+            sim_btn = st.button("⚡執行體檢", use_container_width=True)
         with col_s2:
             if sim_btn and sim_id:
                 with st.spinner("🧠 正在呼叫量化引擎掃描..."):
