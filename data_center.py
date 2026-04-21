@@ -22,9 +22,21 @@ def load_industry_map():
     except: pass 
     return ind_map, name_map
 
-# 📡 V26：三擎驅動報價源 (FinMind -> YFinance Fallback)
+# ==========================================
+# 📈 報價引擎 (OHLCV)：yfinance 優先 -> FinMind 備援
+# (TWSE 抓歷史 K 線極易被永久鎖 IP，故不列入報價序列)
+# ==========================================
 def safe_download(sid, fm_token=None, retries=2):
-    # 1. 主力引擎：FinMind (最穩定、無 Rate Limit 問題)
+    # 🛡️ 第一引擎：YFinance (專職報價，速度快、耐操)
+    for suffix in [".TW", ".TWO"]:
+        for _ in range(retries):
+            try:
+                sym = f"{sid}{suffix}"
+                df = yf.Ticker(sym).history(period="3mo")
+                if not df.empty and len(df) > 5: return df
+            except: time.sleep(0.5 + np.random.rand())
+            
+    # 🚀 第二引擎：FinMind (YFinance 陣亡時無縫接軌)
     if fm_token and fm_token.strip() != "":
         try:
             start_date = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d")
@@ -36,17 +48,8 @@ def safe_download(sid, fm_token=None, retries=2):
                 df['Date'] = pd.to_datetime(df['Date'])
                 df.set_index('Date', inplace=True)
                 if len(df) > 20: return df
-        except: pass # 若 FinMind 斷線，靜默進入備援
-            
-    # 2. 備援引擎：YFinance
-    for suffix in [".TW", ".TWO"]:
-        for _ in range(retries):
-            try:
-                sym = f"{sid}{suffix}"
-                df = yf.Ticker(sym).history(period="3mo")
-                if not df.empty and len(df) > 5: return df
-            except: time.sleep(0.5 + np.random.rand())
-            
+        except: pass
+        
     return pd.DataFrame()
 
 def fetch_single_stock_batch(sid, fm_token=None):
@@ -58,7 +61,6 @@ def fetch_single_stock_batch(sid, fm_token=None):
 def get_macro_dashboard():
     score = 5.0
     macro_data = []
-    # 大盤指數使用 YFinance 抓取即可
     indices = {"^TWII": ("台股加權", "2330.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
     
     for main_sym, (base_name, fallback_sym) in indices.items():
@@ -92,50 +94,77 @@ def get_macro_dashboard():
             continue
     return max(1, min(10, int(score))), pd.DataFrame(macro_data)
 
+# ==========================================
+# 📊 籌碼引擎 (三大法人)：TWSE 優先 -> FinMind 備援
+# (YFinance 不提供台灣特有的三大法人資料，故不列入)
+# ==========================================
 @st.cache_data(ttl=14400, show_spinner=False)
-def fetch_chips_data():
+def fetch_chips_data(fm_token=None):
     chip_dict = {}
     date_ptr = datetime.now()
     attempts = 0
-    while len(chip_dict) < 10 and attempts < 15:
+    while len(chip_dict) < 10 and attempts < 20:
         if date_ptr.weekday() < 5:
             d_str = date_ptr.strftime("%Y%m%d")
+            fm_d_str = date_ptr.strftime("%Y-%m-%d") 
+            success = False
+            
+            # 🛡️ 第一引擎：TWSE 官方 API (最即時)
             url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={d_str}&selectType=ALLBUT0999&response=json"
             try:
-                # 🚨 拆除靜默防護，印出伺服器真實回應
                 r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5, verify=False)
+                if r.status_code == 200:
+                    res = r.json()
+                    if res.get('stat') == 'OK':
+                        df = pd.DataFrame(res['data'], columns=res['fields'])
+                        tru_cols = [c for c in df.columns if '投信' in c and '買賣超' in c]
+                        for_cols = [c for c in df.columns if '外資' in c and '買賣超' in c]
+                        self_cols = [c for c in df.columns if '自營' in c and '買賣超' in c]
+                        def parse_col(col_name): return pd.to_numeric(df[col_name].astype(str).str.replace(',', ''), errors='coerce').fillna(0) / 1000
+                        clean = pd.DataFrame()
+                        clean['代號'] = df[[c for c in df.columns if '代號' in c][0]]
+                        clean['名稱'] = df[[c for c in df.columns if '名稱' in c][0]]
+                        clean['投信(張)'] = parse_col(tru_cols[0]) if tru_cols else 0
+                        clean['外資(張)'] = sum(parse_col(c) for c in for_cols)
+                        clean['自營(張)'] = sum(parse_col(c) for c in self_cols)
+                        clean['三大法人合計'] = clean['投信(張)'] + clean['外資(張)'] + clean['自營(張)']
+                        chip_dict[d_str] = clean
+                        success = True
+            except: pass
+            
+            # 🚀 第二引擎：FinMind (TWSE 出現 307 被擋時無縫接軌)
+            if not success and fm_token and fm_token.strip() != "":
+                try:
+                    fm_url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&start_date={fm_d_str}&end_date={fm_d_str}&token={fm_token}"
+                    r_fm = requests.get(fm_url, timeout=5, verify=False)
+                    if r_fm.status_code == 200:
+                        res_fm = r_fm.json()
+                        if res_fm.get('msg') == 'success' and len(res_fm.get('data', [])) > 0:
+                            df_fm = pd.DataFrame(res_fm['data'])
+                            df_fm['net'] = (df_fm['buy'] - df_fm['sell']) / 1000
+                            pivot_df = df_fm.pivot_table(index='stock_id', columns='name', values='net', aggfunc='sum').fillna(0)
+                            
+                            clean = pd.DataFrame()
+                            clean['代號'] = pivot_df.index
+                            trust_cols = [c for c in pivot_df.columns if '投信' in c]
+                            for_cols = [c for c in pivot_df.columns if '外資' in c]
+                            deal_cols = [c for c in pivot_df.columns if '自營' in c]
+                            
+                            clean['投信(張)'] = pivot_df[trust_cols].sum(axis=1).values if trust_cols else 0
+                            clean['外資(張)'] = pivot_df[for_cols].sum(axis=1).values if for_cols else 0
+                            clean['自營(張)'] = pivot_df[deal_cols].sum(axis=1).values if deal_cols else 0
+                            clean['三大法人合計'] = clean['投信(張)'] + clean['外資(張)'] + clean['自營(張)']
+                            
+                            chip_dict[d_str] = clean
+                            success = True
+                except: pass
                 
-                # 如果證交所沒有回傳正常的 200 OK，立刻報警
-                if r.status_code != 200:
-                    st.error(f"🚨 TWSE 拒絕連線！狀態碼：{r.status_code} (可能被擋 IP 了)")
-                    
-                res = r.json()
-                
-                # 檢查證交所是不是回傳了「呼叫頻率過於頻繁」的警告
-                if res.get('stat') != 'OK':
-                    st.warning(f"⚠️ TWSE 回傳異常 [{d_str}]: {res.get('stat', '未知錯誤')}")
-                    
-                if res.get('stat') == 'OK':
-                    df = pd.DataFrame(res['data'], columns=res['fields'])
-                    tru_cols = [c for c in df.columns if '投信' in c and '買賣超' in c]
-                    for_cols = [c for c in df.columns if '外資' in c and '買賣超' in c]
-                    self_cols = [c for c in df.columns if '自營' in c and '買賣超' in c]
-                    def parse_col(col_name): return pd.to_numeric(df[col_name].astype(str).str.replace(',', ''), errors='coerce').fillna(0) / 1000
-                    clean = pd.DataFrame()
-                    clean['代號'] = df[[c for c in df.columns if '代號' in c][0]]
-                    clean['名稱'] = df[[c for c in df.columns if '名稱' in c][0]]
-                    clean['投信(張)'] = parse_col(tru_cols[0]) if tru_cols else 0
-                    clean['外資(張)'] = sum(parse_col(c) for c in for_cols)
-                    clean['自營(張)'] = sum(parse_col(c) for c in self_cols)
-                    clean['三大法人合計'] = clean['投信(張)'] + clean['外資(張)'] + clean['自營(張)']
-                    chip_dict[d_str] = clean
-                    time.sleep(0.2)
-            except Exception as e:
-                # 🚨 捕捉 JSON 解析失敗或網路斷線的真實錯誤
-                st.error(f"🚨 抓取 {d_str} 籌碼發生致命錯誤：{e}")
+            if success:
+                time.sleep(0.2)
                 
         date_ptr -= timedelta(days=1)
         attempts += 1
+        
     return chip_dict
 
 @st.cache_data(ttl=3600, show_spinner=False)
