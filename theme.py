@@ -15,9 +15,16 @@ THEMES = {
         "accent": "#D1D5DB", "green": "#22C55E", "red": "#EF4444"
     },
     "navy": {
-        "bg": "#0D1117", "card": "#161B22", "border": "#30363D",
-        "text": "#C9D1D9", "subtext": "#8B949E", "primary": "#58A6FF",
-        "accent": "#79C0FF", "green": "#3FB950", "red": "#FF7B72"
+        # 🦈 全新「鯊魚腹淺藍」專屬調色盤
+        "bg": "#E3EAEF",       # 鯊魚腹部的極淺灰藍色
+        "card": "#F0F5F9",     # 卡片稍亮，帶有一點點水光感
+        "border": "#BDCADA",   # 乾淨的鋼鐵藍灰邊框
+        "text": "#1A2530",     # 深海軍藍，取代純黑，更具高階質感
+        "subtext": "#6B7C8E",  # 沉穩的灰藍色副標題
+        "primary": "#2D74B4",  # 經典海軍藍，作為主按鈕和高亮
+        "accent": "#5FA5D9",   # 鯊魚背部的清澈亮灰藍
+        "green": "#20A05D",    # 柔和不刺眼的獲利綠
+        "red": "#D94848"       # 柔和不刺眼的停損紅
     },
     "milktea_tech": { 
         "bg": "#191614", "card": "#26211D", "border": "#3B342E",
@@ -106,7 +113,7 @@ def apply_custom_theme(mode="navy"):
     /* =========================
        🧾 卡片與表格
     ========================= */
-    .tier-card {{ background-color: {t['card']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
+    .tier-card {{ background-color: {t['card']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }}
     [data-testid="stDataFrame"] {{ border-radius: 8px !important; border: 1px solid {t['border']}; overflow: hidden; }}
 
     /* 👑 V3 核心：持股動態發光裝甲 */
@@ -140,7 +147,7 @@ def apply_custom_theme(mode="navy"):
        🎯 按鈕與清理
     ========================= */
     .stButton > button, .stDownloadButton > button {{ background-color: {t['card']} !important; color: {t['primary']} !important; border: 1px solid {t['border']} !important; border-radius: 6px; font-weight: 600 !important; transition: 0.3s; }}
-    .stButton > button:hover, .stDownloadButton > button:hover {{ background-color: {t['primary']} !important; color: {t['bg']} !important; border-color: {t['primary']} !important; box-shadow: 0 0 10px {t['primary']}55 !important; }}
+    .stButton > button:hover, .stDownloadButton > button:hover {{ background-color: {t['primary']} !important; color: {t['card']} !important; border-color: {t['primary']} !important; box-shadow: 0 0 10px {t['primary']}55 !important; }}
     #MainMenu, footer, .stDeployButton {{ display: none; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     </style>
