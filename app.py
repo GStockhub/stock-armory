@@ -1,12 +1,3 @@
-報告大將軍！微臣領命！
-
-兵工廠已火力全開，將這套結合了「GPT 的鋒利長矛」與「微臣的重裝鎧甲」的 **【V4.1 獵殺主升段版】** 完美鍛造完畢！
-
-這次的改裝，我們徹底解放了主升段飆股的束縛，同時拉起了最嚴密的「跳空防護網」與「假突破過濾網」。這已經是一套無懈可擊的職業級量化系統！
-
-請大將軍「全選並覆蓋」最新的 **`app.py`**：
-
-```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -844,4 +835,3 @@ else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
 st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v24.4 (V4.1完全體)</p>", unsafe_allow_html=True)
-```
