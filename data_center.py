@@ -97,13 +97,24 @@ def fetch_chips_data():
     chip_dict = {}
     date_ptr = datetime.now()
     attempts = 0
-    # 籌碼依然使用證交所原生爬蟲
     while len(chip_dict) < 10 and attempts < 15:
         if date_ptr.weekday() < 5:
             d_str = date_ptr.strftime("%Y%m%d")
             url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={d_str}&selectType=ALLBUT0999&response=json"
             try:
-                res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5, verify=False).json()
+                # 🚨 拆除靜默防護，印出伺服器真實回應
+                r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5, verify=False)
+                
+                # 如果證交所沒有回傳正常的 200 OK，立刻報警
+                if r.status_code != 200:
+                    st.error(f"🚨 TWSE 拒絕連線！狀態碼：{r.status_code} (可能被擋 IP 了)")
+                    
+                res = r.json()
+                
+                # 檢查證交所是不是回傳了「呼叫頻率過於頻繁」的警告
+                if res.get('stat') != 'OK':
+                    st.warning(f"⚠️ TWSE 回傳異常 [{d_str}]: {res.get('stat', '未知錯誤')}")
+                    
                 if res.get('stat') == 'OK':
                     df = pd.DataFrame(res['data'], columns=res['fields'])
                     tru_cols = [c for c in df.columns if '投信' in c and '買賣超' in c]
@@ -119,7 +130,10 @@ def fetch_chips_data():
                     clean['三大法人合計'] = clean['投信(張)'] + clean['外資(張)'] + clean['自營(張)']
                     chip_dict[d_str] = clean
                     time.sleep(0.2)
-            except: pass
+            except Exception as e:
+                # 🚨 捕捉 JSON 解析失敗或網路斷線的真實錯誤
+                st.error(f"🚨 抓取 {d_str} 籌碼發生致命錯誤：{e}")
+                
         date_ptr -= timedelta(days=1)
         attempts += 1
     return chip_dict
