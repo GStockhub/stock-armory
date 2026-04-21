@@ -15,6 +15,7 @@ try:
 except AttributeError: pass
 else: ssl._create_default_https_context = _create_unverified_https_context
 
+# 👉 V26.1: 將教戰手冊獨立引入，保持前線程式碼極致純淨！
 from manual import MANUAL_TEXT, HISTORY_TEXT
 import aar  
 import sidebar 
@@ -32,7 +33,7 @@ st.set_page_config(
 controller = CookieController()
 auth_status = controller.get('v3_auth_token')
 SYS_PWD = st.secrets.get("sys_pwd", "1023")
-FM_TOKEN = st.secrets.get("fm_token", "") # 📡 V26 取出 FinMind Token
+FM_TOKEN = st.secrets.get("fm_token", "") 
 
 if auth_status != 'verified_auth':
     st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V6 - 軍事管制區</h1>", unsafe_allow_html=True)
@@ -52,11 +53,47 @@ if auth_status != 'verified_auth':
     st.stop()
 
 # ---------------------------------------------------------
-# 📱 注入 RWD 防跑版變形裝甲
+# 📱 V26.1: 注入終極 RWD 與視覺優化裝甲
 # ---------------------------------------------------------
 st.markdown("""
 <style>
+/* 🎯 階級標籤縮小與美化 */
+.tier-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: bold;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+.badge-s { background-color: rgba(255, 75, 75, 0.1); color: #FF4B4B; border: 1px solid #FF4B4B; }
+.badge-a { background-color: rgba(255, 165, 0, 0.1); color: #FFA500; border: 1px solid #FFA500; }
+.badge-b { background-color: rgba(0, 200, 81, 0.1); color: #00C851; border: 1px solid #00C851; }
+.badge-c { background-color: rgba(128, 128, 128, 0.1); color: #A0A0A0; border: 1px solid #A0A0A0; }
+
+/* 完美對齊與間距優化 */
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    width: 100%;
+}
+.info-label { color: #A0A0A0; font-size: 14px; }
+.info-value { color: #FFFFFF; font-size: 14px; font-weight: 500; text-align: right; }
+
+/* 🛡️ RWD 與 Sidebar 擠壓防護 */
+@media (max-width: 1200px) {
+    [data-testid="stHorizontalBlock"] .stColumn {
+        min-width: 45% !important;
+    }
+}
+
 @media (max-width: 768px) {
+    [data-testid="stHorizontalBlock"] .stColumn {
+        min-width: 100% !important;
+    }
     .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
     .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
     .rwd-flex-profit { text-align: left !important; width: 100%; border-bottom: 1px dashed gray; padding-bottom: 8px; }
@@ -77,7 +114,7 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.0</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.1</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 (機率權重量化中台) ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
@@ -85,19 +122,19 @@ st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 MACRO_SCORE, MACRO_DF = get_macro_dashboard()
 
+def risk_color(val):
+    try:
+        v = float(val)
+        if v >= 85: return f'color: {COLORS["green"]}; font-weight: bold;'
+        elif v < 45: return f'color: {COLORS["red"]}; font-weight: bold;'
+        return f'color: {COLORS["primary"]}; font-weight: bold;'
+    except: return ''
+
 def format_lots(shares):
     shares = int(shares)
     lots = shares / 1000
     if lots <= 0: return "0"
     return f"{lots:.3f}".rstrip('0').rstrip('.')
-
-def risk_color(val):
-    try:
-        v = int(val)
-        if v >= 8: return f'color: {COLORS["green"]}; font-weight: bold;'
-        elif v <= 3: return f'color: {COLORS["red"]}; font-weight: bold;'
-        return f'color: {COLORS["primary"]}; font-weight: bold;'
-    except: return ''
 
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
@@ -196,27 +233,19 @@ if len(chip_db) >= 1:
             if intel_df is not None and not intel_df.empty:
                 final_rank = pd.merge(today_df, intel_df, on='代號')
                 
-                # 💎 V26: 導入 Soft Ranking 機率權重模型 (訊號壓縮器)
                 def calculate_quant_score(row):
-                    score = 50 # 基準分
-                    # 1. 勝率權重
+                    score = 50 
                     if row['勝率(%)'] > 50: score += (row['勝率(%)'] - 50) * 1.5
                     elif row['勝率(%)'] < 50: score -= (50 - row['勝率(%)']) * 1.5
-                    # 2. 期望值權重
                     score += row['均報(%)'] * 10
-                    # 3. 籌碼與安全分權重
                     score += row['連買'] * 5
                     score += row['安全指數'] * 2
-                    # 4. 型態動能權重
                     t = row['戰術型態']
                     if "🔥" in t: score += 25
                     elif "🚀" in t: score += 15
                     elif "🛡️" in t: score += 10
                     elif "⚠️" in t: score -= 15
-                    # 5. 風險扣分 (乖離懲罰)
                     if row['乖離(%)'] > 8: score -= (row['乖離(%)'] - 5) * 3
-                    
-                    # 宏觀環境動態懲罰 (Regime Filter)
                     if MACRO_SCORE <= 5: 
                         score -= 15
                         if row['乖離(%)'] > 5: score -= 20
@@ -225,7 +254,6 @@ if len(chip_db) >= 1:
                 final_rank['Quant_Score'] = final_rank.apply(calculate_quant_score, axis=1)
                 rank_sorted = final_rank.sort_values('Quant_Score', ascending=False).reset_index(drop=True)
                 
-                # 💎 用分數直接霸道分級，不囉嗦！
                 s_mask = (rank_sorted['Quant_Score'] >= 85) & (rank_sorted['基本達標'] == True)
                 a_mask = (~s_mask) & (rank_sorted['Quant_Score'] >= 65) & (rank_sorted['基本達標'] == True)
                 b_mask = (~s_mask) & (~a_mask) & (rank_sorted['Quant_Score'] >= 45)
@@ -248,10 +276,10 @@ if len(chip_db) >= 1:
                         return format_lots(suggested_shares)
                     master_list['建議買量(張)'] = master_list.apply(calc_suggested_lots, axis=1)
 
-                    export_rows, active_fee_rate = [], 0.001425 * fee_discount
+                    export_rows = []
                     tier_names = {'S': '🥇 S級狙擊', 'A': '🥈 A級狙擊', 'B': '⚔️ B級穩健', 'C': '📡 C級潛伏'}
                     for _, r in master_list.iterrows():
-                        export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "戰術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "Quant_Score": r['Quant_Score'], "現價": round(r['現價'], 2), "防守底線": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
+                        export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "戰術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "量化評分": r['Quant_Score'], "現價": round(r['現價'], 2), "防守底線": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
                     st.download_button(label="📱 明日目標下載", data=pd.DataFrame(export_rows).to_csv(index=False).encode('utf-8-sig'), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
                 
                 ui_top = master_list[master_list['評級'].isin(['S', 'A'])]
@@ -267,30 +295,46 @@ if len(chip_db) >= 1:
                         for j in range(3):
                             if i + j < len(ui_top):
                                 r = ui_top.iloc[i + j]
-                                border_color = COLORS['primary'] if r['評級'] == 'S' else COLORS['accent']
-                                title_color = COLORS['primary'] if r['評級'] == 'S' else COLORS['accent']
-                                icon_label = "🥇 S級" if r['評級'] == 'S' else "🥈 A級"
+                                
+                                if r['評級'] == 'S':
+                                    b_cls = 'badge-s'
+                                    b_label = '🥇 S級'
+                                    title_color = COLORS['primary']
+                                    card_border = COLORS['primary']
+                                else:
+                                    b_cls = 'badge-a'
+                                    b_label = '🥈 A級'
+                                    title_color = COLORS['accent']
+                                    card_border = COLORS['accent']
                                 
                                 with cols_s[j]:
                                     st.markdown(f"""
-                                    <div class="tier-card" style="border-top: 5px solid {border_color}; margin-bottom: 15px;">
-                                        <h3 style="margin:0; color:{title_color};">{icon_label} | {r['名稱_x']} ({r['代號']})</h3>
-                                        <p style="color:{COLORS['subtext']}; margin:5px 0 10px 0;">{r['產業']} | 投信連買 {r['連買']} 天</p>
-                                        <div style="background-color: {COLORS['bg']}; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid {COLORS['green']};">
-                                            <b>🎯 Quant Score：<span style="font-size: 18px; color: {COLORS['text']};">{r['Quant_Score']}</span> 分</b><br>
-                                            {r['戰術型態']}
+                                    <div class="tier-card" style="border-top: 5px solid {card_border}; margin-bottom: 15px;">
+                                        <div style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                                            <div style="display: flex; align-items: center;">
+                                                <span class="tier-badge {b_cls}">{b_label}</span>
+                                                <h3 style="margin: 0; display: inline; color: {title_color}; font-size: 22px;">{r['名稱_x']} ({r['代號']})</h3>
+                                            </div>
                                         </div>
-                                        <div style="font-size: 15px; line-height: 1.6;">
-                                            📈 <b>勝率：</b> <span class="highlight-green">{r['勝率(%)']:.1f}%</span> (均報 +{r['均報(%)']:.2f}%)<br>
-                                            💰 <b>現價：</b> <span class="highlight-primary">{r['現價']:.2f}</span> (乖離 {r['乖離(%)']:.1f}%)<br>
-                                            🚨 <b>停損：</b> <span class="highlight-red">{r['停損價']:.2f}</span><br>
-                                            ⚖️ <b>AI買量：</b> <span class="highlight-accent">{r['建議買量(張)']}</span> 張
+                                        <p style="color: #A0A0A0; margin: 0 0 10px 0; font-size: 14px;">{r['產業']} | 投信連買 {r['連買']} 天</p>
+                                        <div style="background-color: {COLORS['bg']}; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid {COLORS['green']};">
+                                            <div class="info-row">
+                                                <span class="info-label">🎯 量化評分</span>
+                                                <span class="info-value" style="font-size: 20px; color: {COLORS['text']};">{r['Quant_Score']} 分</span>
+                                            </div>
+                                            <div style="color: #FFFFFF; font-size: 14px; font-weight: bold; margin-top: 4px;">{r['戰術型態']}</div>
+                                        </div>
+                                        <div style="width: 100%;">
+                                            <div class="info-row"><span class="info-label">📊 歷史勝率</span><span class="info-value"><span style="color: {COLORS['green']}; font-weight:bold;">{r['勝率(%)']:.1f}%</span> (均報 +{r['均報(%)']:.2f}%)</span></div>
+                                            <div class="info-row"><span class="info-label">💰 現價</span><span class="info-value"><span style="color: {COLORS['primary']};">{r['現價']:.2f}</span> (乖離 {r['乖離(%)']:.1f}%)</span></div>
+                                            <div class="info-row"><span class="info-label">🚨 強制停損</span><span class="info-value" style="color: {COLORS['red']};">{r['停損價']:.2f}</span></div>
+                                            <div class="info-row" style="border-top: 1px dashed #444; padding-top: 4px; margin-top: 4px;"><span class="info-label">⚖️ AI 建議買量</span><span class="info-value" style="color: {COLORS['accent']}; font-weight: bold;">{r['建議買量(張)']} 張</span></div>
                                         </div>
                                     </div>
                                     """, unsafe_allow_html=True)
 
                 st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
-                st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (Quant Score > 45)</span>", unsafe_allow_html=True)
+                st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
                 
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
@@ -311,6 +355,8 @@ if len(chip_db) >= 1:
                                     .format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%', 'Quant_Score':'{:.1f}'})
                                     .map(risk_color, subset=['Quant_Score']))
                     st.dataframe(styled_c, use_container_width=True, hide_index=True)
+            else:
+                st.warning("⚠️ 報告大將軍！今日行情極度惡劣，所有掃描名單皆已跌破 M10 防守線或量能萎縮。為保護資金，今日指揮所不指派任何建倉目標，請保持空手觀望！", icon="🛡️")
 
     with t_chip:
         st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
@@ -350,8 +396,10 @@ if len(chip_db) >= 1:
                     try:
                         p_now_raw = r.get('現價', 0)
                         p_now = float(p_now_raw) if pd.notna(p_now_raw) and str(p_now_raw).strip() != '' else 0.0
+                        
                         p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
                         qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
+                        
                         p_cost = float(str(p_cost_raw).replace(',', '').strip()) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0.0
                         qty = float(str(qty_raw).replace(',', '').strip()) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0.0
                         
@@ -371,22 +419,22 @@ if len(chip_db) >= 1:
                         ret_col = COLORS['red'] if pnl > 0 else (COLORS['green'] if pnl < 0 else COLORS['text'])
                         
                         if p_now == 0.0 or m10 == 0.0:
-                            struct, coach, border_col, glow_class = "⚪ 訊號不足 (無有效報價/剛上市)", "無法取得完整均線數據，請手動確認走勢。", COLORS['border'], ""
+                            struct, coach, border_col, glow_class = "⚪ 訊號不足", "無法取得完整均線數據，請手動確認走勢。", COLORS['border'], ""
                         elif p_now > m5 and m5 > m10:
-                            struct = f"🚀 多頭排列 (現價 > M5: {m5:.1f})"
-                            if ret >= 10: coach = "👑 <b>【S級金雞母】</b> 趨勢極強！<b>跌破 M5 前絕對不賣！</b>"
-                            elif ret > 0: coach, border_col = "⚠️ <b>【防賣飛警告】</b> 主升段啟動！獲利達6%先出一半，剩下死抱 M5！", COLORS['accent']
-                            else: coach = "⏳ 強勢洗盤，請耐心抱緊，防守底線設於 M10。"
+                            struct = f"🚀 多頭排列 (現價 > M5)"
+                            if ret >= 10: coach = "👑 <b>【S級抱緊】</b> 趨勢極強！<b>跌破 M5 前絕對不賣！</b>"
+                            elif ret > 0: coach, border_col = "⚠️ <b>【防賣飛】</b> 獲利達6%先出一半，剩下死抱 M5！", COLORS['accent']
+                            else: coach = "⏳ 洗盤震盪中，請耐心抱緊，防守底線設於 M10。"
                         elif p_now >= m10:
-                            struct, coach, border_col = f"⏳ 均線收斂 (守住 M10: {m10:.1f})", "🛡️ 洗盤震盪中，尚未破線，請給予耐心與空間。", COLORS['accent'] if ret > 0 else COLORS['border']
+                            struct, coach, border_col = f"⏳ 均線收斂 (守住 M10)", "🛡️ 洗盤震盪中，尚未破線，請給予耐心與空間。", COLORS['accent'] if ret > 0 else COLORS['border']
                         else:
-                            struct, border_col = f"📉 跌破防守線 (現價 < M10: {m10:.1f})", COLORS['red'] if ret < 0 else COLORS['green']
+                            struct, border_col = f"📉 跌破防守線 (現價 < M10)", COLORS['red'] if ret < 0 else COLORS['green']
                             coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼鎖住獲利！" if ret > 0 else f"💀 <b>【情緒殺預警】</b> 破線硬停損！請無情砍單保命，絕不攤平！"
                         
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
                         
-                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 12px 15px; background-color: {COLORS['card']}; border-radius: 4px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} | 張數: {format_lots(qty * 1000)}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
+                        html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 10px 15px; background-color: {COLORS['card']}; border-radius: 4px; margin-bottom: 8px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                     except Exception as e: continue
                 
                 html_cards += '</div>'
@@ -396,17 +444,14 @@ if len(chip_db) >= 1:
                 if total_pnl != 0 or current_exposure != 0 or len(m_df) > 0: st.markdown(html_cards, unsafe_allow_html=True)
                 else: st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
             else: st.info("💡 目前尚無有效持股資料，或現價抓取失敗。")
-            
-            with st.expander("🛠️ 系統除錯中心"):
-                if 'm_df' in locals() and not m_df.empty: st.dataframe(m_df.drop(columns=['分類'], errors='ignore'), hide_index=True)
-                else: st.write("合併失敗或無資料")
 
         st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
         st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
-        aar.render_aar_tab(aar_sheet_url, fee_discount, FM_TOKEN, COLORS)
+        AAR_FM_TOKEN = st.secrets.get("fm_token", "")
+        aar.render_aar_tab(aar_sheet_url, fee_discount, AAR_FM_TOKEN, COLORS)
 
     with t_book:
-        st.markdown("### 📖 <span class='highlight-primary'>實戰準則與系統圖示教範</span>", unsafe_allow_html=True)
+        st.markdown("### 📖 <span class='highlight-primary'>游擊兵工廠：實戰教戰手冊</span>", unsafe_allow_html=True)
         st.markdown(MANUAL_TEXT, unsafe_allow_html=True)
 
     with t_hist:
@@ -416,4 +461,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.0 (V6 機率權重量化中台)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.1 (V26 裝甲修復版)</p>", unsafe_allow_html=True)
