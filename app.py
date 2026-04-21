@@ -15,7 +15,6 @@ try:
 except AttributeError: pass
 else: ssl._create_default_https_context = _create_unverified_https_context
 
-# 👉 V26.1: 將教戰手冊獨立引入，保持前線程式碼極致純淨！
 from manual import MANUAL_TEXT, HISTORY_TEXT
 import aar  
 import sidebar 
@@ -53,47 +52,60 @@ if auth_status != 'verified_auth':
     st.stop()
 
 # ---------------------------------------------------------
-# 📱 V26.1: 注入終極 RWD 與視覺優化裝甲
+# 📱 V26.2: 注入【液態 CSS Grid】與絕對防擠壓裝甲
 # ---------------------------------------------------------
 st.markdown("""
 <style>
-/* 🎯 階級標籤縮小與美化 */
+/* 🎯 階級標籤縮小與美化 (強制不斷行) */
 .tier-badge {
     display: inline-block;
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 13px;
     font-weight: bold;
-    margin-right: 8px;
-    vertical-align: middle;
+    white-space: nowrap !important; /* 絕對不准斷行 */
 }
 .badge-s { background-color: rgba(255, 75, 75, 0.1); color: #FF4B4B; border: 1px solid #FF4B4B; }
 .badge-a { background-color: rgba(255, 165, 0, 0.1); color: #FFA500; border: 1px solid #FFA500; }
-.badge-b { background-color: rgba(0, 200, 81, 0.1); color: #00C851; border: 1px solid #00C851; }
-.badge-c { background-color: rgba(128, 128, 128, 0.1); color: #A0A0A0; border: 1px solid #A0A0A0; }
+
+/* 🛡️ 終極液態網格系統 (完全取代 st.columns) */
+.card-grid {
+    display: grid;
+    /* 卡片最小寬度 320px，空間不夠會自動折行成 2 欄或 1 欄 */
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.tier-card {
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
 
 /* 完美對齊與間距優化 */
 .info-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 4px;
+    margin-bottom: 5px;
     width: 100%;
 }
-.info-label { color: #A0A0A0; font-size: 14px; }
-.info-value { color: #FFFFFF; font-size: 14px; font-weight: 500; text-align: right; }
+.info-label { font-size: 14px; opacity: 0.8; white-space: nowrap; }
+.info-value { font-size: 14px; font-weight: 500; text-align: right; white-space: nowrap; }
 
-/* 🛡️ RWD 與 Sidebar 擠壓防護 */
-@media (max-width: 1200px) {
-    [data-testid="stHorizontalBlock"] .stColumn {
-        min-width: 45% !important;
-    }
+/* 股票名稱防擠壓：太長自動變成刪節號 */
+.stock-title {
+    margin: 0; 
+    font-size: 20px; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis;
 }
 
 @media (max-width: 768px) {
-    [data-testid="stHorizontalBlock"] .stColumn {
-        min-width: 100% !important;
-    }
     .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
     .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
     .rwd-flex-profit { text-align: left !important; width: 100%; border-bottom: 1px dashed gray; padding-bottom: 8px; }
@@ -114,7 +126,7 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.1</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.2</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 (機率權重量化中台) ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
@@ -290,48 +302,40 @@ if len(chip_db) >= 1:
                 
                 if ui_top.empty: st.info("💡 今日無主戰力標的符合 (Quant 分數未達標)。")
                 else:
-                    for i in range(0, len(ui_top), 3):
-                        cols_s = st.columns(3)
-                        for j in range(3):
-                            if i + j < len(ui_top):
-                                r = ui_top.iloc[i + j]
-                                
-                                if r['評級'] == 'S':
-                                    b_cls = 'badge-s'
-                                    b_label = '🥇 S級'
-                                    title_color = COLORS['primary']
-                                    card_border = COLORS['primary']
-                                else:
-                                    b_cls = 'badge-a'
-                                    b_label = '🥈 A級'
-                                    title_color = COLORS['accent']
-                                    card_border = COLORS['accent']
-                                
-                                with cols_s[j]:
-                                    st.markdown(f"""
-                                    <div class="tier-card" style="border-top: 5px solid {card_border}; margin-bottom: 15px;">
-                                        <div style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
-                                            <div style="display: flex; align-items: center;">
-                                                <span class="tier-badge {b_cls}">{b_label}</span>
-                                                <h3 style="margin: 0; display: inline; color: {title_color}; font-size: 22px;">{r['名稱_x']} ({r['代號']})</h3>
-                                            </div>
-                                        </div>
-                                        <p style="color: #A0A0A0; margin: 0 0 10px 0; font-size: 14px;">{r['產業']} | 投信連買 {r['連買']} 天</p>
-                                        <div style="background-color: {COLORS['bg']}; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid {COLORS['green']};">
-                                            <div class="info-row">
-                                                <span class="info-label">🎯 量化評分</span>
-                                                <span class="info-value" style="font-size: 20px; color: {COLORS['text']};">{r['Quant_Score']} 分</span>
-                                            </div>
-                                            <div style="color: #FFFFFF; font-size: 14px; font-weight: bold; margin-top: 4px;">{r['戰術型態']}</div>
-                                        </div>
-                                        <div style="width: 100%;">
-                                            <div class="info-row"><span class="info-label">📊 歷史勝率</span><span class="info-value"><span style="color: {COLORS['green']}; font-weight:bold;">{r['勝率(%)']:.1f}%</span> (均報 +{r['均報(%)']:.2f}%)</span></div>
-                                            <div class="info-row"><span class="info-label">💰 現價</span><span class="info-value"><span style="color: {COLORS['primary']};">{r['現價']:.2f}</span> (乖離 {r['乖離(%)']:.1f}%)</span></div>
-                                            <div class="info-row"><span class="info-label">🚨 強制停損</span><span class="info-value" style="color: {COLORS['red']};">{r['停損價']:.2f}</span></div>
-                                            <div class="info-row" style="border-top: 1px dashed #444; padding-top: 4px; margin-top: 4px;"><span class="info-label">⚖️ AI 建議買量</span><span class="info-value" style="color: {COLORS['accent']}; font-weight: bold;">{r['建議買量(張)']} 張</span></div>
-                                        </div>
-                                    </div>
-                                    """, unsafe_allow_html=True)
+                    # 🚀 V26.2: 徹底拋棄 st.columns，改用 CSS Grid 達成絕對流暢 RWD！
+                    grid_html = '<div class="card-grid">'
+                    for _, r in ui_top.iterrows():
+                        if r['評級'] == 'S':
+                            b_cls, b_label = 'badge-s', '🥇 S級'
+                            title_color, card_border = COLORS['primary'], COLORS['primary']
+                        else:
+                            b_cls, b_label = 'badge-a', '🥈 A級'
+                            title_color, card_border = COLORS['accent'], COLORS['accent']
+                            
+                        grid_html += f"""
+                        <div class="tier-card" style="background-color: {COLORS['card']}; border-top: 5px solid {card_border}; border-left: 1px solid {COLORS['border']}; border-right: 1px solid {COLORS['border']}; border-bottom: 1px solid {COLORS['border']};">
+                            <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                <span class="tier-badge {b_cls}">{b_label}</span>
+                                <h3 class="stock-title" style="color: {title_color};">{r['名稱_x']} ({r['代號']})</h3>
+                            </div>
+                            <p style="color: #A0A0A0; margin: 0 0 12px 0; font-size: 13px;">{r['產業']} | 投信連買 {r['連買']} 天</p>
+                            <div style="background-color: {COLORS['bg']}; padding: 12px; border-radius: 8px; margin-bottom: 14px; border-left: 4px solid {COLORS['green']};">
+                                <div class="info-row">
+                                    <span class="info-label" style="font-weight:bold; color: {COLORS['text']};">🎯 量化評分</span>
+                                    <span class="info-value" style="font-size: 18px; color: {COLORS['text']}; font-weight:bold;">{r['Quant_Score']} 分</span>
+                                </div>
+                                <div style="color: #FFFFFF; font-size: 13px; font-weight: bold; margin-top: 6px;">{r['戰術型態']}</div>
+                            </div>
+                            <div style="width: 100%;">
+                                <div class="info-row"><span class="info-label" style="color: {COLORS['text']};">📊 歷史勝率</span><span class="info-value"><span style="color: {COLORS['green']}; font-weight:bold;">{r['勝率(%)']:.1f}%</span> <span style="color: {COLORS['subtext']};">(均報 +{r['均報(%)']:.2f}%)</span></span></div>
+                                <div class="info-row"><span class="info-label" style="color: {COLORS['text']};">💰 現價</span><span class="info-value"><span style="color: {COLORS['primary']};">{r['現價']:.2f}</span> <span style="color: {COLORS['subtext']};">(乖離 {r['乖離(%)']:.1f}%)</span></span></div>
+                                <div class="info-row"><span class="info-label" style="color: {COLORS['text']};">🚨 強制停損</span><span class="info-value" style="color: {COLORS['red']};">{r['停損價']:.2f}</span></div>
+                                <div class="info-row" style="border-top: 1px dashed #555; padding-top: 8px; margin-top: 8px;"><span class="info-label" style="color: {COLORS['text']}; font-weight:bold;">⚖️ AI 建議買量</span><span class="info-value" style="color: {COLORS['accent']}; font-weight: bold;">{r['建議買量(張)']} 張</span></div>
+                            </div>
+                        </div>
+                        """
+                    grid_html += '</div>'
+                    st.markdown(grid_html, unsafe_allow_html=True)
 
                 st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
                 st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
@@ -461,4 +465,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.1 (V26 裝甲修復版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.2 (液態網格版)</p>", unsafe_allow_html=True)
