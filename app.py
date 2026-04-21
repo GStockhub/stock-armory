@@ -515,8 +515,10 @@ if len(chip_db) >= 1:
                 
                 s_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 55) & (rank_sorted['均報(%)'] >= 1.5) & (rank_sorted['今日放量'] == True) & (rank_sorted['連買'] >= 2)
                 a_mask = (rank_sorted['基本達標'] == True) & (rank_sorted['勝率(%)'] >= 50) & (rank_sorted['均報(%)'] >= 1.0) & (rank_sorted['連買'] >= 1)
-                b_mask = (~s_mask) & (~a_mask) & (rank_sorted['勝率(%)'] > 50) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1) & (rank_sorted['乖離(%)'] < 10)
-                c_mask = (~s_mask) & (~a_mask) & (~b_mask) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1)
+                
+                # 👉 V3.1 熱修復：B級與C級強制加上 (現價 >= M10) 的破線防呆濾網，徹底消滅「停損價高於現價」的荒謬標的！
+                b_mask = (~s_mask) & (~a_mask) & (rank_sorted['現價'] >= rank_sorted['M10']) & (rank_sorted['勝率(%)'] > 50) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1) & (rank_sorted['乖離(%)'] < 10)
+                c_mask = (~s_mask) & (~a_mask) & (~b_mask) & (rank_sorted['現價'] >= rank_sorted['M10']) & (rank_sorted['成交量'] >= 1.5) & (rank_sorted['連買'] >= 1)
 
                 if MACRO_SCORE <= 5:
                     s_mask, a_mask, b_mask = s_mask & (rank_sorted['乖離(%)'] < 3), a_mask & (rank_sorted['乖離(%)'] < 3), b_mask & (rank_sorted['乖離(%)'] < 3)
