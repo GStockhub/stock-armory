@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np       # 👉 微臣漏掉的就是這一行！請補上！
 import yfinance as yf
 import requests
 import urllib3
