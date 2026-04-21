@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy as np       # 👉 微臣漏掉的就是這一行！請補上！
+import numpy as np
 import yfinance as yf
 import requests
 import urllib3
@@ -22,7 +22,23 @@ def load_industry_map():
     except: pass 
     return ind_map, name_map
 
-def safe_download(sid, retries=2):
+# 📡 V26：三擎驅動報價源 (FinMind -> YFinance Fallback)
+def safe_download(sid, fm_token=None, retries=2):
+    # 1. 主力引擎：FinMind (最穩定、無 Rate Limit 問題)
+    if fm_token and fm_token.strip() != "":
+        try:
+            start_date = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d")
+            url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id={sid}&start_date={start_date}&token={fm_token}"
+            res = requests.get(url, timeout=5, verify=False).json()
+            if res.get('msg') == 'success' and len(res['data']) > 0:
+                df = pd.DataFrame(res['data'])
+                df.rename(columns={'date': 'Date', 'open': 'Open', 'max': 'High', 'min': 'Low', 'close': 'Close', 'Trading_Volume': 'Volume'}, inplace=True)
+                df['Date'] = pd.to_datetime(df['Date'])
+                df.set_index('Date', inplace=True)
+                if len(df) > 20: return df
+        except: pass # 若 FinMind 斷線，靜默進入備援
+            
+    # 2. 備援引擎：YFinance
     for suffix in [".TW", ".TWO"]:
         for _ in range(retries):
             try:
@@ -30,10 +46,11 @@ def safe_download(sid, retries=2):
                 df = yf.Ticker(sym).history(period="3mo")
                 if not df.empty and len(df) > 5: return df
             except: time.sleep(0.5 + np.random.rand())
+            
     return pd.DataFrame()
 
-def fetch_single_stock_batch(sid):
-    df = safe_download(sid)
+def fetch_single_stock_batch(sid, fm_token=None):
+    df = safe_download(sid, fm_token)
     if not df.empty: return sid, df
     return sid, None
 
@@ -41,6 +58,7 @@ def fetch_single_stock_batch(sid):
 def get_macro_dashboard():
     score = 5.0
     macro_data = []
+    # 大盤指數使用 YFinance 抓取即可
     indices = {"^TWII": ("台股加權", "2330.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
     
     for main_sym, (base_name, fallback_sym) in indices.items():
@@ -79,6 +97,7 @@ def fetch_chips_data():
     chip_dict = {}
     date_ptr = datetime.now()
     attempts = 0
+    # 籌碼依然使用證交所原生爬蟲
     while len(chip_dict) < 10 and attempts < 15:
         if date_ptr.weekday() < 5:
             d_str = date_ptr.strftime("%Y%m%d")
@@ -106,14 +125,14 @@ def fetch_chips_data():
     return chip_dict
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_holding_intel(id_tuple, TWSE_IND_MAP):
+def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
     id_list = list(id_tuple)
     intel_results = []
     if not id_list: return pd.DataFrame()
     
     bulk_data = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, sid): sid for sid in id_list}
+        futures = {executor.submit(fetch_single_stock_batch, sid, fm_token): sid for sid in id_list}
         for future in concurrent.futures.as_completed(futures):
             sid, df = future.result()
             if df is not None and not df.empty: 
