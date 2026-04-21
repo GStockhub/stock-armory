@@ -43,7 +43,7 @@ def render_sidebar():
         risk_tolerance_pct = st.slider("單筆最大虧損容忍 (%)", min_value=1.0, max_value=10.0, value=5.0, step=0.5)
         risk_amount = total_capital * (risk_tolerance_pct / 100)
         
-        st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**\n\n*(依此反推單筆最多買進張數)*")
+        st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**")
         
         st.markdown("---")
         st.markdown("#### ⚖️ 真實稅費參數")
