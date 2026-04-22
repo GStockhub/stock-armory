@@ -23,7 +23,7 @@ def load_industry_map():
     return ind_map, name_map
 
 def safe_download(sid, fm_token=None, retries=2):
-    # 🚀 雲端防彈面具：偽裝成正常使用者的瀏覽器，破解 Streamlit Cloud 封鎖
+    # 🚀 雲端防彈面具
     session = requests.Session()
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -64,12 +64,23 @@ def get_macro_dashboard():
     macro_data = []
     indices = {"^TWII": ("台股加權", "2330.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
     
+    # 🚀 將防彈面具也發給大盤雷達
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
+    
     for main_sym, (base_name, fallback_sym) in indices.items():
         display_name = base_name
         hist = safe_download(main_sym.replace('^','')) 
         if hist.empty:
-            hist = yf.Ticker(fallback_sym).history(period="3mo")
-            if not hist.empty: display_name = f"{base_name} (備援)"
+            # 🛡️ 致命漏洞修補：加上 try...except 絕對防彈衣！
+            try:
+                ticker = yf.Ticker(fallback_sym, session=session)
+                hist = ticker.history(period="3mo")
+                if not hist.empty: display_name = f"{base_name} (備援)"
+            except: 
+                pass # 被封鎖就安靜略過，絕不當機
         
         if hist.empty:
             macro_data.append({"戰區": display_name, "現值": "抓取失敗", "月線": "-", "狀態": "⚪ 斷線"})
