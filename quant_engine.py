@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-import concurrent.futures
+import time
 from data_center import fetch_single_stock_batch, safe_download
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -93,11 +93,14 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
     intel_results = []
     if not id_list: return pd.DataFrame()
     bulk_data = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, str(sid).strip(), fm_token): str(sid).strip() for sid in id_list}
-        for future in concurrent.futures.as_completed(futures):
-            sid_str, df = future.result()
-            if df is not None: bulk_data[sid_str] = df
+    
+    # 🛡️ 拆除機關槍，改為單發安靜下載，防止 IP 被封
+    for raw_sid in id_list:
+        sid_str = str(raw_sid).strip()
+        _, df = fetch_single_stock_batch(sid_str, fm_token)
+        if df is not None and not df.empty:
+            bulk_data[sid_str] = df
+        time.sleep(0.1)
             
     for raw_sid in id_list:
         try:
@@ -123,8 +126,9 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             prev_close = float(close_s.iloc[-2]) if len(close_s) > 1 else open_now
             vol_now = float(vol_s.iloc[-1]) / 1000
             
-            if ((open_now - prev_close) / prev_close * 100) > 2.0: continue
-            if p_now < 20 or vol_now < 1.5: continue
+            # 🚀 放寬跳空容忍度為 4.5% (不漏接飆股)
+            if ((open_now - prev_close) / prev_close * 100) > 4.5: continue
+            if p_now < 20 or vol_now < 1.0: continue
             
             m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
             if p_now < m10: continue
