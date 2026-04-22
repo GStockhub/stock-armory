@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-import concurrent.futures
+import time
 from data_center import fetch_single_stock_batch, safe_download
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -10,7 +10,6 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df = safe_download(sid, fm_token)
     if df is None or df.empty or len(df) < 20: return None
     
-    # 消除重複時間軸與修補成交量
     df = df[~df.index.duplicated(keep='last')].copy()
     df['Volume'] = df['Volume'].replace(0, np.nan).ffill().fillna(1000)
         
@@ -111,16 +110,16 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
     if not id_list: return pd.DataFrame()
     bulk_data = {}
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        # 確保丟進去下載的代號絕對是乾淨字串
-        futures = {executor.submit(fetch_single_stock_batch, str(sid).strip(), fm_token): str(sid).strip() for sid in id_list}
-        for future in concurrent.futures.as_completed(futures):
-            sid_str, df = future.result()
-            if df is not None: bulk_data[sid_str] = df
+    # 🛡️ 拆除多執行緒，改為安靜循序下載，避免 Yahoo 防火牆再次把我們擋下
+    for raw_sid in id_list:
+        sid_str = str(raw_sid).strip()
+        df = fetch_single_stock_batch(sid_str, fm_token)[1]
+        if df is not None and not df.empty:
+            bulk_data[sid_str] = df
+        time.sleep(0.1) # 關鍵：停頓 0.1 秒
             
     for raw_sid in id_list:
         try:
-            # 🔪 終極除錯點：強制轉字串！防止整數型態引發 AttributeError 爆炸
             sid = str(raw_sid).strip()
             
             if not sid.startswith('00') and not sid.isdigit(): continue
@@ -131,7 +130,6 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
             
-            # 清除重複時間軸、填補成交量
             df_stock = df_stock[~df_stock.index.duplicated(keep='last')].copy()
             df_stock['Volume'] = df_stock['Volume'].replace(0, np.nan).ffill().fillna(1000)
             
