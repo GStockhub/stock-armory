@@ -9,9 +9,9 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df = safe_download(sid, fm_token)
     if df is None or df.empty or len(df) < 20: return None
     
-    # 🩹 終極成交量修復：把所有 0 變成 NaN，然後用前一天的正常數值填補
+    # 🩹 V26.93 語法更新：使用最新版 Pandas 的 ffill() 寫法
     df = df.copy()
-    df['Volume'] = df['Volume'].replace(0, np.nan).fillna(method='ffill').fillna(1000)
+    df['Volume'] = df['Volume'].replace(0, np.nan).ffill().fillna(1000)
         
     close_s, open_s, vol_s = df['Close'], df['Open'], df['Volume']
     p_now = float(close_s.iloc[-1])
@@ -125,9 +125,9 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
             
-            # 🩹 終極成交量修復：把所有 0 變成 NaN，然後用前一天的正常數值填補！
+            # 🩹 V26.93 語法更新
             df_stock = df_stock.copy()
-            df_stock['Volume'] = df_stock['Volume'].replace(0, np.nan).fillna(method='ffill').fillna(1000)
+            df_stock['Volume'] = df_stock['Volume'].replace(0, np.nan).ffill().fillna(1000)
             
             close_s, open_s, high_s, low_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['High'], df_stock['Low'], df_stock['Volume']
             p_now = float(close_s.iloc[-1])
@@ -135,8 +135,6 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             high_now = float(high_s.iloc[-1])
             low_now = float(low_s.iloc[-1])
             vol_now = float(vol_s.iloc[-1]) / 1000
-            
-            # ⚔️ 徹底刪除 p_now < 20 與 vol_now < 1.5 的死刑過濾器！
             
             m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
             vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1]) / 1000
