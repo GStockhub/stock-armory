@@ -10,6 +10,20 @@ import streamlit as st
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# 🚀 救星：網址自動轉換器 (解決 AAR 404 報錯)
+def convert_gsheet_url(url):
+    url = str(url).strip()
+    if "docs.google.com/spreadsheets/d/" in url and "export?format=csv" not in url:
+        import re
+        match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
+        if match:
+            doc_id = match.group(1)
+            gid = "0"
+            if "gid=" in url:
+                gid = url.split("gid=")[1].split("&")[0]
+            return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
+    return url
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
     ind_map, name_map = {}, {}
@@ -22,35 +36,40 @@ def load_industry_map():
     except: pass 
     return ind_map, name_map
 
-def safe_download(sid, fm_token=None, retries=2):
-    # 🚀 雲端防彈面具
-    session = requests.Session()
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    })
+def safe_download(sid, fm_token=None):
+    sid_str = str(sid).strip()
+    is_tw_stock = sid_str[0].isdigit() if len(sid_str) > 0 else False
     
-    for suffix in [".TW", ".TWO"]:
-        for _ in range(retries):
-            try:
-                sym = f"{sid}{suffix}"
-                ticker = yf.Ticker(sym, session=session)
-                df = ticker.history(period="3mo")
-                if not df.empty and len(df) > 5: return df
-            except: time.sleep(0.5 + np.random.rand())
-            
-    if fm_token and fm_token.strip() != "":
+    # 🚀 終極飆速：只要是台股，一律優先走 FinMind，徹底繞過 Yahoo 黑洞！
+    if is_tw_stock and fm_token and fm_token.strip() != "":
         try:
             start_date = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d")
-            url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id={sid}&start_date={start_date}&token={fm_token}"
+            url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id={sid_str}&start_date={start_date}&token={fm_token.strip()}"
             res = requests.get(url, timeout=5, verify=False).json()
             if res.get('msg') == 'success' and len(res['data']) > 0:
                 df = pd.DataFrame(res['data'])
                 df.rename(columns={'date': 'Date', 'open': 'Open', 'max': 'High', 'min': 'Low', 'close': 'Close', 'Trading_Volume': 'Volume'}, inplace=True)
                 df['Date'] = pd.to_datetime(df['Date'])
                 df.set_index('Date', inplace=True)
-                if len(df) > 20: return df
+                for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                if len(df) > 20: return df.dropna(subset=['Close'])
         except: pass
-        
+
+    # 🛡️ 備援與美股：改用穩定的 yf.download 替代會崩潰的 history
+    try:
+        syms = [f"{sid_str}.TW", f"{sid_str}.TWO"] if is_tw_stock else [sid_str]
+        for sym in syms:
+            df = yf.download(sym, period="3mo", progress=False)
+            if not df.empty and len(df) > 5:
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
+                for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                return df.dropna(subset=['Close'])
+    except: pass
+    
     return pd.DataFrame()
 
 def fetch_single_stock_batch(sid, fm_token=None):
@@ -62,25 +81,15 @@ def fetch_single_stock_batch(sid, fm_token=None):
 def get_macro_dashboard():
     score = 5.0
     macro_data = []
-    indices = {"^TWII": ("台股加權", "2330.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
-    
-    # 🚀 將防彈面具也發給大盤雷達
-    session = requests.Session()
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    })
+    # 台股大盤也備用 0050，確保有數值
+    indices = {"^TWII": ("台股加權", "0050.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
     
     for main_sym, (base_name, fallback_sym) in indices.items():
         display_name = base_name
         hist = safe_download(main_sym.replace('^','')) 
         if hist.empty:
-            # 🛡️ 致命漏洞修補：加上 try...except 絕對防彈衣！
-            try:
-                ticker = yf.Ticker(fallback_sym, session=session)
-                hist = ticker.history(period="3mo")
-                if not hist.empty: display_name = f"{base_name} (備援)"
-            except: 
-                pass # 被封鎖就安靜略過，絕不當機
+            hist = safe_download(fallback_sym)
+            if not hist.empty: display_name = f"{base_name} (備援)"
         
         if hist.empty:
             macro_data.append({"戰區": display_name, "現值": "抓取失敗", "月線": "-", "狀態": "⚪ 斷線"})
@@ -93,7 +102,7 @@ def get_macro_dashboard():
             
             status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
             
-            if base_name == "恐慌指數":
+            if "恐慌" in base_name:
                 status = "🔴 恐慌" if last_p > 25 else ("🟡 警戒" if last_p > 18 else "🟢 安定")
                 if last_p > 25: score -= 2
                 elif last_p < 18: score += 1
@@ -180,12 +189,13 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
     if not id_list: return pd.DataFrame()
     
     bulk_data = {}
-    for raw_sid in id_list:
-        sid_str = str(raw_sid).strip()
-        _, df = fetch_single_stock_batch(sid_str, fm_token)
-        if df is not None and not df.empty: 
-            bulk_data[sid_str] = df
-        time.sleep(0.1)
+    # 🚀 既然已經繞過 Yahoo，這裡可以恢復多執行緒飆速！
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_single_stock_batch, str(sid).strip(), fm_token): str(sid).strip() for sid in id_list}
+        for future in concurrent.futures.as_completed(futures):
+            sid_str, df = future.result()
+            if df is not None and not df.empty: 
+                bulk_data[sid_str] = df
                 
     for raw_sid in id_list:
         try:
