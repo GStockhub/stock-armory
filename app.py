@@ -70,8 +70,8 @@ fee_discount = configs["fee_discount"]
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v27.4</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 幽靈殺手 ✕ 終極無錯版 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v27.41</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 幽靈殺手 ✕ 語法修復版 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -118,8 +118,8 @@ if len(chip_db) >= 1:
     if sheet_url:
         try:
             sheet_df = read_remote_csv(sheet_url, dtype=str)
-            # 🚀 物理消滅隱形 BOM 亂碼，保證欄位名稱乾淨無瑕！
-            sheet_df.columns = sheet_df.columns.str.replace(r'^\ufeff', '', regex=True).str.strip()
+            # 🚀 致命語法修復：關閉 regex，執行單純字串替換，避免引擎崩潰
+            sheet_df.columns = sheet_df.columns.str.replace('\ufeff', '', regex=False).str.strip()
             h_df = sheet_df[sheet_df["分類"] == "持股"].copy() if "分類" in sheet_df.columns else sheet_df.copy()
             if not h_df.empty and "代號" in h_df.columns:
                 h_df["代號"] = h_df["代號"].astype(str).str.strip()
@@ -218,7 +218,16 @@ if len(chip_db) >= 1:
 
                     master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
 
-                    ui_s, ui_a, ui_b, ui_c = master_list[master_list["評級"] == "S"], master_list[master_list["評級"] == "A"], master_list[master_list["評級"] == "B"], master_list[master_list["評級"] == "C"]
+                    export_rows = []
+                    tier_names = {"S": "🥇 S級狙擊", "A": "🥈 A級狙擊", "B": "⚔️ B級穩健", "C": "📡 C級潛伏"}
+                    for _, r in master_list.iterrows():
+                        export_rows.append({"戰區": tier_names.get(r["評級"], ""), "代號": r["代號"], "名稱": r["名稱_x"], "戰術行動": "👀 列入觀察" if r["評級"] == "C" else f"建議買 {r['建議買量(張)']} 張", "量化評分": r["Quant_Score"], "現價": round(r["現價"], 2), "ATR停損": round(r["停損價"], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r["產業"]})
+                    st.download_button(label="📱 明日目標下載", data=pd.DataFrame(export_rows).to_csv(index=False).encode("utf-8-sig"), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
+                
+                ui_s = master_list[master_list["評級"] == "S"]
+                ui_a = master_list[master_list["評級"] == "A"]
+                ui_b = master_list[master_list["評級"] == "B"]
+                ui_c = master_list[master_list["評級"] == "C"]
 
                 st.markdown("#### 🥇 <span class='highlight-primary'>【S / A 級】主力狙擊區</span>", unsafe_allow_html=True)
                 
@@ -270,7 +279,8 @@ if len(chip_db) >= 1:
                         .rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分", "停損價": "ATR停損"})
                         .style.set_properties(**table_style)
                         .format({"現價": "{:.2f}", "ATR停損": "{:.2f}", "勝率(%)": "{:.1f}%", "量化評分": "{:.1f}"})
-                        .map(risk_color, subset=["量化評分"]))
+                        .map(risk_color, subset=["量化評分"])
+                        .map(lambda x: f'color: {COLORS["green"]}; font-weight: bold;' if x > 60 else '', subset=["勝率(%)"]))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
                 st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
@@ -383,4 +393,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V27.4 (幽靈殺手版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V27.41 (語法修復版)</p>", unsafe_allow_html=True)
