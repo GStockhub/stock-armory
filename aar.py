@@ -31,8 +31,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         st.info("交易日誌沒有資料。")
         return
 
-    # 🚀 物理消滅隱形 BOM 亂碼，讓欄位判斷 100% 精準！
-    df.columns = df.columns.str.replace(r'^\ufeff', '', regex=True).str.strip()
+    # 🚀 致命語法修復：關閉 regex，執行單純字串替換，避免引擎崩潰
+    df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
 
     if "代號" not in df.columns:
         st.error("AAR 缺少最核心的必要欄位：『代號』")
