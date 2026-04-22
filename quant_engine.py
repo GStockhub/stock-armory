@@ -9,9 +9,9 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df = safe_download(sid, fm_token)
     if df is None or df.empty or len(df) < 20: return None
     
+    # 🩹 終極成交量修復：把所有 0 變成 NaN，然後用前一天的正常數值填補
     df = df.copy()
-    if float(df['Volume'].iloc[-1]) == 0 and len(df) > 1:
-        df.loc[df.index[-1], 'Volume'] = df['Volume'].iloc[-2]
+    df['Volume'] = df['Volume'].replace(0, np.nan).fillna(method='ffill').fillna(1000)
         
     close_s, open_s, vol_s = df['Close'], df['Open'], df['Volume']
     p_now = float(close_s.iloc[-1])
@@ -27,7 +27,6 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
     df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
     
-    # 🛡️ ATR 獨立防彈機制 (沙盤推演)
     try:
         df_bt['PrevClose'] = df_bt['Close'].shift(1)
         df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
@@ -126,9 +125,9 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
             
+            # 🩹 終極成交量修復：把所有 0 變成 NaN，然後用前一天的正常數值填補！
             df_stock = df_stock.copy()
-            if float(df_stock['Volume'].iloc[-1]) == 0 and len(df_stock) > 1:
-                df_stock.loc[df_stock.index[-1], 'Volume'] = df_stock['Volume'].iloc[-2]
+            df_stock['Volume'] = df_stock['Volume'].replace(0, np.nan).fillna(method='ffill').fillna(1000)
             
             close_s, open_s, high_s, low_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['High'], df_stock['Low'], df_stock['Volume']
             p_now = float(close_s.iloc[-1])
@@ -136,6 +135,8 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             high_now = float(high_s.iloc[-1])
             low_now = float(low_s.iloc[-1])
             vol_now = float(vol_s.iloc[-1]) / 1000
+            
+            # ⚔️ 徹底刪除 p_now < 20 與 vol_now < 1.5 的死刑過濾器！
             
             m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
             vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1]) / 1000
@@ -148,7 +149,6 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
             df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
             
-            # 🛡️ ATR 獨立防彈機制 (大部隊運算)
             try:
                 df_bt['PrevClose'] = df_bt['Close'].shift(1)
                 df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
@@ -256,6 +256,5 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
                 '戰術型態': tactic_label
             })
         except Exception as e: 
-            # 如果真的發生毀滅性錯誤，強迫跳過這檔股票，絕不牽連其他人
             continue
     return pd.DataFrame(intel_results)
