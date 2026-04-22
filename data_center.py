@@ -2,7 +2,6 @@ import io
 import time
 from datetime import datetime, timedelta
 import concurrent.futures
-import re
 
 import numpy as np
 import pandas as pd
@@ -15,36 +14,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 # ---------------------------------------------------------
-# Google Sheet URL 處理
+# 遠端 CSV 讀取
+# 你已經會直接貼 CSV 網址，所以不做網址轉換
 # ---------------------------------------------------------
-def convert_gsheet_url(url: str) -> str:
-    url = str(url).strip()
-    if not url:
-        return ""
-
-    # 已經是可直接讀的 csv 連結，就不要再改
-    if "export?format=csv" in url or "output=csv" in url:
-        return url
-
-    # 已發佈的 Google Sheet：/spreadsheets/d/e/{pub_id}/...
-    m_pub = re.search(r"/spreadsheets/d/e/([a-zA-Z0-9\-_]+)", url)
-    if m_pub:
-        pub_id = m_pub.group(1)
-        return f"https://docs.google.com/spreadsheets/d/e/{pub_id}/pub?output=csv"
-
-    # 一般可編輯 Google Sheet：/spreadsheets/d/{doc_id}/...
-    m_doc = re.search(r"/spreadsheets/d/([a-zA-Z0-9\-_]+)", url)
-    if m_doc:
-        doc_id = m_doc.group(1)
-        gid_match = re.search(r"[#?&]gid=(\d+)", url)
-        gid = gid_match.group(1) if gid_match else "0"
-        return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
-
-    return url
-
-
 def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
-    url = convert_gsheet_url(url)
+    url = str(url).strip()
     if not url:
         return pd.DataFrame()
 
@@ -56,11 +30,17 @@ def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
     if not text:
         return pd.DataFrame()
 
-    # 如果抓到的是 html，不是 csv，直接丟錯讓前端顯示
     if text.lower().startswith("<!doctype html") or text.lower().startswith("<html"):
-        raise ValueError("讀到的是 HTML，不是 CSV。請確認 Google Sheet 是否已開放共用或已發佈為 CSV。")
+        raise ValueError("讀到的是 HTML，不是 CSV。請確認你貼的是 CSV 直連網址。")
 
     return pd.read_csv(io.StringIO(text), dtype=dtype)
+
+
+# ---------------------------------------------------------
+# 舊介面保留：不轉網址，原樣回傳，避免 app / aar import 壞掉
+# ---------------------------------------------------------
+def convert_gsheet_url(url: str) -> str:
+    return str(url).strip()
 
 
 # ---------------------------------------------------------
@@ -81,20 +61,8 @@ def load_industry_map():
 
 
 # ---------------------------------------------------------
-# 股價抓取
+# 報價抓取工具
 # ---------------------------------------------------------
-def get_yf_session():
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        )
-    })
-    return session
-
-
 def _normalize_price_df(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
@@ -117,74 +85,105 @@ def _normalize_price_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def get_yf_session():
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        )
+    })
+    return session
+
+
+def _get_finmind_price(sid_str: str, fm_token=None, days=240) -> pd.DataFrame:
+    if not fm_token or not str(fm_token).strip():
+        return pd.DataFrame()
+
+    try:
+        start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        url = "https://api.finmindtrade.com/api/v4/data"
+        params = {
+            "dataset": "TaiwanStockPrice",
+            "data_id": sid_str,
+            "start_date": start_date,
+            "token": str(fm_token).strip(),
+        }
+        res = requests.get(url, params=params, timeout=12, verify=False).json()
+        if res.get("msg") != "success" or not res.get("data"):
+            return pd.DataFrame()
+
+        df = pd.DataFrame(res["data"])
+        df.rename(columns={
+            "date": "Date",
+            "open": "Open",
+            "max": "High",
+            "min": "Low",
+            "close": "Close",
+            "Trading_Volume": "Volume",
+            "trading_volume": "Volume",
+        }, inplace=True)
+
+        if "Date" not in df.columns:
+            return pd.DataFrame()
+
+        df["Date"] = pd.to_datetime(df["Date"])
+        df.set_index("Date", inplace=True)
+        return _normalize_price_df(df)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _get_yf_history(sym: str, period="6mo") -> pd.DataFrame:
+    try:
+        df = yf.Ticker(sym).history(period=period, auto_adjust=False)
+        return _normalize_price_df(df)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _get_yf_download(sym: str, period="6mo") -> pd.DataFrame:
+    try:
+        session = get_yf_session()
+        try:
+            df = yf.download(sym, period=period, progress=False, auto_adjust=False, threads=False, session=session)
+        except TypeError:
+            df = yf.download(sym, period=period, progress=False, auto_adjust=False, threads=False)
+        return _normalize_price_df(df)
+    except Exception:
+        return pd.DataFrame()
+
+
 def safe_download(sid, fm_token=None, period="6mo"):
     sid_str = str(sid).strip()
     if not sid_str:
         return pd.DataFrame()
 
-    is_tw_stock = sid_str[0].isdigit()
+    is_numeric = sid_str[0].isdigit()
 
-    # 1) 台股先走 FinMind
-    if is_tw_stock and fm_token and str(fm_token).strip():
-        try:
-            start_date = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
-            url = "https://api.finmindtrade.com/api/v4/data"
-            params = {
-                "dataset": "TaiwanStockPrice",
-                "data_id": sid_str,
-                "start_date": start_date,
-                "token": str(fm_token).strip(),
-            }
-            res = requests.get(url, params=params, timeout=10, verify=False).json()
-            if res.get("msg") == "success" and res.get("data"):
-                df = pd.DataFrame(res["data"])
-                df.rename(columns={
-                    "date": "Date",
-                    "open": "Open",
-                    "max": "High",
-                    "min": "Low",
-                    "close": "Close",
-                    "Trading_Volume": "Volume",
-                    "trading_volume": "Volume",
-                }, inplace=True)
-
-                if "Date" in df.columns:
-                    df["Date"] = pd.to_datetime(df["Date"])
-                    df.set_index("Date", inplace=True)
-                    df = _normalize_price_df(df)
-                    if len(df) >= 20:
-                        return df
-        except Exception:
-            pass
+    # 1) 台股個股 / ETF 先走 FinMind
+    if is_numeric:
+        df = _get_finmind_price(sid_str, fm_token=fm_token, days=240)
+        if len(df) >= 20:
+            return df
 
     # 2) yfinance Ticker.history
-    try:
-        symbols = [f"{sid_str}.TW", f"{sid_str}.TWO"] if is_tw_stock else [sid_str]
-        for sym in symbols:
-            try:
-                df = yf.Ticker(sym).history(period=period, auto_adjust=False)
-                df = _normalize_price_df(df)
-                if len(df) >= 20:
-                    return df
-            except Exception:
-                continue
-    except Exception:
-        pass
+    if is_numeric:
+        syms = [f"{sid_str}.TW", f"{sid_str}.TWO"]
+    else:
+        syms = [sid_str]
+
+    for sym in syms:
+        df = _get_yf_history(sym, period=period)
+        if len(df) >= 20:
+            return df
 
     # 3) yfinance download
-    try:
-        session = get_yf_session()
-        symbols = [f"{sid_str}.TW", f"{sid_str}.TWO"] if is_tw_stock else [sid_str]
-        for sym in symbols:
-            try:
-                df = yf.download(sym, period=period, progress=False, auto_adjust=False, threads=False)
-                df = _normalize_price_df(df)
-                if len(df) >= 20:
-                    return df
-            except Exception:
-                continue
-    except Exception:
-        pass
+    for sym in syms:
+        df = _get_yf_download(sym, period=period)
+        if len(df) >= 20:
+            return df
 
     return pd.DataFrame()
 
@@ -214,14 +213,14 @@ def get_macro_dashboard():
         "TWD=X": ("美元/台幣(匯率)", "TWD=X"),
     }
 
-    for main_sym, (name, fallback) in indices.items():
-        display_name = name
+    for main_sym, (name, fallback_sym) in indices.items():
         hist = safe_download(main_sym)
 
-        if hist.empty and fallback != main_sym:
-            hist = safe_download(fallback)
+        display_name = name
+        if hist.empty and fallback_sym != main_sym:
+            hist = safe_download(fallback_sym)
             if not hist.empty:
-                display_name = f"{name}(ETF備援)"
+                display_name = f"{name}(備援)"
 
         if hist.empty:
             macro_data.append({
@@ -270,7 +269,7 @@ def get_macro_dashboard():
                 if "台股" in name and bias > 5:
                     overheat_flag = True
                     score -= 2
-                    status = "🔥 過熱"
+                    status = "🔥 高檔過熱"
 
             macro_data.append({
                 "戰區": display_name,
@@ -278,7 +277,6 @@ def get_macro_dashboard():
                 "月線": f"{ma20:.2f}",
                 "狀態": status
             })
-
         except Exception:
             macro_data.append({
                 "戰區": display_name,
@@ -291,7 +289,7 @@ def get_macro_dashboard():
 
 
 # ---------------------------------------------------------
-# 籌碼資料
+# 籌碼
 # ---------------------------------------------------------
 @st.cache_data(ttl=14400, show_spinner=False)
 def fetch_chips_data(fm_token=None):
