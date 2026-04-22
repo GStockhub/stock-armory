@@ -3,25 +3,12 @@ import numpy as np
 import yfinance as yf
 import requests
 import urllib3
+import concurrent.futures
 import time
 from datetime import datetime, timedelta
 import streamlit as st
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# 🚀 AAR 救星：網址自動轉換器
-def convert_gsheet_url(url):
-    url = str(url).strip()
-    if "docs.google.com/spreadsheets/d/" in url and "export?format=csv" not in url:
-        import re
-        match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
-        if match:
-            doc_id = match.group(1)
-            gid = "0"
-            if "gid=" in url:
-                gid = url.split("gid=")[1].split("&")[0]
-            return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
-    return url
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
@@ -36,11 +23,18 @@ def load_industry_map():
     return ind_map, name_map
 
 def safe_download(sid, fm_token=None, retries=2):
+    # 🚀 雲端防彈面具：偽裝成正常使用者的瀏覽器，破解 Streamlit Cloud 封鎖
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
+    
     for suffix in [".TW", ".TWO"]:
         for _ in range(retries):
             try:
                 sym = f"{sid}{suffix}"
-                df = yf.Ticker(sym).history(period="3mo")
+                ticker = yf.Ticker(sym, session=session)
+                df = ticker.history(period="3mo")
                 if not df.empty and len(df) > 5: return df
             except: time.sleep(0.5 + np.random.rand())
             
@@ -175,7 +169,6 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
     if not id_list: return pd.DataFrame()
     
     bulk_data = {}
-    # 🛡️ 拆除機關槍，改為單發安靜下載，防止 IP 被封
     for raw_sid in id_list:
         sid_str = str(raw_sid).strip()
         _, df = fetch_single_stock_batch(sid_str, fm_token)
