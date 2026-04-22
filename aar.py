@@ -33,7 +33,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         st.info("交易日誌沒有資料。")
         return
 
-    # 🚀 致命語法修復：關閉 regex=False，執行最單純的安全字串替換！
+    # 🚀 物理消滅隱形 BOM 亂碼 (確保 regex=False 關閉，避免引擎崩潰)
     df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
 
     def get_val(row, possible_keys, default=""):
@@ -137,13 +137,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         else:
                             demon = "🛡️ 紀律停損"
                             comment = "正常的試錯成本，保持紀律，下一檔會賺回來。"
-                else:
-                    if missed_pnl > buy_cost * 0.1:
-                        demon = "🕊️ 抱不住賣飛"
-                        comment = f"獲利了結，但後續錯失高達 {missed_pnl:,.0f} 元潛在利潤！需練習移動停利法 (如跌破 M5 才全出)。"
                     else:
-                        demon = "🎯 完美狙擊"
-                        comment = "漂亮的波段操作！獲利入袋且賣在相對高點，維持這個節奏。"
+                        if missed_pnl > buy_cost * 0.1:
+                            demon = "🕊️ 抱不住賣飛"
+                            comment = f"獲利了結，但後續錯失高達 {missed_pnl:,.0f} 元潛在利潤！需練習移動停利法 (如跌破 M5 才全出)。"
+                        else:
+                            demon = "🎯 完美狙擊"
+                            comment = "漂亮的波段操作！獲利入袋且賣在相對高點，維持這個節奏。"
                 else:
                     # 持股中診斷
                     if latest_price > m5 > m10:
