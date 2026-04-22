@@ -1,18 +1,19 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-import time
+import concurrent.futures
 from data_center import fetch_single_stock_batch, safe_download
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     sid = str(sid).strip()
     df = safe_download(sid, fm_token)
     if df is None or df.empty or len(df) < 20: return None
     
+    # 穩定修補
     df = df[~df.index.duplicated(keep='last')].copy()
     df['Volume'] = df['Volume'].replace(0, np.nan).ffill().fillna(1000)
-        
+
     close_s, open_s, vol_s = df['Close'], df['Open'], df['Volume']
     p_now = float(close_s.iloc[-1])
     m5 = float(close_s.rolling(5).mean().iloc[-1])
@@ -26,15 +27,6 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df_bt['MA20'] = df_bt['Close'].rolling(20).mean()
     df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
     df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
-    
-    try:
-        df_bt['PrevClose'] = df_bt['Close'].shift(1)
-        df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
-        df_bt['ATR'] = df_bt['TR'].rolling(14).mean()
-        atr_now = float(df_bt['ATR'].iloc[-1])
-        if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03
-    except Exception:
-        atr_now = p_now * 0.03
     
     df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
     df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
@@ -59,28 +51,20 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
         entry_p, prev_close = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
         if entry_p > prev_close * 1.02: continue 
 
-        try:
-            entry_atr = df_bt.iloc[loc_idx]['ATR']
-            if pd.isna(entry_atr) or entry_atr == 0: entry_atr = entry_p * 0.03
-        except:
-            entry_atr = entry_p * 0.03
-
         future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21]
         if future_data.empty: continue
 
-        stop_loss = entry_p - 1.5 * entry_atr
-        tp_target = entry_p + 2.0 * entry_atr
+        stop_loss = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97)
         sold_half, ret = False, 0.0
         
         for f_idx, row in future_data.iterrows():
             curr_p = row['Close']
             curr_m5 = row['MA5']
-            if curr_p > entry_p + entry_atr: stop_loss = max(stop_loss, entry_p) 
-            if not sold_half and curr_p >= tp_target: sold_half = True
+            if not sold_half and curr_p >= entry_p * 1.06: sold_half = True
             
             if sold_half:
                 if curr_p < curr_m5:
-                    ret = 0.5 * ((tp_target - entry_p)/entry_p) + 0.5 * ((curr_m5 - entry_p) / entry_p)
+                    ret = 0.5 * 0.06 + 0.5 * ((curr_m5 - entry_p) / entry_p)
                     break
             else:
                 if curr_p < stop_loss:
@@ -88,7 +72,7 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
                     break
         else:
             final_p = future_data['Close'].iloc[-1]
-            if sold_half: ret = 0.5 * ((tp_target - entry_p)/entry_p) + 0.5 * ((final_p - entry_p) / entry_p)
+            if sold_half: ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p)
             else: ret = (final_p - entry_p) / entry_p
         sim_returns.append(ret)
 
@@ -99,8 +83,8 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
 
     return {
         '代號': sid, '名稱': name, '現價': p_now,
-        'M5': m5, 'M10': m10, 'M20': m20, '乖離': bias, 'ATR': atr_now,
-        '勝率': win_rate, '停損價': p_now - 1.5 * atr_now
+        'M5': m5, 'M10': m10, 'M20': m20, '乖離': bias,
+        '勝率': win_rate, '停損價': max(m10, p_now * 0.97)
     }
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -109,21 +93,17 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
     intel_results = []
     if not id_list: return pd.DataFrame()
     bulk_data = {}
-    
-    # 🛡️ 拆除多執行緒，改為安靜循序下載，避免 Yahoo 防火牆再次把我們擋下
-    for raw_sid in id_list:
-        sid_str = str(raw_sid).strip()
-        df = fetch_single_stock_batch(sid_str, fm_token)[1]
-        if df is not None and not df.empty:
-            bulk_data[sid_str] = df
-        time.sleep(0.1) # 關鍵：停頓 0.1 秒
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(fetch_single_stock_batch, str(sid).strip(), fm_token): str(sid).strip() for sid in id_list}
+        for future in concurrent.futures.as_completed(futures):
+            sid_str, df = future.result()
+            if df is not None: bulk_data[sid_str] = df
             
     for raw_sid in id_list:
         try:
             sid = str(raw_sid).strip()
-            
             if not sid.startswith('00') and not sid.isdigit(): continue
-            ind = TWSE_IND_MAP.get(sid, "其他")
+            ind = TWSE_IND_MAP.get(sid) or "其他"
             if sid.startswith('00'): ind = "ETF"
             if "金融" in ind or "保險" in ind: continue
             
@@ -133,16 +113,22 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_stock = df_stock[~df_stock.index.duplicated(keep='last')].copy()
             df_stock['Volume'] = df_stock['Volume'].replace(0, np.nan).ffill().fillna(1000)
             
-            if len(df_stock) < 20: continue
-            
             close_s, open_s, high_s, low_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['High'], df_stock['Low'], df_stock['Volume']
+            if len(close_s) < 20: continue
+
             p_now = float(close_s.iloc[-1])
             open_now = float(open_s.iloc[-1])
             high_now = float(high_s.iloc[-1])
             low_now = float(low_s.iloc[-1])
+            prev_close = float(close_s.iloc[-2]) if len(close_s) > 1 else open_now
             vol_now = float(vol_s.iloc[-1]) / 1000
             
+            if ((open_now - prev_close) / prev_close * 100) > 2.0: continue
+            if p_now < 20 or vol_now < 1.5: continue
+            
             m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
+            if p_now < m10: continue
+                
             vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1]) / 1000
             bias = ((p_now - m20) / m20) * 100 if m20 > 0 else 0
             
@@ -152,15 +138,6 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_bt['MA20'] = df_bt['Close'].rolling(20).mean()
             df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
             df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
-            
-            try:
-                df_bt['PrevClose'] = df_bt['Close'].shift(1)
-                df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
-                df_bt['ATR'] = df_bt['TR'].rolling(14).mean()
-                atr_now = float(df_bt['ATR'].iloc[-1])
-                if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03
-            except Exception:
-                atr_now = p_now * 0.03
             
             df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
             df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
@@ -187,7 +164,7 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             is_candidate = trend_strength and (is_breakout_base or tactic_b)
             
             if tactic_a_strong and tactic_b: tactic_label = "🔥 雙戰術共振"
-            elif tactic_a_strong: tactic_label = "🚀 S級突破"
+            elif tactic_a_strong: tactic_label = "🚀 S級主升段"
             elif tactic_a_weak: tactic_label = "⚠️ 弱勢震盪"
             elif tactic_b: tactic_label = "🛡️ 穩健回踩"
             else: tactic_label = "⏳ 觀望盤整"
@@ -208,28 +185,20 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
                 entry_p, prev_close_bt = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
                 if entry_p > prev_close_bt * 1.02: continue
                 
-                try:
-                    entry_atr = df_bt.iloc[loc_idx]['ATR']
-                    if pd.isna(entry_atr) or entry_atr == 0: entry_atr = entry_p * 0.03
-                except:
-                    entry_atr = entry_p * 0.03
-                
                 future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21] 
                 if future_data.empty: continue
                 
-                stop_loss = entry_p - 1.5 * entry_atr
-                tp_target = entry_p + 2.0 * entry_atr
+                stop_loss = max(df_bt.iloc[loc_idx]['MA10'], entry_p * 0.97)
                 sold_half, ret = False, 0.0
                 
                 for f_idx, row in future_data.iterrows():
                     curr_p = row['Close']
                     curr_m5 = row['MA5']
-                    if curr_p > entry_p + entry_atr: stop_loss = max(stop_loss, entry_p) 
-                    if not sold_half and curr_p >= tp_target: sold_half = True
+                    if not sold_half and curr_p >= entry_p * 1.06: sold_half = True
                     
                     if sold_half:
                         if curr_p < curr_m5: 
-                            ret = 0.5 * ((tp_target - entry_p) / entry_p) + 0.5 * ((curr_m5 - entry_p) / entry_p)
+                            ret = 0.5 * 0.06 + 0.5 * ((curr_m5 - entry_p) / entry_p)
                             break
                     else:
                         if curr_p < stop_loss:
@@ -237,7 +206,7 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
                             break
                 else: 
                     final_p = future_data['Close'].iloc[-1]
-                    if sold_half: ret = 0.5 * ((tp_target - entry_p) / entry_p) + 0.5 * ((final_p - entry_p) / entry_p)
+                    if sold_half: ret = 0.5 * 0.06 + 0.5 * ((final_p - entry_p) / entry_p)
                     else: ret = (final_p - entry_p) / entry_p
                 sim_returns.append(ret)
                 
@@ -253,10 +222,10 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             if any(h_ind in ind for h_ind in hot_industries): s_score += 1
 
             intel_results.append({
-                '代號': sid, '名稱': TWSE_NAME_MAP.get(sid, sid), '產業': ind, '現價': p_now, '成交量': vol_now, '今日放量': (vol_now > vol_ma5 * 1.5),
+                '代號': sid, '名稱': TWSE_NAME_MAP.get(sid, sid), '產業': ind, '現價': p_now,
                 'M5': m5, 'M10': m10, 'M20': m20, '乖離(%)': bias, '基本達標': is_candidate, '安全指數': max(1, min(10, int(s_score))),
-                '勝率(%)': win_rate, '均報(%)': avg_ret, 'ATR': atr_now, 
-                '停損價': p_now - 1.5 * atr_now, '原始風險差額': 1.5 * atr_now,
+                '勝率(%)': win_rate, '均報(%)': avg_ret, 
+                '停損價': max(m10, p_now * 0.97), '原始風險差額': p_now - max(m10, p_now * 0.97),
                 '戰術型態': tactic_label
             })
         except Exception as e: 
