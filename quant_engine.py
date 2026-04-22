@@ -127,7 +127,7 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             prev_close = float(close_s.iloc[-2]) if len(close_s) > 1 else open_now
             vol_now = float(vol_s.iloc[-1]) / 1000
             
-            if ((open_now - prev_close) / prev_close * 100) > 2.0: continue
+            if ((open_now - prev_close) / prev_close * 100) > 4.5: continue
             if p_now < 20 or vol_now < 1.5: continue
             
             m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
