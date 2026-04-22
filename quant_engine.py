@@ -9,7 +9,6 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df = safe_download(sid, fm_token)
     if df is None or df.empty or len(df) < 20: return None
     
-    # 🩹 V26.8 盤中搶修：YF 零量 Bug 補救
     df = df.copy()
     if float(df['Volume'].iloc[-1]) == 0 and len(df) > 1:
         df.loc[df.index[-1], 'Volume'] = df['Volume'].iloc[-2]
@@ -19,7 +18,7 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     m5 = float(close_s.rolling(5).mean().iloc[-1])
     m10 = float(close_s.rolling(10).mean().iloc[-1])
     m20 = float(close_s.rolling(20).mean().iloc[-1])
-    bias = ((p_now - m20) / m20) * 100
+    bias = ((p_now - m20) / m20) * 100 if m20 > 0 else 0
 
     df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': df['High'], 'Low': df['Low'], 'Volume': df['Volume']})
     df_bt['MA5'] = df_bt['Close'].rolling(5).mean()
@@ -28,12 +27,15 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
     df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
     
-    # ATR 指標實裝
-    df_bt['PrevClose'] = df_bt['Close'].shift(1)
-    df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
-    df_bt['ATR'] = df_bt['TR'].rolling(14).mean()
-    atr_now = float(df_bt['ATR'].iloc[-1])
-    if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03
+    # 🛡️ ATR 獨立防彈機制 (沙盤推演)
+    try:
+        df_bt['PrevClose'] = df_bt['Close'].shift(1)
+        df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
+        df_bt['ATR'] = df_bt['TR'].rolling(14).mean()
+        atr_now = float(df_bt['ATR'].iloc[-1])
+        if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03
+    except Exception:
+        atr_now = p_now * 0.03
     
     df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
     df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
@@ -58,8 +60,11 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
         entry_p, prev_close = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
         if entry_p > prev_close * 1.02: continue 
 
-        entry_atr = df_bt.iloc[loc_idx]['ATR']
-        if pd.isna(entry_atr) or entry_atr == 0: entry_atr = entry_p * 0.03
+        try:
+            entry_atr = df_bt.iloc[loc_idx]['ATR']
+            if pd.isna(entry_atr) or entry_atr == 0: entry_atr = entry_p * 0.03
+        except:
+            entry_atr = entry_p * 0.03
 
         future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21]
         if future_data.empty: continue
@@ -121,7 +126,6 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
             
-            # 🩹 V26.8 盤中搶修：YF 零量 Bug 補救
             df_stock = df_stock.copy()
             if float(df_stock['Volume'].iloc[-1]) == 0 and len(df_stock) > 1:
                 df_stock.loc[df_stock.index[-1], 'Volume'] = df_stock['Volume'].iloc[-2]
@@ -131,19 +135,11 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             open_now = float(open_s.iloc[-1])
             high_now = float(high_s.iloc[-1])
             low_now = float(low_s.iloc[-1])
-            prev_close = float(close_s.iloc[-2]) if len(close_s) > 1 else open_now
             vol_now = float(vol_s.iloc[-1]) / 1000
             
-            # ⚔️ 放寬跳空限制為 4.5% (75分均衡突擊裝甲)
-            if ((open_now - prev_close) / prev_close * 100) > 4.5: continue
-            
-            if p_now < 20 or vol_now < 1.5: continue
-            
             m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
-            if p_now < m10: continue
-                
             vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1]) / 1000
-            bias = ((p_now - m20) / m20) * 100
+            bias = ((p_now - m20) / m20) * 100 if m20 > 0 else 0
             
             df_bt = pd.DataFrame({'Close': close_s, 'Open': open_s, 'High': high_s, 'Low': low_s, 'Volume': vol_s})
             df_bt['MA5'] = df_bt['Close'].rolling(5).mean()
@@ -152,11 +148,15 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
             df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
             
-            df_bt['PrevClose'] = df_bt['Close'].shift(1)
-            df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
-            df_bt['ATR'] = df_bt['TR'].rolling(14).mean()
-            atr_now = float(df_bt['ATR'].iloc[-1])
-            if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03
+            # 🛡️ ATR 獨立防彈機制 (大部隊運算)
+            try:
+                df_bt['PrevClose'] = df_bt['Close'].shift(1)
+                df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
+                df_bt['ATR'] = df_bt['TR'].rolling(14).mean()
+                atr_now = float(df_bt['ATR'].iloc[-1])
+                if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03
+            except Exception:
+                atr_now = p_now * 0.03
             
             df_bt['RSV'] = (df_bt['Close'] - df_bt['Low'].rolling(9).min()) / (df_bt['High'].rolling(9).max() - df_bt['Low'].rolling(9).min()) * 100
             df_bt['K'] = df_bt['RSV'].ewm(alpha=1/3, adjust=False).mean()
@@ -167,7 +167,7 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             k_now, d_now = float(df_bt['K'].iloc[-1]), float(df_bt['D'].iloc[-1])
             red_k = p_now > open_now
             close_position = (p_now - low_now) / (high_now - low_now) if high_now > low_now else 0
-            is_strong_candle = ((p_now - open_now) / open_now) > 0.04
+            is_strong_candle = ((p_now - open_now) / open_now) > 0.04 if open_now > 0 else False
             
             trend_strength = (m5 > m10) and (m10 > m20)
             vol_ratio = vol_now / vol_ma5 if vol_ma5 > 0 else 0
@@ -183,8 +183,8 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             is_candidate = trend_strength and (is_breakout_base or tactic_b)
             
             if tactic_a_strong and tactic_b: tactic_label = "🔥 雙戰術共振"
-            elif tactic_a_strong: tactic_label = "🚀 S級主升段 (重擊)"
-            elif tactic_a_weak: tactic_label = "⚠️ 降級弱突破 (避雷)"
+            elif tactic_a_strong: tactic_label = "🚀 S級突破"
+            elif tactic_a_weak: tactic_label = "⚠️ 弱勢震盪"
             elif tactic_b: tactic_label = "🛡️ 穩健回踩"
             else: tactic_label = "⏳ 觀望盤整"
             
@@ -204,8 +204,11 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
                 entry_p, prev_close_bt = df_bt.iloc[loc_idx + 1]['Open'], df_bt.iloc[loc_idx]['Close']
                 if entry_p > prev_close_bt * 1.02: continue
                 
-                entry_atr = df_bt.iloc[loc_idx]['ATR']
-                if pd.isna(entry_atr) or entry_atr == 0: entry_atr = entry_p * 0.03
+                try:
+                    entry_atr = df_bt.iloc[loc_idx]['ATR']
+                    if pd.isna(entry_atr) or entry_atr == 0: entry_atr = entry_p * 0.03
+                except:
+                    entry_atr = entry_p * 0.03
                 
                 future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21] 
                 if future_data.empty: continue
@@ -252,5 +255,7 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
                 '停損價': p_now - 1.5 * atr_now, '原始風險差額': 1.5 * atr_now,
                 '戰術型態': tactic_label
             })
-        except: continue
+        except Exception as e: 
+            # 如果真的發生毀滅性錯誤，強迫跳過這檔股票，絕不牽連其他人
+            continue
     return pd.DataFrame(intel_results)
