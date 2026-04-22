@@ -6,7 +6,7 @@ import time
 import ssl
 from streamlit_cookies_controller import CookieController
 
-from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel
+from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel, convert_gsheet_url
 from quant_engine import run_sandbox_sim, level2_quant_engine
 
 try:
@@ -76,16 +76,17 @@ st.markdown("""
 configs = sidebar.render_sidebar()
 
 COLORS = configs["COLORS"]
-sheet_url = configs["sheet_url"]
-aar_sheet_url = configs["aar_sheet_url"]
+# 🚀 透過自動轉換器清洗網址，解決 AAR "尚無資料" 問題！
+sheet_url = convert_gsheet_url(configs["sheet_url"])
+aar_sheet_url = convert_gsheet_url(configs["aar_sheet_url"])
 total_capital = configs["total_capital"]
 risk_amount = configs["risk_amount"]
 fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v26.7</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.95</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極防封鎖 ✕ AAR 修復版 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
@@ -112,7 +113,7 @@ elif MACRO_SCORE <= 5:
     st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
 
 if OVERHEAT_FLAG:
-    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
+    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已強制限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
 
 with st.spinner('情報兵正在部署防線 (FinMind 驅動中)...'):
     chip_db = fetch_chips_data()
@@ -329,7 +330,7 @@ if len(chip_db) >= 1:
                                     .map(risk_color, subset=['量化評分']))
                     st.dataframe(styled_c, use_container_width=True, hide_index=True)
             else:
-                st.warning("⚠️ 今日行情極度惡劣，所有掃描名單皆已跌破 M10 防守線或量能萎縮。為保護資金，今日指揮所不指派任何建倉目標，請保持空手觀望！", icon="🛡️")
+                st.warning("⚠️ 今日行情極度惡劣，所有掃描名單皆已跌破防守線或量能萎縮。為保護資金，今日不指派任何建倉目標，請保持空手觀望！", icon="🛡️")
 
     with t_chip:
         st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
@@ -386,7 +387,6 @@ if len(chip_db) >= 1:
                         
                         m5, m10 = float(r.get('M5', 0)) if pd.notna(r.get('M5', 0)) else 0.0, float(r.get('M10', 0)) if pd.notna(r.get('M10', 0)) else 0.0
                         
-                        # 🚀 V26.7: 抓取 ATR 與動態停損
                         atr = float(r.get('ATR', p_now * 0.03))
                         dynamic_sl = float(r.get('停損價', p_cost - 1.5 * atr))
                         
@@ -440,4 +440,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.7 </p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.95 </p>", unsafe_allow_html=True)
