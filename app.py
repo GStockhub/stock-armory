@@ -70,8 +70,8 @@ fee_discount = configs["fee_discount"]
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v27.5</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 破曉神盾 ✕ 語法無錯版 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v27.6</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 破曉神盾 ✕ 下載清單補完版 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -118,7 +118,6 @@ if len(chip_db) >= 1:
     if sheet_url:
         try:
             sheet_df = read_remote_csv(sheet_url, dtype=str)
-            # 🚀 致命語法修復：關閉 regex=False，執行最單純的安全字串替換！
             sheet_df.columns = sheet_df.columns.str.replace('\ufeff', '', regex=False).str.strip()
             h_df = sheet_df[sheet_df["分類"] == "持股"].copy() if "分類" in sheet_df.columns else sheet_df.copy()
             if not h_df.empty and "代號" in h_df.columns:
@@ -165,7 +164,7 @@ if len(chip_db) >= 1:
                     else: st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
 
         st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
-        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
+        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊 (軟性權重模型)</span>", unsafe_allow_html=True)
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty:
@@ -218,11 +217,49 @@ if len(chip_db) >= 1:
 
                     master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
 
+                    # 🚀 救星：把「現役持股」撈進來放在上半部
+                    holding_rows = []
+                    if not m_df.empty:
+                        for _, r in m_df.iterrows():
+                            try:
+                                p_now = float(r.get('現價', 0) or 0)
+                                p_cost = float(str(r.get("成本價", r.get("成本", r.get("買進價", 0)))).replace(",", "") or 0)
+                                qty = float(str(r.get("庫存張數", r.get("張數", r.get("庫存", 0)))).replace(",", "") or 0)
+                                atr = float(r.get('ATR', p_now * 0.03))
+                                dynamic_sl = float(r.get('停損價', p_cost - 1.5 * atr))
+                                
+                                holding_rows.append({
+                                    "戰區": "🛡️ 現役持股",
+                                    "代號": r.get("代號", ""),
+                                    "名稱": r.get("名稱", ""),
+                                    "戰術行動": f"庫存 {qty} 張",
+                                    "量化評分": "-",
+                                    "現價": round(p_now, 2) if p_now > 0 else "抓取中",
+                                    "ATR停損": round(dynamic_sl, 2),
+                                    "次要數據": f"成本 {p_cost}",
+                                    "產業": r.get("產業", "未知")
+                                })
+                            except Exception:
+                                continue
+
                     export_rows = []
                     tier_names = {"S": "🥇 S級狙擊", "A": "🥈 A級狙擊", "B": "⚔️ B級穩健", "C": "📡 C級潛伏"}
                     for _, r in master_list.iterrows():
                         export_rows.append({"戰區": tier_names.get(r["評級"], ""), "代號": r["代號"], "名稱": r["名稱_x"], "戰術行動": "👀 列入觀察" if r["評級"] == "C" else f"建議買 {r['建議買量(張)']} 張", "量化評分": r["Quant_Score"], "現價": round(r["現價"], 2), "ATR停損": round(r["停損價"], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r["產業"]})
-                    st.download_button(label="📱 明日目標下載", data=pd.DataFrame(export_rows).to_csv(index=False).encode("utf-8-sig"), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
+                    
+                    # 🚀 合併清單：現役持股 -> 兩行空白 -> 明日目標
+                    final_export = []
+                    if holding_rows:
+                        final_export.extend(holding_rows)
+                        empty_row = {
+                            "戰區": "", "代號": "", "名稱": "", "戰術行動": "",
+                            "量化評分": "", "現價": "", "ATR停損": "", "次要數據": "", "產業": ""
+                        }
+                        final_export.extend([empty_row, empty_row]) # 隔兩行
+                        
+                    final_export.extend(export_rows)
+
+                    st.download_button(label="📱 明日目標下載", data=pd.DataFrame(final_export).to_csv(index=False).encode("utf-8-sig"), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
                 
                 ui_s = master_list[master_list["評級"] == "S"]
                 ui_a = master_list[master_list["評級"] == "A"]
@@ -393,4 +430,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V27.5 (語法無錯版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V27.6 (下載清單補完版)</p>", unsafe_allow_html=True)
