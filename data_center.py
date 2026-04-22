@@ -55,15 +55,23 @@ def fetch_single_stock_batch(sid, fm_token=None):
 def get_macro_dashboard():
     score = 5.0
     macro_data = []
-    OVERHEAT_FLAG = False # 🌋 V26.5: 新增過熱警報標記
-    indices = {"^TWII": ("台股加權", "2330.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
+    OVERHEAT_FLAG = False 
+    
+    # 🚀 V26.6: 新增「美元兌台幣 (TWD=X)」外資熱錢照妖鏡
+    indices = {
+        "^TWII": ("台股加權", "2330.TW"), 
+        "^PHLX_SO": ("美費半導體", "SOXX"), 
+        "^IXIC": ("那斯達克", "QQQ"), 
+        "^VIX": ("恐慌指數", "VIXY"),
+        "TWD=X": ("美元/台幣(匯率)", "TWD=X") # 👈 新增匯率指標
+    }
     
     for main_sym, (base_name, fallback_sym) in indices.items():
         display_name = base_name
         hist = safe_download(main_sym.replace('^','')) 
         if hist.empty:
             hist = yf.Ticker(fallback_sym).history(period="3mo")
-            if not hist.empty: display_name = f"{base_name} (備援: {fallback_sym.replace('.TW','')})"
+            if not hist.empty: display_name = f"{base_name} (備援)"
         
         if hist.empty:
             macro_data.append({"戰區": display_name, "現值": "抓取失敗", "月線": "-", "狀態": "⚪ 斷線"})
@@ -73,22 +81,36 @@ def get_macro_dashboard():
             close_s = hist['Close']
             last_p = float(close_s.iloc[-1])
             ma20 = float(close_s.rolling(20).mean().iloc[-1])
-            bias = ((last_p - ma20) / ma20) * 100 # 計算大盤乖離率
+            bias = ((last_p - ma20) / ma20) * 100 
             
+            # 預設狀態與加減分
             status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
             
-            if base_name == "恐慌指數":
+            # 獨立邏輯 1：恐慌指數 (越高越危險)
+            if "恐慌指數" in base_name:
                 status = "🔴 恐慌" if last_p > 25 else ("🟡 警戒" if last_p > 18 else "🟢 安定")
                 if last_p > 25: score -= 2
                 elif last_p < 18: score += 1
+                
+            # 獨立邏輯 2：台幣匯率 (越高代表台幣越貶值，資金外逃，越危險)
+            elif "匯率" in base_name:
+                # 如果目前的匯率大於月線，代表美元強勢、台幣正在貶值
+                if last_p > ma20: 
+                    status = "🔴 貶值(資金外逃)"
+                    score -= 1.5 # 外資撤出，扣分
+                else: 
+                    status = "🟢 升值(熱錢湧入)"
+                    score += 1.5 # 熱錢湧入，加分
+                    
+            # 獨立邏輯 3：一般股市大盤 (越高越好)
             else:
                 if last_p > ma20: score += 1
                 else: score -= 1
                 
-                # 🌋 V26.5: 台股過熱專屬偵測！如果大盤正乖離超過 5%，直接啟動警報！
-                if base_name == "台股加權" and bias > 5.0:
+                # 台股過熱專屬偵測
+                if "台股加權" in base_name and bias > 5.0:
                     OVERHEAT_FLAG = True
-                    score -= 3 # 嚴格扣分懲罰
+                    score -= 3 
                     status = "🔥 高檔過熱"
                 
             macro_data.append({"戰區": display_name, "現值": f"{last_p:.2f}", "月線": f"{ma20:.2f}", "狀態": status})
@@ -96,7 +118,6 @@ def get_macro_dashboard():
             macro_data.append({"戰區": display_name, "現值": "計算失敗", "月線": "-", "狀態": "⚪ 斷線"})
             continue
             
-    # 回傳值從兩個變成三個，把警報旗標傳給前線
     return max(1, min(10, int(score))), pd.DataFrame(macro_data), OVERHEAT_FLAG
 
 @st.cache_data(ttl=14400, show_spinner=False)
