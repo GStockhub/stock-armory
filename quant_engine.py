@@ -8,6 +8,12 @@ from data_center import fetch_single_stock_batch, safe_download
 def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df = safe_download(sid, fm_token)
     if df is None or df.empty or len(df) < 20: return None
+    
+    # 🩹 V26.8 盤中搶修：YF 零量 Bug 補救
+    df = df.copy()
+    if float(df['Volume'].iloc[-1]) == 0 and len(df) > 1:
+        df.loc[df.index[-1], 'Volume'] = df['Volume'].iloc[-2]
+        
     close_s, open_s, vol_s = df['Close'], df['Open'], df['Volume']
     p_now = float(close_s.iloc[-1])
     m5 = float(close_s.rolling(5).mean().iloc[-1])
@@ -22,7 +28,7 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
     df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
     
-    # 🚀 V26.7: ATR 指標實裝
+    # ATR 指標實裝
     df_bt['PrevClose'] = df_bt['Close'].shift(1)
     df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
     df_bt['ATR'] = df_bt['TR'].rolling(14).mean()
@@ -58,7 +64,6 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
         future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21]
         if future_data.empty: continue
 
-        # 🛡️ 實裝 ATR 動態風控與移動保本
         stop_loss = entry_p - 1.5 * entry_atr
         tp_target = entry_p + 2.0 * entry_atr
         sold_half, ret = False, 0.0
@@ -66,11 +71,7 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
         for f_idx, row in future_data.iterrows():
             curr_p = row['Close']
             curr_m5 = row['MA5']
-            
-            # 保本機制：帳面獲利超過 1 個 ATR，停損線上移至成本價保本
-            if curr_p > entry_p + entry_atr: 
-                stop_loss = max(stop_loss, entry_p) 
-                
+            if curr_p > entry_p + entry_atr: stop_loss = max(stop_loss, entry_p) 
             if not sold_half and curr_p >= tp_target: sold_half = True
             
             if sold_half:
@@ -116,8 +117,14 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             ind = TWSE_IND_MAP.get(sid) or "其他"
             if sid.startswith('00'): ind = "ETF"
             if "金融" in ind or "保險" in ind: continue
+            
             df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
+            
+            # 🩹 V26.8 盤中搶修：YF 零量 Bug 補救
+            df_stock = df_stock.copy()
+            if float(df_stock['Volume'].iloc[-1]) == 0 and len(df_stock) > 1:
+                df_stock.loc[df_stock.index[-1], 'Volume'] = df_stock['Volume'].iloc[-2]
             
             close_s, open_s, high_s, low_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['High'], df_stock['Low'], df_stock['Volume']
             p_now = float(close_s.iloc[-1])
@@ -127,7 +134,9 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             prev_close = float(close_s.iloc[-2]) if len(close_s) > 1 else open_now
             vol_now = float(vol_s.iloc[-1]) / 1000
             
+            # ⚔️ 放寬跳空限制為 4.5% (75分均衡突擊裝甲)
             if ((open_now - prev_close) / prev_close * 100) > 4.5: continue
+            
             if p_now < 20 or vol_now < 1.5: continue
             
             m5, m10, m20 = float(close_s.rolling(5).mean().iloc[-1]), float(close_s.rolling(10).mean().iloc[-1]), float(close_s.rolling(20).mean().iloc[-1])
@@ -143,7 +152,6 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
             df_bt['RollMax20'] = df_bt['Close'].rolling(20).max()
             df_bt['Vol_MA5'] = df_bt['Volume'].rolling(5).mean()
             
-            # 🚀 V26.7: ATR 實裝
             df_bt['PrevClose'] = df_bt['Close'].shift(1)
             df_bt['TR'] = np.maximum(df_bt['High'] - df_bt['Low'], np.maximum(abs(df_bt['High'] - df_bt['PrevClose']), abs(df_bt['Low'] - df_bt['PrevClose'])))
             df_bt['ATR'] = df_bt['TR'].rolling(14).mean()
@@ -202,7 +210,6 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
                 future_data = df_bt.iloc[loc_idx + 1 : loc_idx + 21] 
                 if future_data.empty: continue
                 
-                # 🛡️ 實裝 ATR 動態風控與移動保本
                 stop_loss = entry_p - 1.5 * entry_atr
                 tp_target = entry_p + 2.0 * entry_atr
                 sold_half, ret = False, 0.0
