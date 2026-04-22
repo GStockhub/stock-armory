@@ -3,25 +3,12 @@ import numpy as np
 import yfinance as yf
 import requests
 import urllib3
+import concurrent.futures
 import time
 from datetime import datetime, timedelta
 import streamlit as st
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# 🚀 V26.95: 終極網址轉換器，破解 Google 表單 HTML 陷阱！
-def convert_gsheet_url(url):
-    url = str(url).strip()
-    if "docs.google.com/spreadsheets/d/" in url and "export?format=csv" not in url:
-        import re
-        match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
-        if match:
-            doc_id = match.group(1)
-            gid = "0"
-            if "gid=" in url:
-                gid = url.split("gid=")[1].split("&")[0]
-            return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
-    return url
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
@@ -68,15 +55,7 @@ def fetch_single_stock_batch(sid, fm_token=None):
 def get_macro_dashboard():
     score = 5.0
     macro_data = []
-    OVERHEAT_FLAG = False 
-    
-    indices = {
-        "^TWII": ("台股加權", "2330.TW"), 
-        "^PHLX_SO": ("美費半導體", "SOXX"), 
-        "^IXIC": ("那斯達克", "QQQ"), 
-        "^VIX": ("恐慌指數", "VIXY"),
-        "TWD=X": ("美元/台幣(匯率)", "TWD=X")
-    }
+    indices = {"^TWII": ("台股加權", "2330.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
     
     for main_sym, (base_name, fallback_sym) in indices.items():
         display_name = base_name
@@ -97,31 +76,20 @@ def get_macro_dashboard():
             
             status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
             
-            if "恐慌指數" in base_name:
+            if base_name == "恐慌指數":
                 status = "🔴 恐慌" if last_p > 25 else ("🟡 警戒" if last_p > 18 else "🟢 安定")
                 if last_p > 25: score -= 2
                 elif last_p < 18: score += 1
-            elif "匯率" in base_name:
-                if last_p > ma20: 
-                    status = "🔴 貶值(資金外逃)"
-                    score -= 1.5 
-                else: 
-                    status = "🟢 升值(熱錢湧入)"
-                    score += 1.5 
             else:
                 if last_p > ma20: score += 1
                 else: score -= 1
-                if "台股加權" in base_name and bias > 5.0:
-                    OVERHEAT_FLAG = True
-                    score -= 3 
-                    status = "🔥 高檔過熱"
                 
             macro_data.append({"戰區": display_name, "現值": f"{last_p:.2f}", "月線": f"{ma20:.2f}", "狀態": status})
         except: 
             macro_data.append({"戰區": display_name, "現值": "計算失敗", "月線": "-", "狀態": "⚪ 斷線"})
             continue
             
-    return max(1, min(10, int(score))), pd.DataFrame(macro_data), OVERHEAT_FLAG
+    return max(1, min(10, int(score))), pd.DataFrame(macro_data)
 
 @st.cache_data(ttl=14400, show_spinner=False)
 def fetch_chips_data(fm_token=None):
@@ -176,6 +144,7 @@ def fetch_chips_data(fm_token=None):
                             clean['外資(張)'] = pivot_df[for_cols].sum(axis=1).values if for_cols else 0
                             clean['自營(張)'] = pivot_df[deal_cols].sum(axis=1).values if deal_cols else 0
                             clean['三大法人合計'] = clean['投信(張)'] + clean['外資(張)'] + clean['自營(張)']
+                            
                             chip_dict[d_str] = clean
                             success = True
                 except: pass
@@ -194,17 +163,17 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
     if not id_list: return pd.DataFrame()
     
     bulk_data = {}
-    # 🛡️ 拆除多執行緒，改為安靜的循序下載防封鎖
-    for sid in id_list:
-        sid_str = str(sid).strip()
-        df = fetch_single_stock_batch(sid_str, fm_token)[1]
-        if df is not None and not df.empty: 
-            bulk_data[sid_str] = df
-        time.sleep(0.1) # 降速防擋
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(fetch_single_stock_batch, str(sid).strip(), fm_token): str(sid).strip() for sid in id_list}
+        for future in concurrent.futures.as_completed(futures):
+            sid, df = future.result()
+            if df is not None and not df.empty: 
+                bulk_data[sid] = df
                 
-    for sid in id_list:
+    for raw_sid in id_list:
         try:
-            df_stock = bulk_data.get(str(sid).strip())
+            sid = str(raw_sid).strip()
+            df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
             close_s = df_stock['Close']
             if len(close_s) < 20: continue
@@ -214,19 +183,13 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
             m10 = float(close_s.rolling(10).mean().iloc[-1])
             m20 = float(close_s.rolling(20).mean().iloc[-1])
             
-            df_stock['PrevClose'] = df_stock['Close'].shift(1)
-            df_stock['TR'] = np.maximum(df_stock['High'] - df_stock['Low'], np.maximum(abs(df_stock['High'] - df_stock['PrevClose']), abs(df_stock['Low'] - df_stock['PrevClose'])))
-            df_stock['ATR'] = df_stock['TR'].rolling(14).mean()
-            atr_now = float(df_stock['ATR'].iloc[-1])
-            if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03
-            
-            ind = TWSE_IND_MAP.get(str(sid).strip()) or "其他"
-            if str(sid).strip().startswith('00'): ind = "ETF"
+            ind = TWSE_IND_MAP.get(sid) or "其他"
+            if sid.startswith('00'): ind = "ETF"
             
             intel_results.append({
-                '代號': str(sid).strip(), '產業': ind, '現價': p_now,
-                'M5': m5, 'M10': m10, 'M20': m20, 'ATR': atr_now,
-                '停損價': p_now - 1.5 * atr_now
+                '代號': sid, '產業': ind, '現價': p_now,
+                'M5': m5, 'M10': m10, 'M20': m20,
+                '停損價': max(m10, p_now * 0.97)
             })
         except: continue
     return pd.DataFrame(intel_results)
