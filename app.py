@@ -6,8 +6,7 @@ import time
 import ssl
 from streamlit_cookies_controller import CookieController
 
-# 🚀 引用網址轉換器
-from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel, convert_gsheet_url
+from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel
 from quant_engine import run_sandbox_sim, level2_quant_engine
 
 try:
@@ -75,19 +74,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 configs = sidebar.render_sidebar()
-COLORS = configs["COLORS"]
 
-# 🚀 使用轉換器強制把網址變成可讀的 CSV 格式！解決 AAR 報錯！
-sheet_url = convert_gsheet_url(configs["sheet_url"])
-aar_sheet_url = convert_gsheet_url(configs["aar_sheet_url"])
+COLORS = configs["COLORS"]
+sheet_url = configs["sheet_url"]
+aar_sheet_url = configs["aar_sheet_url"]
 total_capital = configs["total_capital"]
 risk_amount = configs["risk_amount"]
 fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.50</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極穩健回歸 ✕ 防封鎖修復版 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.42</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 雲端防彈回歸版 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
@@ -111,7 +109,7 @@ def format_lots(shares):
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
 
-with st.spinner('情報兵正在部署防線 (緩速防擋下載中，約需 10 秒)...'):
+with st.spinner('情報兵正在部署防線 (FinMind 驅動中)...'):
     chip_db = fetch_chips_data(FM_TOKEN)
 
 m_df = pd.DataFrame() 
@@ -202,7 +200,10 @@ if len(chip_db) >= 1:
         if calc_list and MACRO_SCORE > 3: 
             intel_df = level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
             
-            if intel_df is not None and not intel_df.empty:
+            # 🚀 雲端防護：真正辨識是「斷線」還是「沒股票」
+            if intel_df is None:
+                st.error("🚨 **致命錯誤：資料源完全斷線！**\n\n報告大將軍，Streamlit 雲端伺服器的 IP 已經被 Yahoo 徹底封鎖，且您的 FinMind 額度也已耗盡，導致情報兵拿不到半檔股票的資料！\n\n**💡 解決方案**：\n這與您的參數無關，也無法靠手機換網路解決（因為是雲端主機被擋）。系統現在已換上「偽裝面具裝甲」，但如果仍被擋，請您放置 1 個小時，等待 FinMind 每小時額度重置後，部隊就會自動滿血復活！", icon="💀")
+            elif not intel_df.empty:
                 final_rank = pd.merge(today_df, intel_df, on='代號')
                 
                 def calculate_quant_score(row):
@@ -429,4 +430,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V26.50 (終極穩健回歸版) </p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.42 雲端修復版 </p>", unsafe_allow_html=True)
