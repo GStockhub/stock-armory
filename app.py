@@ -6,7 +6,8 @@ import time
 import ssl
 from streamlit_cookies_controller import CookieController
 
-from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel
+# 🚀 引用網址轉換器
+from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel, convert_gsheet_url
 from quant_engine import run_sandbox_sim, level2_quant_engine
 
 try:
@@ -51,7 +52,7 @@ if auth_status != 'verified_auth':
     st.stop()
 
 # ---------------------------------------------------------
-# 📱 視覺裝甲 (九宮格防護)
+# 📱 視覺裝甲
 # ---------------------------------------------------------
 st.markdown("""
 <style>
@@ -74,18 +75,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 configs = sidebar.render_sidebar()
-
 COLORS = configs["COLORS"]
-sheet_url = configs["sheet_url"]
-aar_sheet_url = configs["aar_sheet_url"]
+
+# 🚀 使用轉換器強制把網址變成可讀的 CSV 格式！解決 AAR 報錯！
+sheet_url = convert_gsheet_url(configs["sheet_url"])
+aar_sheet_url = convert_gsheet_url(configs["aar_sheet_url"])
 total_capital = configs["total_capital"]
 risk_amount = configs["risk_amount"]
 fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.41</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.50</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極穩健回歸 ✕ 防封鎖修復版 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
@@ -109,8 +111,7 @@ def format_lots(shares):
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
 
-with st.spinner('情報兵正在部署防線 (FinMind 驅動中)...'):
-    # 🚀 致命修復：將 FM_TOKEN 發給情報兵，啟動備用雷達！
+with st.spinner('情報兵正在部署防線 (緩速防擋下載中，約需 10 秒)...'):
     chip_db = fetch_chips_data(FM_TOKEN)
 
 m_df = pd.DataFrame() 
@@ -190,8 +191,8 @@ if len(chip_db) >= 1:
                     else: st.error("❌ 查無此股票或歷史資料不足，請確認代號是否正確。")
         st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS['border'] + ";'>", unsafe_allow_html=True)
 
-        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
-        st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率/均報/型態動能/籌碼」動態加權運算，分數越高代表共振越強！")
+        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊 (軟性權重模型)</span>", unsafe_allow_html=True)
+        st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率 + 均報 + 型態動能 + 籌碼」動態加權運算，分數越高代表共振越強！")
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty: st.dataframe(MACRO_DF.style.set_properties(**table_style).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
@@ -324,11 +325,11 @@ if len(chip_db) >= 1:
                                     .map(risk_color, subset=['量化評分']))
                     st.dataframe(styled_c, use_container_width=True, hide_index=True)
             else:
-                st.warning("⚠️ 今日行情極度惡劣，所有掃描名單皆已跌破 M10 防守線或量能萎縮。為保護資金，今日指揮所不指派任何建倉目標，請保持空手觀望！", icon="🛡️")
+                st.warning("⚠️ 報告大將軍！今日行情極度惡劣，所有掃描名單皆已跌破 M10 防守線或量能萎縮。為保護資金，今日指揮所不指派任何建倉目標，請保持空手觀望！", icon="🛡️")
 
     with t_chip:
         st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
-        st.caption("💡 **籌碼流向**：當日全台股外接、投信、自營商買賣超Top 200。")
+        st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
         surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
         if not surprise_atk.empty:
             st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
@@ -428,4 +429,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V26.41 (補給上膛版) </p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V26.50 (終極穩健回歸版) </p>", unsafe_allow_html=True)
