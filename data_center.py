@@ -12,13 +12,20 @@ import yfinance as yf
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ---------------------------------------------------------
-# 🚀 救星：網址自動轉換器 (破解 Google 表單 HTML 陷阱！)
+# 🚀 終極聰明網址轉換器 (絕對不會再把 d/e/ 截斷！)
 # ---------------------------------------------------------
 def convert_gsheet_url(url: str) -> str:
     url = str(url).strip()
-    if "docs.google.com/spreadsheets/d/" in url and "export?format=csv" not in url:
+    if not url: return url
+    
+    # 🚨 絕對防呆：如果網址裡面有 pub (發布到網路) 或 export 或 output=csv，代表已經是純淨資料，絕對不要動它！
+    if "/pub" in url or "export" in url or "output=csv" in url:
+        return url
+        
+    # 只有包含 /edit 或 /view 的一般共用網址才進行轉換，並且精準抓取大於 40 碼的真實 ID
+    if "/edit" in url or "/view" in url:
         import re
-        match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
+        match = re.search(r'/d/([a-zA-Z0-9-_]{40,})', url)
         if match:
             doc_id = match.group(1)
             gid = "0"
@@ -28,7 +35,7 @@ def convert_gsheet_url(url: str) -> str:
     return url
 
 def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
-    url = convert_gsheet_url(url) # 強制轉換網址
+    url = convert_gsheet_url(url)
     if not url: return pd.DataFrame()
 
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -39,7 +46,7 @@ def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
     if not text: return pd.DataFrame()
 
     if text.lower().startswith("<!doctype html") or text.lower().startswith("<html"):
-        raise ValueError("讀到的是 HTML，不是 CSV。請確認網址格式。")
+        raise ValueError("讀到的是 HTML 網頁。請確認您貼的是『發布到網路 -> CSV』的直連網址。")
 
     return pd.read_csv(io.StringIO(text), dtype=dtype)
 
@@ -209,7 +216,7 @@ def fetch_chips_data(fm_token=None):
                             chip_dict[d_str] = clean
                             success = True
                 except Exception: pass
-
+            
             if not success:
                 try:
                     url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={d_str}&selectType=ALLBUT0999&response=json"
