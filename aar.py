@@ -33,7 +33,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         st.info("交易日誌沒有資料。")
         return
 
-    # 🚀 物理消滅隱形 BOM 亂碼 (確保 regex=False 關閉)
+    # 🚀 物理消滅隱形 BOM 亂碼，關閉 regex=False 防止崩潰
     df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
 
     def get_val(row, possible_keys, default=""):
@@ -103,7 +103,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 held_days = (sell_date - buy_date).days if is_sold and pd.notna(sell_date) else (datetime.now() - buy_date).days
 
-                # === 深度診斷與心魔判定 (原汁原味救回版) ===
+                # === 深度診斷與心魔判定 (生動 Icon 完美歸隊) ===
                 demon = ""
                 comment = ""
 
@@ -114,7 +114,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                     post_sell_hist = hist.loc[sell_date:]
                     if not post_sell_hist.empty and len(post_sell_hist) > 1:
-                        post_hist = post_sell_hist.iloc[1:] # 觀察賣出後的走勢
+                        post_hist = post_sell_hist.iloc[1:] 
                         if not post_hist.empty:
                             max_row = post_hist.loc[post_hist['High'].idxmax()]
                             min_row = post_hist.loc[post_hist['Low'].idxmin()]
@@ -132,47 +132,45 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                                 max_missed_profit = missed_pnl
                                 max_missed_stock = f"{TWSE_NAME_MAP.get(sid, sid)} ({missed_pnl:,.0f}元)"
 
-                            # 評分標準重建
+                            # 評分標準與生動語氣
                             if roi > 0:
                                 if missed_pnl > buy_cost * 0.03: 
                                     grade = "🥈 A級"
-                                    comment = f"獲利了結！但隨後於第 {days_to_max} 天漲至 {max_after_sell:.1f} 元，潛在錯失 +{missed_pnl:,.0f} 元。"
+                                    comment = f"🕊️獲利了結！後於第{days_to_max}天漲至{max_after_sell:.1f}元，潛在錯失+{missed_pnl:,.0f}元。"
                                     demon = "🕊️ 賣飛"
                                 else:
                                     grade = "👑 S級"
-                                    comment = "完美停利！賣出後未見大幅創高，波段高點精準入袋！"
+                                    comment = "👑完美停利！賣出後未見大幅創高，波段高點精準入袋！"
                             else:
                                 if avoided_loss > buy_cost * 0.03: 
                                     grade = "⚔️ B級"
-                                    comment = f"果斷停損！隨後於第 {days_to_min} 天跌至 {min_after_sell:.1f} 元，防止 -{avoided_loss:,.0f} 元的虧損！"
+                                    comment = f"🛡️果斷停損！後於第{days_to_min}天跌至{min_after_sell:.1f}元，防止-{avoided_loss:,.0f}元的虧損"
                                     demon = "🛡️ 紀律"
                                 else:
                                     grade = "⚠️ C級"
-                                    comment = f"砍在阿呆谷！賣出後於第 {days_to_max} 天反彈至 {max_after_sell:.1f} 元，潛在可少虧或回血 +{missed_pnl:,.0f} 元。"
+                                    comment = f"😨砍在阿呆谷！後於第{days_to_max}天反彈至{max_after_sell:.1f}元，潛在可少虧或回血+{missed_pnl:,.0f}元"
                                     demon = "😨 恐慌"
                         else:
                             grade = "👑 S級" if roi > 0 else "⚔️ B級"
-                            comment = "剛平倉，無足夠的後續交易日可供覆盤。"
+                            comment = "⏳ 剛平倉，無足夠的後續交易日可供覆盤"
                     else:
                         grade = "👑 S級" if roi > 0 else "⚔️ B級"
-                        comment = "剛平倉，無足夠的後續交易日可供覆盤。"
+                        comment = "⏳ 剛平倉，無足夠的後續交易日可供覆盤"
                 else:
                     # 持股中
                     grade = "⚪ 戰鬥中"
                     if latest_price > m5 > m10: comment = "🚀 強勢多頭排列，跌破 M5 前死抱不賣！"
                     elif latest_price >= m10: comment = "⏳ 均線收斂整理中，防守底線設於 M10。"
                     else: 
-                        comment = "⚠️ 已跌破 M10 防守線，建議檢視是否該停損！"
+                        comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
                         demon = "⚓ 凹單"
 
                 if demon and "紀律" not in demon and "完美" not in demon:
                     demons.append(demon)
 
-                # 🚀 格式化為 MM-DD 隱藏年份
                 buy_str = buy_date.strftime("%m-%d")
                 sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
 
-                # 🚀 重新排列欄位順序：讓「評級」跟在「診斷詳情」後面
                 results.append({
                     "代號": sid,
                     "名稱": TWSE_NAME_MAP.get(sid, sid),
@@ -221,7 +219,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             .format({"報酬率(%)": "{:.2f}%", "淨利": "{:,.0f}"})
             .map(lambda x: f"color:{COLORS['red']}; font-weight:bold;" if x > 0 else (f"color:{COLORS['green']}; font-weight:bold;" if x < 0 else ""), subset=["淨利", "報酬率(%)"])
             .map(grade_color, subset=["評級"])
-            .set_properties(subset=["診斷詳情"], **{'text-align': 'left'})
+            # 🚀 救星：設定 white-space 為 pre-wrap，讓超長評語可以自動往下折行！
+            .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap'})
         )
         
         st.dataframe(
@@ -229,13 +228,14 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             use_container_width=True, 
             hide_index=True,
             column_config={
-                "代號": st.column_config.TextColumn(width=60),
-                "名稱": st.column_config.TextColumn(width=80),
-                "診斷詳情": st.column_config.TextColumn(width=360),
-                "評級": st.column_config.TextColumn(width=70),
-                "買進日": st.column_config.TextColumn(width=60),
-                "賣出日": st.column_config.TextColumn(width=60),
-                "持有天數": st.column_config.NumberColumn(width=60),
+                "代號": st.column_config.TextColumn(width="small"),
+                "名稱": st.column_config.TextColumn(width="small"),
+                # 🚀 救星：把寬度設為 large，讓它佔據最大空間
+                "診斷詳情": st.column_config.TextColumn(width="large"),
+                "評級": st.column_config.TextColumn(width="small"),
+                "買進日": st.column_config.TextColumn(width="small"),
+                "賣出日": st.column_config.TextColumn(width="small"),
+                "持有天數": st.column_config.NumberColumn(width="small"),
             }
         )
     else:
