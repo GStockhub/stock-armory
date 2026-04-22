@@ -213,13 +213,20 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
             m10 = float(close_s.rolling(10).mean().iloc[-1])
             m20 = float(close_s.rolling(20).mean().iloc[-1])
             
+            # 🚀 V26.7: 實裝 ATR 波動率計算
+            df_stock['PrevClose'] = df_stock['Close'].shift(1)
+            df_stock['TR'] = np.maximum(df_stock['High'] - df_stock['Low'], np.maximum(abs(df_stock['High'] - df_stock['PrevClose']), abs(df_stock['Low'] - df_stock['PrevClose'])))
+            df_stock['ATR'] = df_stock['TR'].rolling(14).mean()
+            atr_now = float(df_stock['ATR'].iloc[-1])
+            if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03 # 防呆
+            
             ind = TWSE_IND_MAP.get(sid) or "其他"
             if sid.startswith('00'): ind = "ETF"
             
             intel_results.append({
                 '代號': sid, '產業': ind, '現價': p_now,
-                'M5': m5, 'M10': m10, 'M20': m20,
-                '停損價': max(m10, p_now * 0.97)
+                'M5': m5, 'M10': m10, 'M20': m20, 'ATR': atr_now,
+                '停損價': p_now - 1.5 * atr_now # 動態 ATR 停損
             })
         except: continue
     return pd.DataFrame(intel_results)
