@@ -6,11 +6,12 @@ from data_center import fetch_single_stock_batch, safe_download
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
+    sid = str(sid).strip()
     df = safe_download(sid, fm_token)
     if df is None or df.empty or len(df) < 20: return None
     
-    # 🩹 V26.93 語法更新：使用最新版 Pandas 的 ffill() 寫法
-    df = df.copy()
+    # 消除重複時間軸與修補成交量
+    df = df[~df.index.duplicated(keep='last')].copy()
     df['Volume'] = df['Volume'].replace(0, np.nan).ffill().fillna(1000)
         
     close_s, open_s, vol_s = df['Close'], df['Open'], df['Volume']
@@ -109,25 +110,32 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
     intel_results = []
     if not id_list: return pd.DataFrame()
     bulk_data = {}
+    
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, sid, fm_token): sid for sid in id_list}
+        # 確保丟進去下載的代號絕對是乾淨字串
+        futures = {executor.submit(fetch_single_stock_batch, str(sid).strip(), fm_token): str(sid).strip() for sid in id_list}
         for future in concurrent.futures.as_completed(futures):
-            sid, df = future.result()
-            if df is not None: bulk_data[sid] = df
+            sid_str, df = future.result()
+            if df is not None: bulk_data[sid_str] = df
             
-    for sid in id_list:
+    for raw_sid in id_list:
         try:
+            # 🔪 終極除錯點：強制轉字串！防止整數型態引發 AttributeError 爆炸
+            sid = str(raw_sid).strip()
+            
             if not sid.startswith('00') and not sid.isdigit(): continue
-            ind = TWSE_IND_MAP.get(sid) or "其他"
+            ind = TWSE_IND_MAP.get(sid, "其他")
             if sid.startswith('00'): ind = "ETF"
             if "金融" in ind or "保險" in ind: continue
             
             df_stock = bulk_data.get(sid)
             if df_stock is None or df_stock.empty: continue
             
-            # 🩹 V26.93 語法更新
-            df_stock = df_stock.copy()
+            # 清除重複時間軸、填補成交量
+            df_stock = df_stock[~df_stock.index.duplicated(keep='last')].copy()
             df_stock['Volume'] = df_stock['Volume'].replace(0, np.nan).ffill().fillna(1000)
+            
+            if len(df_stock) < 20: continue
             
             close_s, open_s, high_s, low_s, vol_s = df_stock['Close'], df_stock['Open'], df_stock['High'], df_stock['Low'], df_stock['Volume']
             p_now = float(close_s.iloc[-1])
