@@ -70,8 +70,8 @@ fee_discount = configs["fee_discount"]
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v27.3</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 破曉神盾 ✕ 究極 UI 歸隊版 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v27.4</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 幽靈殺手 ✕ 終極無錯版 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -118,7 +118,8 @@ if len(chip_db) >= 1:
     if sheet_url:
         try:
             sheet_df = read_remote_csv(sheet_url, dtype=str)
-            sheet_df.columns = sheet_df.columns.str.strip()
+            # 🚀 物理消滅隱形 BOM 亂碼，保證欄位名稱乾淨無瑕！
+            sheet_df.columns = sheet_df.columns.str.replace(r'^\ufeff', '', regex=True).str.strip()
             h_df = sheet_df[sheet_df["分類"] == "持股"].copy() if "分類" in sheet_df.columns else sheet_df.copy()
             if not h_df.empty and "代號" in h_df.columns:
                 h_df["代號"] = h_df["代號"].astype(str).str.strip()
@@ -221,7 +222,6 @@ if len(chip_db) >= 1:
 
                 st.markdown("#### 🥇 <span class='highlight-primary'>【S / A 級】主力狙擊區</span>", unsafe_allow_html=True)
                 
-                # 🚀 救回被砍掉的 S/A 卡片介面！
                 if ui_s.empty and ui_a.empty: 
                     st.info("💡 今日無主戰力標的符合 (Quant 分數未達標)。")
                 else:
@@ -289,7 +289,6 @@ if len(chip_db) >= 1:
         st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
         st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
         
-        # 🚀 救回被砍掉的土洋合擊區！
         surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
         if not surprise_atk.empty:
             st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
@@ -384,4 +383,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V27.3 (UI 全面歸隊版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V27.4 (幽靈殺手版)</p>", unsafe_allow_html=True)
