@@ -6,7 +6,7 @@ import time
 import ssl
 from streamlit_cookies_controller import CookieController
 
-from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel, convert_gsheet_url
+from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel, convert_gsheet_url, read_remote_csv
 from quant_engine import run_sandbox_sim, level2_quant_engine
 
 try:
@@ -132,7 +132,7 @@ if len(chip_db) >= 1:
 
     if sheet_url:
         try:
-            sheet_df = pd.read_csv(sheet_url, dtype=str)
+            sheet_df = read_remote_csv(sheet_url, dtype=str)
             sheet_df.columns = sheet_df.columns.str.strip()
             h_df = sheet_df[sheet_df['分類'] == '持股'].copy() if '分類' in sheet_df.columns else sheet_df.copy()
             if not h_df.empty and '代號' in h_df.columns:
