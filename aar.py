@@ -52,7 +52,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 sid = str(row.get("代號", "")).strip()
                 if not sid: continue
 
-                # 智慧抓取欄位
+                # 智慧抓取欄位，包容各種常見的表單命名
                 buy_date_raw = get_val(row, ["買進日期", "買進日", "日期"])
                 buy_price_raw = get_val(row, ["買進價", "成本價", "成本", "買價"])
                 shares_raw = get_val(row, ["張數", "庫存張數", "庫存", "股數"])
