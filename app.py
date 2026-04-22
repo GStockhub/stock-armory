@@ -112,7 +112,7 @@ elif MACRO_SCORE <= 5:
     st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
 
 if OVERHEAT_FLAG:
-    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，系統已強制限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
+    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
 
 with st.spinner('情報兵正在部署防線 (FinMind 驅動中)...'):
     chip_db = fetch_chips_data()
