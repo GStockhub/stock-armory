@@ -9,7 +9,6 @@ def parse_tw_date(d_str):
         d_str = str(d_str).strip().replace("/", "-").replace(".", "-")
         if not d_str: return pd.NaT
         parts = d_str.split("-")
-        # 救回被刪掉的民國年份轉換器 (解決 0001 年的 Bug)
         if len(parts) == 3:
             y = int(parts[0])
             if y < 1911: y += 1911
@@ -34,8 +33,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         st.info("交易日誌沒有資料。")
         return
 
-    # 物理消滅隱形 BOM 亂碼
-    df.columns = df.columns.str.replace(r'^\ufeff', '', regex=True).str.strip()
+    # 🚀 致命語法修復：關閉 regex=False，執行最單純的安全字串替換！
+    df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
 
     def get_val(row, possible_keys, default=""):
         for k in possible_keys:
@@ -106,7 +105,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 held_days = (sell_date - buy_date).days if is_sold and pd.notna(sell_date) else (datetime.now() - buy_date).days
 
-                # === 深度診斷與心魔判定 (救回被刪除的核心精華) ===
+                # === 深度診斷與心魔判定 ===
                 demon = ""
                 missed_pnl = 0
                 comment = ""
@@ -138,13 +137,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         else:
                             demon = "🛡️ 紀律停損"
                             comment = "正常的試錯成本，保持紀律，下一檔會賺回來。"
+                else:
+                    if missed_pnl > buy_cost * 0.1:
+                        demon = "🕊️ 抱不住賣飛"
+                        comment = f"獲利了結，但後續錯失高達 {missed_pnl:,.0f} 元潛在利潤！需練習移動停利法 (如跌破 M5 才全出)。"
                     else:
-                        if missed_pnl > buy_cost * 0.1: # 錯過超過 10% 本金的利潤
-                            demon = "🕊️ 抱不住賣飛"
-                            comment = f"獲利了結，但後續錯失高達 {missed_pnl:,.0f} 元潛在利潤！需練習移動停利法 (如跌破 M5 才全出)。"
-                        else:
-                            demon = "🎯 完美狙擊"
-                            comment = "漂亮的波段操作！獲利入袋且賣在相對高點，維持這個節奏。"
+                        demon = "🎯 完美狙擊"
+                        comment = "漂亮的波段操作！獲利入袋且賣在相對高點，維持這個節奏。"
                 else:
                     # 持股中診斷
                     if latest_price > m5 > m10:
@@ -184,7 +183,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     top_demon = pd.Series(demons).mode()[0] if demons else "無"
     p_color = COLORS["red"] if total_pnl > 0 else COLORS["green"]
 
-    # 注意：這裡已經拔除了多餘的 AAR 標題，解決了雙重標題的問題
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"<div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['primary']};'><div style='color:{COLORS['subtext']}; font-size:14px;'>已平倉總淨利</div><div style='font-size:24px; font-weight:bold; color:{p_color};'>{total_pnl:,.0f}</div></div>", unsafe_allow_html=True)
@@ -224,7 +222,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 "代號": st.column_config.TextColumn(width=60),
                 "名稱": st.column_config.TextColumn(width=80),
                 "評級": st.column_config.TextColumn(width=80),
-                "診斷詳情": st.column_config.TextColumn(width=380), # 恢復您的詳情寬度
+                "診斷詳情": st.column_config.TextColumn(width=380),
                 "持有天數": st.column_config.NumberColumn(width=60),
             }
         )
