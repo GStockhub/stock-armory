@@ -22,12 +22,7 @@ def load_industry_map():
     except: pass 
     return ind_map, name_map
 
-# ==========================================
-# 📈 報價引擎 (OHLCV)：yfinance 優先 -> FinMind 備援
-# (TWSE 抓歷史 K 線極易被永久鎖 IP，故不列入報價序列)
-# ==========================================
 def safe_download(sid, fm_token=None, retries=2):
-    # 🛡️ 第一引擎：YFinance (專職報價，速度快、耐操)
     for suffix in [".TW", ".TWO"]:
         for _ in range(retries):
             try:
@@ -36,7 +31,6 @@ def safe_download(sid, fm_token=None, retries=2):
                 if not df.empty and len(df) > 5: return df
             except: time.sleep(0.5 + np.random.rand())
             
-    # 🚀 第二引擎：FinMind (YFinance 陣亡時無縫接軌)
     if fm_token and fm_token.strip() != "":
         try:
             start_date = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d")
@@ -57,10 +51,11 @@ def fetch_single_stock_batch(sid, fm_token=None):
     if not df.empty: return sid, df
     return sid, None
 
-@st.cache_data(ttl=14400, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_macro_dashboard():
     score = 5.0
     macro_data = []
+    OVERHEAT_FLAG = False # 🌋 V26.5: 新增過熱警報標記
     indices = {"^TWII": ("台股加權", "2330.TW"), "^PHLX_SO": ("美費半導體", "SOXX"), "^IXIC": ("那斯達克", "QQQ"), "^VIX": ("恐慌指數", "VIXY")}
     
     for main_sym, (base_name, fallback_sym) in indices.items():
@@ -78,6 +73,8 @@ def get_macro_dashboard():
             close_s = hist['Close']
             last_p = float(close_s.iloc[-1])
             ma20 = float(close_s.rolling(20).mean().iloc[-1])
+            bias = ((last_p - ma20) / ma20) * 100 # 計算大盤乖離率
+            
             status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
             
             if base_name == "恐慌指數":
@@ -88,16 +85,20 @@ def get_macro_dashboard():
                 if last_p > ma20: score += 1
                 else: score -= 1
                 
+                # 🌋 V26.5: 台股過熱專屬偵測！如果大盤正乖離超過 5%，直接啟動警報！
+                if base_name == "台股加權" and bias > 5.0:
+                    OVERHEAT_FLAG = True
+                    score -= 3 # 嚴格扣分懲罰
+                    status = "🔥 高檔過熱"
+                
             macro_data.append({"戰區": display_name, "現值": f"{last_p:.2f}", "月線": f"{ma20:.2f}", "狀態": status})
         except: 
             macro_data.append({"戰區": display_name, "現值": "計算失敗", "月線": "-", "狀態": "⚪ 斷線"})
             continue
-    return max(1, min(10, int(score))), pd.DataFrame(macro_data)
+            
+    # 回傳值從兩個變成三個，把警報旗標傳給前線
+    return max(1, min(10, int(score))), pd.DataFrame(macro_data), OVERHEAT_FLAG
 
-# ==========================================
-# 📊 籌碼引擎 (三大法人)：TWSE 優先 -> FinMind 備援
-# (YFinance 不提供台灣特有的三大法人資料，故不列入)
-# ==========================================
 @st.cache_data(ttl=14400, show_spinner=False)
 def fetch_chips_data(fm_token=None):
     chip_dict = {}
@@ -109,7 +110,6 @@ def fetch_chips_data(fm_token=None):
             fm_d_str = date_ptr.strftime("%Y-%m-%d") 
             success = False
             
-            # 🛡️ 第一引擎：TWSE 官方 API (最即時)
             url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={d_str}&selectType=ALLBUT0999&response=json"
             try:
                 r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5, verify=False)
@@ -132,7 +132,6 @@ def fetch_chips_data(fm_token=None):
                         success = True
             except: pass
             
-            # 🚀 第二引擎：FinMind (TWSE 出現 307 被擋時無縫接軌)
             if not success and fm_token and fm_token.strip() != "":
                 try:
                     fm_url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&start_date={fm_d_str}&end_date={fm_d_str}&token={fm_token}"
