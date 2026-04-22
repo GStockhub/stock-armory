@@ -3,12 +3,25 @@ import numpy as np
 import yfinance as yf
 import requests
 import urllib3
-import concurrent.futures
 import time
 from datetime import datetime, timedelta
 import streamlit as st
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# 🚀 V26.95: 終極網址轉換器，破解 Google 表單 HTML 陷阱！
+def convert_gsheet_url(url):
+    url = str(url).strip()
+    if "docs.google.com/spreadsheets/d/" in url and "export?format=csv" not in url:
+        import re
+        match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
+        if match:
+            doc_id = match.group(1)
+            gid = "0"
+            if "gid=" in url:
+                gid = url.split("gid=")[1].split("&")[0]
+            return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
+    return url
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
@@ -57,13 +70,12 @@ def get_macro_dashboard():
     macro_data = []
     OVERHEAT_FLAG = False 
     
-    # 🚀 V26.6: 新增「美元兌台幣 (TWD=X)」外資熱錢照妖鏡
     indices = {
         "^TWII": ("台股加權", "2330.TW"), 
         "^PHLX_SO": ("美費半導體", "SOXX"), 
         "^IXIC": ("那斯達克", "QQQ"), 
         "^VIX": ("恐慌指數", "VIXY"),
-        "TWD=X": ("美元/台幣(匯率)", "TWD=X") # 👈 新增匯率指標
+        "TWD=X": ("美元/台幣(匯率)", "TWD=X")
     }
     
     for main_sym, (base_name, fallback_sym) in indices.items():
@@ -83,31 +95,22 @@ def get_macro_dashboard():
             ma20 = float(close_s.rolling(20).mean().iloc[-1])
             bias = ((last_p - ma20) / ma20) * 100 
             
-            # 預設狀態與加減分
             status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
             
-            # 獨立邏輯 1：恐慌指數 (越高越危險)
             if "恐慌指數" in base_name:
                 status = "🔴 恐慌" if last_p > 25 else ("🟡 警戒" if last_p > 18 else "🟢 安定")
                 if last_p > 25: score -= 2
                 elif last_p < 18: score += 1
-                
-            # 獨立邏輯 2：台幣匯率 (越高代表台幣越貶值，資金外逃，越危險)
             elif "匯率" in base_name:
-                # 如果目前的匯率大於月線，代表美元強勢、台幣正在貶值
                 if last_p > ma20: 
                     status = "🔴 貶值(資金外逃)"
-                    score -= 1.5 # 外資撤出，扣分
+                    score -= 1.5 
                 else: 
                     status = "🟢 升值(熱錢湧入)"
-                    score += 1.5 # 熱錢湧入，加分
-                    
-            # 獨立邏輯 3：一般股市大盤 (越高越好)
+                    score += 1.5 
             else:
                 if last_p > ma20: score += 1
                 else: score -= 1
-                
-                # 台股過熱專屬偵測
                 if "台股加權" in base_name and bias > 5.0:
                     OVERHEAT_FLAG = True
                     score -= 3 
@@ -130,7 +133,6 @@ def fetch_chips_data(fm_token=None):
             d_str = date_ptr.strftime("%Y%m%d")
             fm_d_str = date_ptr.strftime("%Y-%m-%d") 
             success = False
-            
             url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={d_str}&selectType=ALLBUT0999&response=json"
             try:
                 r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5, verify=False)
@@ -174,13 +176,11 @@ def fetch_chips_data(fm_token=None):
                             clean['外資(張)'] = pivot_df[for_cols].sum(axis=1).values if for_cols else 0
                             clean['自營(張)'] = pivot_df[deal_cols].sum(axis=1).values if deal_cols else 0
                             clean['三大法人合計'] = clean['投信(張)'] + clean['外資(張)'] + clean['自營(張)']
-                            
                             chip_dict[d_str] = clean
                             success = True
                 except: pass
                 
-            if success:
-                time.sleep(0.2)
+            if success: time.sleep(0.2)
                 
         date_ptr -= timedelta(days=1)
         attempts += 1
@@ -194,16 +194,17 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
     if not id_list: return pd.DataFrame()
     
     bulk_data = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, sid, fm_token): sid for sid in id_list}
-        for future in concurrent.futures.as_completed(futures):
-            sid, df = future.result()
-            if df is not None and not df.empty: 
-                bulk_data[sid] = df
+    # 🛡️ 拆除多執行緒，改為安靜的循序下載防封鎖
+    for sid in id_list:
+        sid_str = str(sid).strip()
+        df = fetch_single_stock_batch(sid_str, fm_token)[1]
+        if df is not None and not df.empty: 
+            bulk_data[sid_str] = df
+        time.sleep(0.1) # 降速防擋
                 
     for sid in id_list:
         try:
-            df_stock = bulk_data.get(sid)
+            df_stock = bulk_data.get(str(sid).strip())
             if df_stock is None or df_stock.empty: continue
             close_s = df_stock['Close']
             if len(close_s) < 20: continue
@@ -213,20 +214,19 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
             m10 = float(close_s.rolling(10).mean().iloc[-1])
             m20 = float(close_s.rolling(20).mean().iloc[-1])
             
-            # 🚀 V26.7: 實裝 ATR 波動率計算
             df_stock['PrevClose'] = df_stock['Close'].shift(1)
             df_stock['TR'] = np.maximum(df_stock['High'] - df_stock['Low'], np.maximum(abs(df_stock['High'] - df_stock['PrevClose']), abs(df_stock['Low'] - df_stock['PrevClose'])))
             df_stock['ATR'] = df_stock['TR'].rolling(14).mean()
             atr_now = float(df_stock['ATR'].iloc[-1])
-            if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03 # 防呆
+            if pd.isna(atr_now) or atr_now == 0: atr_now = p_now * 0.03
             
-            ind = TWSE_IND_MAP.get(sid) or "其他"
-            if sid.startswith('00'): ind = "ETF"
+            ind = TWSE_IND_MAP.get(str(sid).strip()) or "其他"
+            if str(sid).strip().startswith('00'): ind = "ETF"
             
             intel_results.append({
-                '代號': sid, '產業': ind, '現價': p_now,
+                '代號': str(sid).strip(), '產業': ind, '現價': p_now,
                 'M5': m5, 'M10': m10, 'M20': m20, 'ATR': atr_now,
-                '停損價': p_now - 1.5 * atr_now # 動態 ATR 停損
+                '停損價': p_now - 1.5 * atr_now
             })
         except: continue
     return pd.DataFrame(intel_results)
