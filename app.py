@@ -52,54 +52,18 @@ if auth_status != 'verified_auth':
     st.stop()
 
 # ---------------------------------------------------------
-# 📱 V26.4: 九宮格陣型與極致壓縮裝甲
+# 📱 視覺裝甲 (九宮格防護)
 # ---------------------------------------------------------
 st.markdown("""
 <style>
-/* 🎯 階級標籤縮小與美化 (強制不斷行) */
-.tier-badge {
-    display: inline-block;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 11px; /* 極致縮小 */
-    font-weight: bold;
-    white-space: nowrap !important;
-}
+.tier-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap !important; }
 .badge-s { background-color: rgba(255, 75, 75, 0.1); color: #FF4B4B; border: 1px solid #FF4B4B; }
 .badge-a { background-color: rgba(255, 165, 0, 0.1); color: #FFA500; border: 1px solid #FFA500; }
-
-/* 🛡️ 卡片本體極致壓縮 */
-.tier-card {
-    border-radius: 6px;
-    padding: 12px; /* 從 16px 縮小到 12px */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    box-sizing: border-box;
-    margin-bottom: 12px;
-}
-
-/* 完美對齊與間距優化 */
-.info-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 3px;
-    width: 100%;
-}
+.tier-card { border-radius: 6px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; margin-bottom: 12px; }
+.info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; width: 100%; }
 .info-label { font-size: 13px; opacity: 0.8; white-space: nowrap; }
 .info-value { font-size: 13px; font-weight: 500; text-align: right; white-space: nowrap; }
-
-/* 股票名稱防擠壓：太長自動變成刪節號 */
-.stock-title {
-    margin: 0; 
-    font-size: 18px; /* 從 20px 縮小 */
-    white-space: nowrap; 
-    overflow: hidden; 
-    text-overflow: ellipsis;
-}
-
+.stock-title { margin: 0; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 768px) {
     .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
     .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
@@ -121,13 +85,15 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.4</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.6</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 (大盤過熱與匯率監控版) ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
-MACRO_SCORE, MACRO_DF = get_macro_dashboard()
+
+# 🌋 修正點：正確接收 3 個回傳值 (分數, 表格, 過熱旗標)
+MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
 
 def risk_color(val):
     try:
@@ -143,8 +109,15 @@ def format_lots(shares):
     if lots <= 0: return "0"
     return f"{lots:.3f}".rstrip('0').rstrip('.')
 
-if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌！保留現金。", icon="🚨")
-elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
+# 🚨 警告燈號顯示區
+if MACRO_SCORE <= 3: 
+    st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
+elif MACRO_SCORE <= 5: 
+    st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
+
+# 🌋 過熱獨立警報
+if OVERHEAT_FLAG:
+    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，系統已強制限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
 
 with st.spinner('情報兵正在部署防線 (FinMind 驅動中)...'):
     chip_db = fetch_chips_data()
@@ -230,7 +203,7 @@ if len(chip_db) >= 1:
         st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率 + 均報 + 型態動能 + 籌碼」動態加權運算，分數越高代表共振越強！")
 
         with st.expander("🌍 國際大盤數值"):
-            if not MACRO_DF.empty: st.dataframe(MACRO_DF.style.set_properties(**table_style).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
+            if not MACRO_DF.empty: st.dataframe(MACRO_DF.style.set_properties(**table_style).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) or '升值' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) or '貶值' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
 
         calc_list = tuple(set(today_df[today_df['連買'] >= 1]['代號'].tolist() + top_80_chips))
         
@@ -279,8 +252,10 @@ if len(chip_db) >= 1:
                     def calc_suggested_lots(row):
                         if row['原始風險差額'] > 0: suggested_shares = min(risk_amount / row['原始風險差額'], (total_capital * 0.15) / row['現價'])
                         else: suggested_shares = 0
-                        if MACRO_SCORE <= 5: suggested_shares *= 0.5
+                        # 🌋 資金嚴格風控，遇到過熱或大盤弱勢，買量一律強制減半
+                        if MACRO_SCORE <= 5 or OVERHEAT_FLAG: suggested_shares *= 0.5
                         return format_lots(suggested_shares)
+                    
                     master_list['建議買量(張)'] = master_list.apply(calc_suggested_lots, axis=1)
 
                     export_rows = []
@@ -289,7 +264,6 @@ if len(chip_db) >= 1:
                         export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "戰術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "量化評分": r['Quant_Score'], "現價": round(r['現價'], 2), "防守底線": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
                     st.download_button(label="📱 明日目標下載", data=pd.DataFrame(export_rows).to_csv(index=False).encode('utf-8-sig'), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
                 
-                # 分離 S 級與 A 級，強制九宮格斷行
                 ui_s = master_list[master_list['評級'] == 'S']
                 ui_a = master_list[master_list['評級'] == 'A']
                 ui_b = master_list[master_list['評級'] == 'B']
@@ -300,11 +274,10 @@ if len(chip_db) >= 1:
                 if ui_s.empty and ui_a.empty: 
                     st.info("💡 今日無主戰力標的符合 (Quant 分數未達標)。")
                 else:
-                    # 🚀 V26.4: S 級專屬排（最多3個）
                     if not ui_s.empty:
                         cols_s = st.columns(3)
                         for idx, (_, r) in enumerate(ui_s.iterrows()):
-                            if idx < 3: # 確保不會超過3格
+                            if idx < 3: 
                                 with cols_s[idx]:
                                     card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {COLORS["primary"]}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]};">'
                                     card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: center; gap: 6px; overflow: hidden;"><span class="tier-badge badge-s">🥇 S級</span><h3 class="stock-title" style="color: {COLORS["primary"]};">{r["名稱_x"]} ({r["代號"]})</h3></div>'
@@ -320,11 +293,10 @@ if len(chip_db) >= 1:
                                     card_html += '</div></div>'
                                     st.markdown(card_html.replace('\n', ''), unsafe_allow_html=True)
                     
-                    # 🚀 V26.4: A 級專屬排（最多3個），嚴格斷行不越界
                     if not ui_a.empty:
                         cols_a = st.columns(3)
                         for idx, (_, r) in enumerate(ui_a.iterrows()):
-                            if idx < 3: # 確保不會超過3格
+                            if idx < 3: 
                                 with cols_a[idx]:
                                     card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {COLORS["accent"]}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]};">'
                                     card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: center; gap: 6px; overflow: hidden;"><span class="tier-badge badge-a">🥈 A級</span><h3 class="stock-title" style="color: {COLORS["accent"]};">{r["名稱_x"]} ({r["代號"]})</h3></div>'
@@ -345,7 +317,6 @@ if len(chip_db) >= 1:
                 
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
-                    # 🚀 V26.4: 表格欄位全中文化 (將 Quant_Score 顯示為 量化評分)
                     styled_b = (ui_b[['名次','評級','代號','名稱_x','產業','戰術型態','Quant_Score','勝率(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱', 'Quant_Score':'量化評分'})
                                     .style.set_properties(**table_style)
                                     .format({'現價':'{:.2f}', '停損價':'{:.2f}', '勝率(%)':'{:.1f}%', '量化評分':'{:.1f}'})
@@ -358,7 +329,6 @@ if len(chip_db) >= 1:
                 
                 if ui_c.empty: st.info("💡 今日無 C 級潛伏標的。")
                 else:
-                    # 🚀 V26.4: 表格欄位全中文化
                     styled_c = (ui_c[['名次','評級','代號','名稱_x','產業','戰術型態','Quant_Score','勝率(%)','現價','乖離(%)','連買']].rename(columns={'名稱_x':'名稱', 'Quant_Score':'量化評分'})
                                     .style.set_properties(**table_style)
                                     .format({'現價':'{:.2f}', '勝率(%)':'{:.1f}%', '乖離(%)':'{:.1f}%', '量化評分':'{:.1f}'})
@@ -470,4 +440,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.4 </p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.6 (完整同步版)</p>", unsafe_allow_html=True)
