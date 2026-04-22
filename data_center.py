@@ -3,12 +3,25 @@ import numpy as np
 import yfinance as yf
 import requests
 import urllib3
-import concurrent.futures
 import time
 from datetime import datetime, timedelta
 import streamlit as st
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# 🚀 AAR 救星：網址自動轉換器
+def convert_gsheet_url(url):
+    url = str(url).strip()
+    if "docs.google.com/spreadsheets/d/" in url and "export?format=csv" not in url:
+        import re
+        match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
+        if match:
+            doc_id = match.group(1)
+            gid = "0"
+            if "gid=" in url:
+                gid = url.split("gid=")[1].split("&")[0]
+            return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
+    return url
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
@@ -72,7 +85,6 @@ def get_macro_dashboard():
             close_s = hist['Close']
             last_p = float(close_s.iloc[-1])
             ma20 = float(close_s.rolling(20).mean().iloc[-1])
-            bias = ((last_p - ma20) / ma20) * 100 
             
             status = "🟢 多頭" if last_p > ma20 else "🔴 空頭"
             
@@ -163,12 +175,13 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
     if not id_list: return pd.DataFrame()
     
     bulk_data = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, str(sid).strip(), fm_token): str(sid).strip() for sid in id_list}
-        for future in concurrent.futures.as_completed(futures):
-            sid, df = future.result()
-            if df is not None and not df.empty: 
-                bulk_data[sid] = df
+    # 🛡️ 拆除機關槍，改為單發安靜下載，防止 IP 被封
+    for raw_sid in id_list:
+        sid_str = str(raw_sid).strip()
+        _, df = fetch_single_stock_batch(sid_str, fm_token)
+        if df is not None and not df.empty: 
+            bulk_data[sid_str] = df
+        time.sleep(0.1)
                 
     for raw_sid in id_list:
         try:
