@@ -6,7 +6,7 @@ import time
 import ssl
 from streamlit_cookies_controller import CookieController
 
-from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel, read_remote_csv
+from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel, read_remote_csv, convert_gsheet_url
 from quant_engine import run_sandbox_sim, level2_quant_engine
 
 try:
@@ -70,8 +70,8 @@ fee_discount = configs["fee_discount"]
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v27.2</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極王者歸來 ✕ 全面修復版 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v27.3</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 破曉神盾 ✕ 究極 UI 歸隊版 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -221,7 +221,7 @@ if len(chip_db) >= 1:
 
                 st.markdown("#### 🥇 <span class='highlight-primary'>【S / A 級】主力狙擊區</span>", unsafe_allow_html=True)
                 
-                # 🚀 救星：恢復被 GPT 刪掉的美化 S/A 卡片 UI！
+                # 🚀 救回被砍掉的 S/A 卡片介面！
                 if ui_s.empty and ui_a.empty: 
                     st.info("💡 今日無主戰力標的符合 (Quant 分數未達標)。")
                 else:
@@ -287,6 +287,16 @@ if len(chip_db) >= 1:
 
     with t_chip:
         st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
+        st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
+        
+        # 🚀 救回被砍掉的土洋合擊區！
+        surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
+        if not surprise_atk.empty:
+            st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
+            st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.set_properties(**table_style).format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
+            st.markdown("---")
+
+        st.markdown("#### <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
         main_chips = today_df.sort_values("三大法人合計", ascending=False).head(200)
         if "intel_df" in locals() and intel_df is not None and not intel_df.empty:
             main_chips = pd.merge(main_chips, intel_df[["代號", "安全指數"]], on="代號", how="left")
@@ -304,7 +314,6 @@ if len(chip_db) >= 1:
                 total_pnl = 0
                 active_fee_rate = 0.001425 * fee_discount
                 
-                # 🚀 救星：恢復被 GPT 砍掉的華麗「持股盈虧卡片」
                 html_cards = '<div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">'
                 for _, r in m_df.iterrows():
                     try:
@@ -375,4 +384,4 @@ else:
     st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V27.2 (全面修復版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V27.3 (UI 全面歸隊版)</p>", unsafe_allow_html=True)
