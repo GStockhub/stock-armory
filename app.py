@@ -6,7 +6,6 @@ import time
 import ssl
 from streamlit_cookies_controller import CookieController
 
-# 載入後勤大腦
 from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, get_holding_intel
 from quant_engine import run_sandbox_sim, level2_quant_engine
 
@@ -85,14 +84,12 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v26.6</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v26.7</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
-
-# 🌋 修正點：正確接收 3 個回傳值 (分數, 表格, 過熱旗標)
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
 
 def risk_color(val):
@@ -109,15 +106,13 @@ def format_lots(shares):
     if lots <= 0: return "0"
     return f"{lots:.3f}".rstrip('0').rstrip('.')
 
-# 🚨 警告燈號顯示區
 if MACRO_SCORE <= 3: 
     st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: 
     st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
 
-# 🌋 過熱獨立警報
 if OVERHEAT_FLAG:
-    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
+    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，系統已強制限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
 
 with st.spinner('情報兵正在部署防線 (FinMind 驅動中)...'):
     chip_db = fetch_chips_data()
@@ -169,16 +164,16 @@ if len(chip_db) >= 1:
 
                         if p_now < m10:
                             grade_color, grade_text = COLORS['red'], "🛑 嚴禁接刀 (D級)"
-                            advice = f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。禁止進場摸底，以免被套牢！"
+                            advice = f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底，以免被套牢！"
                         elif bias > 7:
                             grade_color, grade_text = COLORS['accent'], "⚠️ 追高警告 (C級)"
                             advice = f"乖離率高達 {bias:.1f}%。極易買在短線最高點，除非爆量真突破，否則等回拉 M5。"
                         elif p_now > m5 and win_rate >= 50:
                             grade_color, grade_text = COLORS['primary'], "👑 准許出兵 (S/A級)"
-                            advice = f"多頭結構且回測勝率達 {win_rate:.0f}%！防守底線嚴格設於 {sl_price:.1f}，可依戰術進場。"
+                            advice = f"多頭結構且回測勝率達 {win_rate:.0f}%！防守底線嚴格設於 {sl_price:.1f} (動態 ATR)，可依戰術進場。"
                         else:
                             grade_color, grade_text = COLORS['green'], "⚖️ 穩健觀察 (B級)"
-                            advice = f"結構普通 (勝率 {win_rate:.0f}%)。若資金充裕可小量試單，防守底線嚴格設於 {sl_price:.1f}。"
+                            advice = f"結構普通 (勝率 {win_rate:.0f}%)。若資金充裕可小量試單，防守底線嚴格設於 {sl_price:.1f} (動態 ATR)。"
 
                         st.markdown(f"""
                         <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:6px; margin-bottom:10px;">
@@ -200,7 +195,7 @@ if len(chip_db) >= 1:
         st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS['border'] + ";'>", unsafe_allow_html=True)
 
         st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
-        st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率/均報/型態動能/籌碼」動態加權運算，分數越高共振越強！")
+        st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率/均報/型態動能/籌碼」動態加權運算，分數越高代表共振越強！")
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty: st.dataframe(MACRO_DF.style.set_properties(**table_style).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) or '升值' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) or '貶值' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
@@ -252,7 +247,6 @@ if len(chip_db) >= 1:
                     def calc_suggested_lots(row):
                         if row['原始風險差額'] > 0: suggested_shares = min(risk_amount / row['原始風險差額'], (total_capital * 0.15) / row['現價'])
                         else: suggested_shares = 0
-                        # 🌋 資金嚴格風控，遇到過熱或大盤弱勢，買量一律強制減半
                         if MACRO_SCORE <= 5 or OVERHEAT_FLAG: suggested_shares *= 0.5
                         return format_lots(suggested_shares)
                     
@@ -261,7 +255,7 @@ if len(chip_db) >= 1:
                     export_rows = []
                     tier_names = {'S': '🥇 S級狙擊', 'A': '🥈 A級狙擊', 'B': '⚔️ B級穩健', 'C': '📡 C級潛伏'}
                     for _, r in master_list.iterrows():
-                        export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "戰術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "量化評分": r['Quant_Score'], "現價": round(r['現價'], 2), "防守底線": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
+                        export_rows.append({"戰區": tier_names.get(r['評級'], ""), "代號": r['代號'], "名稱": r['名稱_x'], "戰術行動": "👀 列入觀察" if r['評級'] == 'C' else f"建議買 {r['建議買量(張)']} 張", "量化評分": r['Quant_Score'], "現價": round(r['現價'], 2), "ATR停損": round(r['停損價'], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r['產業']})
                     st.download_button(label="📱 明日目標下載", data=pd.DataFrame(export_rows).to_csv(index=False).encode('utf-8-sig'), file_name=f"Tactical_Map_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
                 
                 ui_s = master_list[master_list['評級'] == 'S']
@@ -288,7 +282,7 @@ if len(chip_db) >= 1:
                                     card_html += f'<div style="width: 100%;">'
                                     card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">📊 歷史勝率</span><span class="info-value"><span style="color: {COLORS["green"]}; font-weight:bold;">{r["勝率(%)"]:.1f}%</span> <span style="color: {COLORS["subtext"]}; font-size:11px;">(均報 +{r["均報(%)"]:.2f}%)</span></span></div>'
                                     card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">💰 現價</span><span class="info-value"><span style="color: {COLORS["primary"]};">{r["現價"]:.2f}</span> <span style="color: {COLORS["subtext"]}; font-size:11px;">(乖離 {r["乖離(%)"]:.1f}%)</span></span></div>'
-                                    card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">🚨 強制停損</span><span class="info-value" style="color: {COLORS["red"]};">{r["停損價"]:.2f}</span></div>'
+                                    card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">🚨 ATR 停損</span><span class="info-value" style="color: {COLORS["red"]};">{r["停損價"]:.2f}</span></div>'
                                     card_html += f'<div class="info-row" style="border-top: 1px dashed #555; padding-top: 6px; margin-top: 6px;"><span class="info-label" style="color: {COLORS["text"]}; font-weight:bold;">⚖️ AI建議買量</span><span class="info-value" style="color: {COLORS["accent"]}; font-weight: bold;">{r["建議買量(張)"]} 張</span></div>'
                                     card_html += '</div></div>'
                                     st.markdown(card_html.replace('\n', ''), unsafe_allow_html=True)
@@ -307,7 +301,7 @@ if len(chip_db) >= 1:
                                     card_html += f'<div style="width: 100%;">'
                                     card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">📊 歷史勝率</span><span class="info-value"><span style="color: {COLORS["green"]}; font-weight:bold;">{r["勝率(%)"]:.1f}%</span> <span style="color: {COLORS["subtext"]}; font-size:11px;">(均報 +{r["均報(%)"]:.2f}%)</span></span></div>'
                                     card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">💰 現價</span><span class="info-value"><span style="color: {COLORS["primary"]};">{r["現價"]:.2f}</span> <span style="color: {COLORS["subtext"]}; font-size:11px;">(乖離 {r["乖離(%)"]:.1f}%)</span></span></div>'
-                                    card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">🚨 強制停損</span><span class="info-value" style="color: {COLORS["red"]};">{r["停損價"]:.2f}</span></div>'
+                                    card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">🚨 ATR 停損</span><span class="info-value" style="color: {COLORS["red"]};">{r["停損價"]:.2f}</span></div>'
                                     card_html += f'<div class="info-row" style="border-top: 1px dashed #555; padding-top: 6px; margin-top: 6px;"><span class="info-label" style="color: {COLORS["text"]}; font-weight:bold;">⚖️ AI建議買量</span><span class="info-value" style="color: {COLORS["accent"]}; font-weight: bold;">{r["建議買量(張)"]} 張</span></div>'
                                     card_html += '</div></div>'
                                     st.markdown(card_html.replace('\n', ''), unsafe_allow_html=True)
@@ -317,9 +311,9 @@ if len(chip_db) >= 1:
                 
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
-                    styled_b = (ui_b[['名次','評級','代號','名稱_x','產業','戰術型態','Quant_Score','勝率(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱', 'Quant_Score':'量化評分'})
+                    styled_b = (ui_b[['名次','評級','代號','名稱_x','產業','戰術型態','Quant_Score','勝率(%)','現價','停損價','建議買量(張)','連買']].rename(columns={'名稱_x':'名稱', 'Quant_Score':'量化評分', '停損價':'ATR停損'})
                                     .style.set_properties(**table_style)
-                                    .format({'現價':'{:.2f}', '停損價':'{:.2f}', '勝率(%)':'{:.1f}%', '量化評分':'{:.1f}'})
+                                    .format({'現價':'{:.2f}', 'ATR停損':'{:.2f}', '勝率(%)':'{:.1f}%', '量化評分':'{:.1f}'})
                                     .map(risk_color, subset=['量化評分'])
                                     .map(lambda x: f'color: {COLORS["green"]}; font-weight: bold;' if x > 60 else '', subset=['勝率(%)']))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
@@ -360,7 +354,7 @@ if len(chip_db) >= 1:
 
     with t_cmd:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
-        st.caption("💡 **資金風控**：個人現役持股盈虧計算機與 V5 防賣飛火控雷達。")
+        st.caption("💡 **資金風控**：個人現役持股盈虧計算機與 ATR 動態防守雷達。")
         
         if not sheet_url: 
             st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
@@ -375,7 +369,6 @@ if len(chip_db) >= 1:
                     try:
                         p_now_raw = r.get('現價', 0)
                         p_now = float(p_now_raw) if pd.notna(p_now_raw) and str(p_now_raw).strip() != '' else 0.0
-                        
                         p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
                         qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
                         
@@ -393,6 +386,10 @@ if len(chip_db) >= 1:
                         
                         m5, m10 = float(r.get('M5', 0)) if pd.notna(r.get('M5', 0)) else 0.0, float(r.get('M10', 0)) if pd.notna(r.get('M10', 0)) else 0.0
                         
+                        # 🚀 V26.7: 抓取 ATR 與動態停損
+                        atr = float(r.get('ATR', p_now * 0.03))
+                        dynamic_sl = float(r.get('停損價', p_cost - 1.5 * atr))
+                        
                         glow_class = "glow-s-tier" if (ret >= 10 and p_now > m5) else ""
                         border_col = COLORS['primary'] if glow_class else COLORS['border']
                         ret_col = COLORS['red'] if pnl > 0 else (COLORS['green'] if pnl < 0 else COLORS['text'])
@@ -402,13 +399,16 @@ if len(chip_db) >= 1:
                         elif p_now > m5 and m5 > m10:
                             struct = f"🚀 多頭排列 (現價 > M5)"
                             if ret >= 10: coach = "👑 <b>【S級抱緊】</b> 趨勢極強！<b>跌破 M5 前絕對不賣！</b>"
-                            elif ret > 0: coach, border_col = "⚠️ <b>【防賣飛】</b> 獲利達6%先出一半，剩下死抱 M5！", COLORS['accent']
-                            else: coach = "⏳ 洗盤震盪中，請耐心抱緊，防守底線設於 M10。"
+                            elif ret > 0: coach, border_col = f"⚠️ <b>【防賣飛】</b> 達動態停利目標前先死抱 M5！", COLORS['accent']
+                            else: coach = f"⏳ 洗盤震盪中，請耐心抱緊，ATR 動態防守線設於 {dynamic_sl:.1f}。"
                         elif p_now >= m10:
-                            struct, coach, border_col = f"⏳ 均線收斂 (守住 M10)", "🛡️ 洗盤震盪中，尚未破線，請給予耐心與空間。", COLORS['accent'] if ret > 0 else COLORS['border']
+                            struct, coach, border_col = f"⏳ 均線收斂 (守住 M10)", f"🛡️ 洗盤震盪中，ATR 防守線設於 {dynamic_sl:.1f}，未破底前請耐心續抱。", COLORS['accent'] if ret > 0 else COLORS['border']
                         else:
-                            struct, border_col = f"📉 跌破防守線 (現價 < M10)", COLORS['red'] if ret < 0 else COLORS['green']
-                            coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼鎖住獲利！" if ret > 0 else f"💀 <b>【情緒殺預警】</b> 破線硬停損！請無情砍單保命，絕不攤平！"
+                            if p_now >= dynamic_sl:
+                                struct, coach, border_col = f"📉 跌破短均 (現價 < M10)", f"🛡️ <b>【最後防線】</b> 雖然破線，但尚未跌破 ATR 極限防禦 ({dynamic_sl:.1f})，觀察尾盤！", COLORS['accent']
+                            else:
+                                struct, border_col = f"📉 貫穿動態防守 (現價 < {dynamic_sl:.1f})", COLORS['red'] if ret < 0 else COLORS['green']
+                                coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼鎖住獲利！" if ret > 0 else f"💀 <b>【情緒殺預警】</b> 跌破 ATR 動態底線！請無情砍單保命，絕不攤平！"
                         
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
@@ -440,4 +440,4 @@ if len(chip_db) >= 1:
 else: st.error("⚠️ 資料匯入失敗。請檢查網路或稍後再試。")
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.6 </p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v26.7 </p>", unsafe_allow_html=True)
