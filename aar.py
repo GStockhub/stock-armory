@@ -31,9 +31,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         st.info("交易日誌沒有資料。")
         return
 
-    df.columns = df.columns.str.strip()
+    # 🚀 物理消滅隱形 BOM 亂碼，讓欄位判斷 100% 精準！
+    df.columns = df.columns.str.replace(r'^\ufeff', '', regex=True).str.strip()
 
-    # 🚀 救星：廢除嚴格的欄位寫死檢查，改為智慧匹配
     if "代號" not in df.columns:
         st.error("AAR 缺少最核心的必要欄位：『代號』")
         return
@@ -52,10 +52,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 sid = str(row.get("代號", "")).strip()
                 if not sid: continue
 
-                # 智慧抓取欄位，包容各種常見的表單命名
-                buy_date_raw = get_val(row, ["買進日期", "買進日", "日期"])
-                buy_price_raw = get_val(row, ["買進價", "成本價", "成本", "買價"])
-                shares_raw = get_val(row, ["張數", "庫存張數", "庫存", "股數"])
+                buy_date_raw = get_val(row, ["買進日期", "買進日", "日期", "建倉日"])
+                buy_price_raw = get_val(row, ["買進價", "成本價", "成本", "買價", "均價"])
+                shares_raw = get_val(row, ["張數", "庫存張數", "庫存", "股數", "數量"])
 
                 if not buy_date_raw or not buy_price_raw or not shares_raw: continue
 
