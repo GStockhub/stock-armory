@@ -85,7 +85,7 @@ fee_discount = configs["fee_discount"]
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.41</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 (完美回歸版) ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
 
@@ -190,8 +190,8 @@ if len(chip_db) >= 1:
                     else: st.error("❌ 查無此股票或歷史資料不足，請確認代號是否正確。")
         st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS['border'] + ";'>", unsafe_allow_html=True)
 
-        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊 (軟性權重模型)</span>", unsafe_allow_html=True)
-        st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率 + 均報 + 型態動能 + 籌碼」動態加權運算，分數越高代表共振越強！")
+        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
+        st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率/均報/型態動能/籌碼」動態加權運算，分數越高代表共振越強！")
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty: st.dataframe(MACRO_DF.style.set_properties(**table_style).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
