@@ -33,7 +33,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         st.info("交易日誌沒有資料。")
         return
 
-    # 🚀 物理消滅隱形 BOM 亂碼 (確保 regex=False 關閉，避免引擎崩潰)
+    # 🚀 物理消滅隱形 BOM 亂碼 (確保 regex=False 關閉)
     df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
 
     def get_val(row, possible_keys, default=""):
@@ -57,7 +57,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 sid = str(row.get("代號", "")).strip()
                 if not sid: continue
 
-                # 智慧抓取欄位
                 buy_date_raw = get_val(row, ["買進日期", "買進日", "日期", "建倉日"])
                 buy_price_raw = get_val(row, ["買進價", "成本價", "成本", "買價", "均價"])
                 shares_raw = get_val(row, ["張數", "庫存張數", "庫存", "股數", "數量"])
@@ -77,7 +76,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 hist = safe_download(sid, fm_token, period="1y")
                 if hist.empty: continue
                 
-                # 確保時間格式比對正確
                 hist.index = pd.to_datetime(hist.index).tz_localize(None)
 
                 latest_price = float(hist["Close"].iloc[-1])
@@ -105,9 +103,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 held_days = (sell_date - buy_date).days if is_sold and pd.notna(sell_date) else (datetime.now() - buy_date).days
 
-                # === 深度診斷與心魔判定 ===
+                # === 深度診斷與心魔判定 (原汁原味救回版) ===
                 demon = ""
-                missed_pnl = 0
                 comment = ""
 
                 if is_sold:
@@ -115,62 +112,74 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     total_closed_trades += 1
                     if pnl > 0: win_trades += 1
 
-                    # 計算最痛賣飛
-                    if pd.notna(sell_date) and sell_date in hist.index:
-                        post_sell_hist = hist.loc[sell_date:]
-                        if not post_sell_hist.empty:
-                            max_after_sell = float(post_sell_hist["High"].max())
-                            if max_after_sell > sell_price:
-                                missed_pnl = (max_after_sell - sell_price) * shares * 1000
-                                if missed_pnl > max_missed_profit:
-                                    max_missed_profit = missed_pnl
-                                    max_missed_stock = f"{TWSE_NAME_MAP.get(sid, sid)} ({missed_pnl:,.0f}元)"
+                    post_sell_hist = hist.loc[sell_date:]
+                    if not post_sell_hist.empty and len(post_sell_hist) > 1:
+                        post_hist = post_sell_hist.iloc[1:] # 觀察賣出後的走勢
+                        if not post_hist.empty:
+                            max_row = post_hist.loc[post_hist['High'].idxmax()]
+                            min_row = post_hist.loc[post_hist['Low'].idxmin()]
+                            
+                            max_after_sell = float(max_row['High'])
+                            min_after_sell = float(min_row['Low'])
+                            
+                            days_to_max = (max_row.name - sell_date).days
+                            days_to_min = (min_row.name - sell_date).days
+                            
+                            missed_pnl = (max_after_sell - sell_price) * shares * 1000
+                            avoided_loss = (sell_price - min_after_sell) * shares * 1000
+                            
+                            if missed_pnl > max_missed_profit:
+                                max_missed_profit = missed_pnl
+                                max_missed_stock = f"{TWSE_NAME_MAP.get(sid, sid)} ({missed_pnl:,.0f}元)"
 
-                    # 判定心魔
-                    if roi < 0:
-                        if held_days <= 3:
-                            demon = "😨 恐慌殺低"
-                            comment = f"建倉 {held_days} 天即停損。若非跌破防守線，需留意是否受情緒影響過早離場。"
-                        elif held_days > 15:
-                            demon = "⚓ 凹單死抱"
-                            comment = f"虧損抱了 {held_days} 天才砍。未嚴格執行跌破 M10/ATR 停損，導致資金卡死。"
+                            # 評分標準重建
+                            if roi > 0:
+                                if missed_pnl > buy_cost * 0.03: 
+                                    grade = "🥈 A級"
+                                    comment = f"獲利了結！但隨後於第 {days_to_max} 天漲至 {max_after_sell:.1f} 元，潛在錯失 +{missed_pnl:,.0f} 元。"
+                                    demon = "🕊️ 賣飛"
+                                else:
+                                    grade = "👑 S級"
+                                    comment = "完美停利！賣出後未見大幅創高，波段高點精準入袋！"
+                            else:
+                                if avoided_loss > buy_cost * 0.03: 
+                                    grade = "⚔️ B級"
+                                    comment = f"果斷停損！隨後於第 {days_to_min} 天跌至 {min_after_sell:.1f} 元，防止 -{avoided_loss:,.0f} 元的虧損！"
+                                    demon = "🛡️ 紀律"
+                                else:
+                                    grade = "⚠️ C級"
+                                    comment = f"砍在阿呆谷！賣出後於第 {days_to_max} 天反彈至 {max_after_sell:.1f} 元，潛在可少虧或回血 +{missed_pnl:,.0f} 元。"
+                                    demon = "😨 恐慌"
                         else:
-                            demon = "🛡️ 紀律停損"
-                            comment = "正常的試錯成本，保持紀律，下一檔會賺回來。"
+                            grade = "👑 S級" if roi > 0 else "⚔️ B級"
+                            comment = "剛平倉，無足夠的後續交易日可供覆盤。"
                     else:
-                        if missed_pnl > buy_cost * 0.1:
-                            demon = "🕊️ 抱不住賣飛"
-                            comment = f"獲利了結，但後續錯失高達 {missed_pnl:,.0f} 元潛在利潤！需練習移動停利法 (如跌破 M5 才全出)。"
-                        else:
-                            demon = "🎯 完美狙擊"
-                            comment = "漂亮的波段操作！獲利入袋且賣在相對高點，維持這個節奏。"
+                        grade = "👑 S級" if roi > 0 else "⚔️ B級"
+                        comment = "剛平倉，無足夠的後續交易日可供覆盤。"
                 else:
-                    # 持股中診斷
-                    if latest_price > m5 > m10:
-                        comment = "🚀 強勢多頭排列，跌破 M5 前死抱不賣！"
-                    elif latest_price >= m10:
-                        comment = "⏳ 均線收斂整理中，防守底線設於 M10。"
-                    else:
-                        comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
-                        demon = "⚓ 潛在凹單"
+                    # 持股中
+                    grade = "⚪ 戰鬥中"
+                    if latest_price > m5 > m10: comment = "🚀 強勢多頭排列，跌破 M5 前死抱不賣！"
+                    elif latest_price >= m10: comment = "⏳ 均線收斂整理中，防守底線設於 M10。"
+                    else: 
+                        comment = "⚠️ 已跌破 M10 防守線，建議檢視是否該停損！"
+                        demon = "⚓ 凹單"
 
-                if demon and "紀律" not in demon and "完美" not in demon and "潛在" not in demon:
+                if demon and "紀律" not in demon and "完美" not in demon:
                     demons.append(demon)
 
-                grade = "⚪ 戰鬥中"
-                if is_sold:
-                    if roi >= 10: grade = "👑 S級"
-                    elif roi > 0: grade = "🥈 A級"
-                    elif roi > -5: grade = "⚔️ B級"
-                    else: grade = "💀 D級"
+                # 🚀 格式化為 MM-DD 隱藏年份
+                buy_str = buy_date.strftime("%m-%d")
+                sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
 
+                # 🚀 重新排列欄位順序：讓「評級」跟在「診斷詳情」後面
                 results.append({
                     "代號": sid,
                     "名稱": TWSE_NAME_MAP.get(sid, sid),
-                    "評級": grade,
                     "診斷詳情": comment,
-                    "買進日": buy_date.strftime("%Y-%m-%d"),
-                    "賣出日": sell_date.strftime("%Y-%m-%d") if is_sold and pd.notna(sell_date) else "-",
+                    "評級": grade,
+                    "買進日": buy_str,
+                    "賣出日": sell_str,
                     "持有天數": int(held_days),
                     "報酬率(%)": roi,
                     "淨利": int(pnl),
@@ -178,7 +187,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             except Exception as e:
                 continue
 
-    # === 渲染頂部戰報儀表板 ===
+    # === 渲染戰報儀表板 ===
     win_rate = (win_trades / total_closed_trades * 100) if total_closed_trades > 0 else 0
     top_demon = pd.Series(demons).mode()[0] if demons else "無"
     p_color = COLORS["red"] if total_pnl > 0 else COLORS["green"]
@@ -200,7 +209,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         
         def grade_color(val):
             if 'S級' in str(val): return f"color: {COLORS['primary']}; font-weight: bold;"
-            if 'D級' in str(val): return f"color: {COLORS['green']}; font-weight: bold;"
+            if 'C級' in str(val): return f"color: {COLORS['green']}; font-weight: bold;"
+            if 'B級' in str(val): return f"color: {COLORS['accent']}; font-weight: bold;"
             if 'A級' in str(val): return f"color: {COLORS['red']}; font-weight: bold;"
             return f"color: {COLORS['subtext']};"
 
@@ -221,8 +231,10 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             column_config={
                 "代號": st.column_config.TextColumn(width=60),
                 "名稱": st.column_config.TextColumn(width=80),
-                "評級": st.column_config.TextColumn(width=80),
-                "診斷詳情": st.column_config.TextColumn(width=380),
+                "診斷詳情": st.column_config.TextColumn(width=360),
+                "評級": st.column_config.TextColumn(width=70),
+                "買進日": st.column_config.TextColumn(width=60),
+                "賣出日": st.column_config.TextColumn(width=60),
                 "持有天數": st.column_config.NumberColumn(width=60),
             }
         )
