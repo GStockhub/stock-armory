@@ -11,26 +11,17 @@ import yfinance as yf
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# ---------------------------------------------------------
-# 🚀 終極聰明網址轉換器 (絕對不會再把 d/e/ 截斷！)
-# ---------------------------------------------------------
 def convert_gsheet_url(url: str) -> str:
     url = str(url).strip()
     if not url: return url
-    
-    # 🚨 絕對防呆：如果網址裡面有 pub (發布到網路) 或 export 或 output=csv，代表已經是純淨資料，絕對不要動它！
-    if "/pub" in url or "export" in url or "output=csv" in url:
-        return url
-        
-    # 只有包含 /edit 或 /view 的一般共用網址才進行轉換，並且精準抓取大於 40 碼的真實 ID
+    if "/pub" in url or "export" in url or "output=csv" in url: return url
     if "/edit" in url or "/view" in url:
         import re
         match = re.search(r'/d/([a-zA-Z0-9-_]{40,})', url)
         if match:
             doc_id = match.group(1)
             gid = "0"
-            if "gid=" in url:
-                gid = url.split("gid=")[1].split("&")[0]
+            if "gid=" in url: gid = url.split("gid=")[1].split("&")[0]
             return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
     return url
 
@@ -42,7 +33,8 @@ def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
     resp = requests.get(url, headers=headers, timeout=20, verify=False)
     resp.raise_for_status()
 
-    text = resp.text.strip()
+    # 🚀 終極殺手鐧：使用 utf-8-sig 強制解碼，徹底消滅 Google 隱形 BOM 亂碼 (\ufeff)！
+    text = resp.content.decode('utf-8-sig').strip()
     if not text: return pd.DataFrame()
 
     if text.lower().startswith("<!doctype html") or text.lower().startswith("<html"):
@@ -76,9 +68,7 @@ def _normalize_price_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def get_yf_session():
     session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    })
+    session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"})
     return session
 
 def _get_finmind_price(sid_str: str, fm_token=None, days=240) -> pd.DataFrame:
