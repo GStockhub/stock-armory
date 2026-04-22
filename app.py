@@ -85,7 +85,7 @@ fee_discount = configs["fee_discount"]
 
 table_style = {'text-align': 'center', 'background-color': COLORS['card'], 'color': COLORS['text'], 'border-color': COLORS['border']}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️ 讓我賺大錢 v26.6</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v26.6</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極番號 ✕ 交易教練 V26 ——</p>", unsafe_allow_html=True)
 current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{current_time} (EOD 決策系統)</div>", unsafe_allow_html=True)
@@ -117,7 +117,7 @@ elif MACRO_SCORE <= 5:
 
 # 🌋 過熱獨立警報
 if OVERHEAT_FLAG:
-    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，系統已強制限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
+    st.error(f"🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量，嚴防追高風險！", icon="🌋")
 
 with st.spinner('情報兵正在部署防線 (FinMind 驅動中)...'):
     chip_db = fetch_chips_data()
@@ -169,7 +169,7 @@ if len(chip_db) >= 1:
 
                         if p_now < m10:
                             grade_color, grade_text = COLORS['red'], "🛑 嚴禁接刀 (D級)"
-                            advice = f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底，以免被套牢！"
+                            advice = f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。禁止進場摸底，以免被套牢！"
                         elif bias > 7:
                             grade_color, grade_text = COLORS['accent'], "⚠️ 追高警告 (C級)"
                             advice = f"乖離率高達 {bias:.1f}%。極易買在短線最高點，除非爆量真突破，否則等回拉 M5。"
@@ -199,8 +199,8 @@ if len(chip_db) >= 1:
                     else: st.error("❌ 查無此股票或歷史資料不足，請確認代號是否正確。")
         st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS['border'] + ";'>", unsafe_allow_html=True)
 
-        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊 (軟性權重模型)</span>", unsafe_allow_html=True)
-        st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率 + 均報 + 型態動能 + 籌碼」動態加權運算，分數越高代表共振越強！")
+        st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
+        st.info("💎 **V26 量化中台** 👉 S/A/B 級已改由「勝率/均報/型態動能/籌碼」動態加權運算，分數越高共振越強！")
 
         with st.expander("🌍 國際大盤數值"):
             if not MACRO_DF.empty: st.dataframe(MACRO_DF.style.set_properties(**table_style).map(lambda x: f'color: {COLORS["green"]};' if '多頭' in str(x) or '安定' in str(x) or '升值' in str(x) else (f'color: {COLORS["red"]};' if '空頭' in str(x) or '恐慌' in str(x) or '貶值' in str(x) else ''), subset=['狀態']), use_container_width=True, hide_index=True)
@@ -335,7 +335,7 @@ if len(chip_db) >= 1:
                                     .map(risk_color, subset=['量化評分']))
                     st.dataframe(styled_c, use_container_width=True, hide_index=True)
             else:
-                st.warning("⚠️ 報告大將軍！今日行情極度惡劣，所有掃描名單皆已跌破 M10 防守線或量能萎縮。為保護資金，今日指揮所不指派任何建倉目標，請保持空手觀望！", icon="🛡️")
+                st.warning("⚠️ 今日行情極度惡劣，所有掃描名單皆已跌破 M10 防守線或量能萎縮。為保護資金，今日指揮所不指派任何建倉目標，請保持空手觀望！", icon="🛡️")
 
     with t_chip:
         st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
