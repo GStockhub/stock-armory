@@ -136,7 +136,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             if roi > 0:
                                 if missed_pnl > buy_cost * 0.03: 
                                     grade = "🥈 A級"
-                                    comment = f"🕊️獲利了結！後於第{days_to_max}天漲至{max_after_sell:.1f}元，潛在錯失+{missed_pnl:,.0f}元。"
+                                    comment = f"🕊️獲利了結！後於第{days_to_max}天漲至{max_after_sell:.1f}元，潛在+{missed_pnl:,.0f}元。"
                                     demon = "🕊️ 賣飛"
                                 else:
                                     grade = "👑 S級"
@@ -148,7 +148,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                                     demon = "🛡️ 紀律"
                                 else:
                                     grade = "⚠️ C級"
-                                    comment = f"😨砍在阿呆谷！後於第{days_to_max}天反彈至{max_after_sell:.1f}元，潛在可少虧或回血+{missed_pnl:,.0f}元"
+                                    comment = f"😨砍在阿呆谷！後於第{days_to_max}天反彈至{max_after_sell:.1f}元，潛在+{missed_pnl:,.0f}元"
                                     demon = "😨 恐慌"
                         else:
                             grade = "👑 S級" if roi > 0 else "⚔️ B級"
