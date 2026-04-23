@@ -71,7 +71,7 @@ fee_discount = configs["fee_discount"]
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v27.6</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 破曉神盾 ✕ ATR上線 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 破曉神盾 ✕ 幽靈斬首 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -206,8 +206,13 @@ if len(chip_db) >= 1:
 
                 s_tier, a_tier, b_tier, c_tier = rank_sorted[s_mask].head(3).copy(), rank_sorted[a_mask].head(3).copy(), rank_sorted[b_mask].head(7).copy(), rank_sorted[c_mask].copy()
                 s_tier["評級"], a_tier["評級"], b_tier["評級"], c_tier["評級"] = "S", "A", "B", "C"
-                master_list = pd.concat([s_tier, a_tier, b_tier, c_tier]).reset_index(drop=True).head(20)
-                master_list["名次"] = master_list.index + 1
+                master_list = pd.concat([s_tier, a_tier, b_tier, c_tier]).reset_index(drop=True)
+                
+                # 🛡️【緊急防呆裝甲】剔除「現價 <= 停損價」的幽靈標的
+                master_list = master_list[master_list["現價"] > master_list["停損價"]]
+                
+                master_list = master_list.head(20)
+                master_list["名次"] = range(1, len(master_list) + 1)
 
                 if not master_list.empty:
                     def calc_suggested_lots(row):
