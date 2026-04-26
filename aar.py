@@ -54,7 +54,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     with st.spinner("🧠 AAR 戰術教練正在深度覆盤您的交易歷史..."):
         for _, row in df.iterrows():
             try:
-                sid = str(row.get("代號", "")).strip()
+                # 🚀 修復：不管表單寫的是代碼、股票代碼、還是證券代號，全部通殺攔截
+                sid_raw = get_val(row, ["代號", "股票代號", "證券代號", "股票代碼", "stock_id"])
+                sid = str(sid_raw).strip()
                 if not sid: continue
 
                 buy_date_raw = get_val(row, ["買進日期", "買進日", "日期", "建倉日"])
@@ -74,7 +76,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 is_sold = sell_date_raw != "" and sell_price_raw != ""
 
                 hist = safe_download(sid, fm_token, period="1y")
-                if hist.empty: continue
+                if hist is None or hist.empty: continue
                 
                 hist.index = pd.to_datetime(hist.index).tz_localize(None)
 
@@ -103,7 +105,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 held_days = (sell_date - buy_date).days if is_sold and pd.notna(sell_date) else (datetime.now() - buy_date).days
 
-                # === 深度診斷與心魔判定 (生動 Icon 完美歸隊) ===
+                # === 深度診斷與心魔判定 ===
                 demon = ""
                 comment = ""
 
@@ -132,7 +134,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                                 max_missed_profit = missed_pnl
                                 max_missed_stock = f"{TWSE_NAME_MAP.get(sid, sid)} ({missed_pnl:,.0f}元)"
 
-                            # 評分標準與生動語氣
                             if roi > 0:
                                 if missed_pnl > buy_cost * 0.03: 
                                     grade = "🥈 A級"
@@ -157,7 +158,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         grade = "👑 S級" if roi > 0 else "⚔️ B級"
                         comment = "⏳ 剛平倉，無足夠的後續交易日可供覆盤"
                 else:
-                    # 持股中
                     grade = "⚪ 戰鬥中"
                     if latest_price > m5 > m10: comment = "🚀 強勢多頭排列，跌破 M5 前死抱不賣！"
                     elif latest_price >= m10: comment = "⏳ 均線收斂整理中，防守底線設於 M10。"
@@ -185,7 +185,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             except Exception as e:
                 continue
 
-    # === 渲染戰報儀表板 ===
     win_rate = (win_trades / total_closed_trades * 100) if total_closed_trades > 0 else 0
     top_demon = pd.Series(demons).mode()[0] if demons else "無"
     p_color = COLORS["red"] if total_pnl > 0 else COLORS["green"]
@@ -219,7 +218,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             .format({"報酬率(%)": "{:.2f}%", "淨利": "{:,.0f}"})
             .map(lambda x: f"color:{COLORS['red']}; font-weight:bold;" if x > 0 else (f"color:{COLORS['green']}; font-weight:bold;" if x < 0 else ""), subset=["淨利", "報酬率(%)"])
             .map(grade_color, subset=["評級"])
-            # 🚀 救星：設定 white-space 為 pre-wrap，讓超長評語可以自動往下折行！
             .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap'})
         )
         
@@ -230,7 +228,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             column_config={
                 "代號": st.column_config.TextColumn(width="small"),
                 "名稱": st.column_config.TextColumn(width="small"),
-                # 🚀 救星：把寬度設為 large，讓它佔據最大空間
                 "診斷詳情": st.column_config.TextColumn(width="large"),
                 "評級": st.column_config.TextColumn(width="small"),
                 "買進日": st.column_config.TextColumn(width="small"),
