@@ -5,31 +5,33 @@ from datetime import datetime, timedelta
 import re
 from data_center import read_remote_csv, safe_download, load_industry_map
 
-# 🚀 終極日期解析器：暴力斬斷 00:00:00 尾巴，無腦支援西元與民國
+# 🚀 終極日期解析器：暴力斬斷尾巴，並封殺 1970 年的幽靈數字
 def parse_tw_date(d_str):
     try:
         d_str = str(d_str).strip()
-        # 排除空值與異常字眼
-        if not d_str or d_str.lower() in ["nan", "nat", "none"]: 
+        if not d_str or d_str.lower() in ["nan", "nat", "none", "0"]: 
             return pd.NaT
         
         # 物理斬斷尾巴：只取空白或 'T' 前面的純日期部分
         d_str = d_str.split(" ")[0].split("T")[0]
-        # 統一符號
         d_str = d_str.replace("/", "-").replace(".", "-")
         
         parts = d_str.split("-")
         if len(parts) == 3:
             y = int(parts[0])
-            # 如果年份小於 1911，自動視為民國年並轉換為西元
             if y < 1911: y += 1911
             d_str = f"{y}-{str(parts[1]).zfill(2)}-{str(parts[2]).zfill(2)}"
             
-        return pd.to_datetime(d_str, errors='coerce')
+        dt = pd.to_datetime(d_str, errors='coerce')
+        
+        # 🚀 絕對防禦：如果算出來是 1970 年 (電腦元年)，直接視為無效，避免跑出兩萬天！
+        if dt is not pd.NaT and dt.year < 2000:
+            return pd.NaT
+            
+        return dt
     except Exception: 
         return pd.NaT
 
-# 🚀 終極數字解析器：無視逗號，強力萃取數字
 def extract_number(val_str):
     try:
         s = str(val_str).replace(',', '').strip()
@@ -40,7 +42,7 @@ def extract_number(val_str):
     except Exception:
         return 0.0
 
-# 🚀 絕對精準欄位鎖定：優先尋找 100% 完全一樣的欄位名，找不到才用模糊比對
+# 絕對精準欄位鎖定
 def get_val(row, possible_keys, exclude_keys=None, default=""):
     if exclude_keys is None: exclude_keys = []
     
@@ -52,7 +54,7 @@ def get_val(row, possible_keys, exclude_keys=None, default=""):
             if pd.notna(val) and str(val).strip() != "":
                 return str(val).strip()
                 
-    # 2. 模糊比對 (備用，並排除干擾)
+    # 2. 模糊比對 (備用)
     for col in row.index:
         col_str = str(col).strip()
         if any(x in col_str for x in exclude_keys):
@@ -101,7 +103,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     skipped_rows.append({"行數 (Excel)": i+2, "代號": "未知", "原因": "找不到【代號】欄位"})
                     continue
 
-                # 排除賣出字眼，確保精準抓到買進日期與價格
                 buy_date_raw = get_val(row, ["買進日期", "買進日", "日期", "建倉日"], exclude_keys=["賣", "平"])
                 buy_price_raw = get_val(row, ["買進價", "成本價", "成本", "買價", "均價"], exclude_keys=["賣", "平"])
                 shares_raw = get_val(row, ["張數", "庫存張數", "庫存", "股數", "數量"])
@@ -115,9 +116,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 buy_price = extract_number(buy_price_raw)
                 shares = extract_number(shares_raw)
 
-                # 只要有一個無法辨識，直接列入跳過名單
                 if pd.isna(buy_date) or buy_price <= 0 or shares <= 0:
-                    skipped_rows.append({"行數 (Excel)": i+2, "代號": sid, "原因": f"數值無法辨識 (日:{buy_date_raw} -> {buy_date}, 價:{buy_price}, 張:{shares})"})
+                    skipped_rows.append({"行數 (Excel)": i+2, "代號": sid, "原因": f"數值無法辨識 (日:{buy_date_raw}, 價:{buy_price}, 張:{shares})"})
                     continue
 
                 sell_date_raw = get_val(row, ["賣出日期", "賣出日", "平倉日"])
@@ -157,7 +157,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 held_days = (sell_date - buy_date).days if is_sold and pd.notna(sell_date) else (datetime.now() - buy_date).days
 
-                # === 深度診斷與心魔判定 ===
                 demon = ""
                 comment = ""
 
@@ -168,16 +167,29 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                     post_sell_hist = hist.loc[sell_date:]
                     if not post_sell_hist.empty and len(post_sell_hist) > 1:
-                        post_hist = post_sell_hist.iloc[1:] 
+                        # 🚀 統帥規矩：只抓賣出後的 20 個交易日！不再當無止盡追蹤的恐怖情人！
+                        post_hist = post_sell_hist.iloc[1:21] 
                         if not post_hist.empty:
-                            max_row = post_hist.loc[post_hist['High'].idxmax()]
-                            min_row = post_hist.loc[post_hist['Low'].idxmin()]
+                            max_idx = post_hist['High'].idxmax()
+                            min_idx = post_hist['Low'].idxmin()
+                            
+                            max_row = post_hist.loc[max_idx]
+                            min_row = post_hist.loc[min_idx]
                             
                             max_after_sell = float(max_row['High'])
                             min_after_sell = float(min_row['Low'])
                             
-                            days_to_max = (max_row.name - sell_date).days
-                            days_to_min = (min_row.name - sell_date).days
+                            s_date = pd.to_datetime(sell_date)
+                            max_date = pd.to_datetime(max_idx)
+                            min_date = pd.to_datetime(min_idx)
+                            
+                            # 計算日曆天數
+                            days_to_max = (max_date - s_date).days
+                            days_to_min = (min_date - s_date).days
+                            
+                            # 避免極端異常值 (如果還是算錯，強制轉成文字)
+                            disp_days_max = str(days_to_max) if 0 <= days_to_max <= 50 else "?"
+                            disp_days_min = str(days_to_min) if 0 <= days_to_min <= 50 else "?"
                             
                             missed_pnl = (max_after_sell - sell_price) * shares * 1000
                             avoided_loss = (sell_price - min_after_sell) * shares * 1000
@@ -189,7 +201,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             if roi > 0:
                                 if missed_pnl > buy_cost * 0.03: 
                                     grade = "🥈 A級"
-                                    comment = f"🕊️獲利了結！後於第{days_to_max}天漲至{max_after_sell:.1f}元，潛在+{missed_pnl:,.0f}元。"
+                                    comment = f"🕊️獲利了結！後於第 {disp_days_max} 天漲至 {max_after_sell:.1f} 元，潛在 +{missed_pnl:,.0f} 元。"
                                     demon = "🕊️ 賣飛"
                                 else:
                                     grade = "👑 S級"
@@ -197,11 +209,11 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             else:
                                 if avoided_loss > buy_cost * 0.03: 
                                     grade = "⚔️ B級"
-                                    comment = f"🛡️果斷停損！後於第{days_to_min}天跌至{min_after_sell:.1f}元，防止-{avoided_loss:,.0f}元的虧損"
+                                    comment = f"🛡️果斷停損！後於第 {disp_days_min} 天跌至 {min_after_sell:.1f} 元，防止 -{avoided_loss:,.0f} 元的虧損"
                                     demon = "🛡️ 紀律"
                                 else:
                                     grade = "⚠️ C級"
-                                    comment = f"😨砍在阿呆谷！後於第{days_to_max}天反彈至{max_after_sell:.1f}元，潛在+{missed_pnl:,.0f}元"
+                                    comment = f"😨砍在阿呆谷！後於第 {disp_days_max} 天反彈至 {max_after_sell:.1f} 元，潛在 +{missed_pnl:,.0f} 元"
                                     demon = "😨 恐慌"
                         else:
                             grade = "👑 S級" if roi > 0 else "⚔️ B級"
@@ -217,7 +229,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
                         demon = "⚓ 凹單"
 
-                # 讀取將軍手動記錄的專屬心魔！
                 if user_demon:
                     demon = f"👤 {user_demon}"
 
@@ -227,6 +238,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 buy_str = buy_date.strftime("%m-%d")
                 sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
 
+                # 確保持有天數不會出現負數或離譜數字
+                disp_held = int(held_days) if 0 <= held_days <= 10000 else 0
+
                 results.append({
                     "代號": sid,
                     "名稱": TWSE_NAME_MAP.get(sid, sid),
@@ -234,7 +248,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     "評級": grade,
                     "買進日": buy_str,
                     "賣出日": sell_str,
-                    "持有天數": int(held_days),
+                    "持有天數": disp_held,
                     "報酬率(%)": roi,
                     "淨利": int(pnl),
                 })
@@ -259,7 +273,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     st.markdown("<br>", unsafe_allow_html=True)
 
     if skipped_rows:
-        with st.expander(f"⚠️ 系統跳過了 {len(skipped_rows)} 筆格式異常的資料，點擊查看詳細原因", expanded=True):
+        with st.expander(f"⚠️ 系統跳過了 {len(skipped_rows)} 筆格式異常的資料，點擊查看詳細原因", expanded=False):
             st.dataframe(pd.DataFrame(skipped_rows), use_container_width=True)
 
     if results:
