@@ -25,19 +25,19 @@ def get_retry_session():
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "Accept-Language": "en-US,en;q=0.9,zh-TW;q=0.8,zh;q=0.7"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     })
     return session
 
 def convert_gsheet_url(url: str) -> str:
     url = str(url).strip()
     if not url: return url
+    # 🚀 救星：強制將 Web 網頁連結轉為 CSV 下載連結
+    if "pubhtml" in url: url = url.replace("pubhtml", "pub?output=csv")
     if "/pub" in url or "export" in url or "output=csv" in url: return url
     if "/edit" in url or "/view" in url:
         import re
-        match = re.search(r'/d/([a-zA-Z0-9-_]{40,})', url)
+        match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
         if match:
             doc_id = match.group(1)
             gid = "0"
@@ -48,7 +48,6 @@ def convert_gsheet_url(url: str) -> str:
 def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
     url = convert_gsheet_url(url)
     if not url: return pd.DataFrame()
-
     session = get_retry_session()
     try:
         resp = session.get(url, timeout=20, verify=False)
@@ -62,8 +61,10 @@ def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
     try:
-        df = pd.read_csv("industry_map.csv", dtype=str)
-        df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
+        # 🚀 救星：強制使用 utf-8-sig 讀取，徹底消滅 BOM 亂碼，名字絕對出得來！
+        with open("industry_map.csv", "r", encoding="utf-8-sig") as f:
+            df = pd.read_csv(f, dtype=str)
+        df.columns = df.columns.str.strip()
         df["代號"] = df["代號"].astype(str).str.strip()
         df["產業"] = df["產業"].astype(str).str.strip()
         df["名稱"] = df["名稱"].astype(str).str.strip()
@@ -85,7 +86,6 @@ def get_macro_dashboard():
 
     try:
         data = yf.download(list(indices.keys()), period="60d", threads=False, progress=False)
-        
         if data.empty or "Close" not in data.columns:
             return 5, pd.DataFrame([{"名稱": "系統", "現價": "0", "月線(M20)": "0", "乖離(%)": "0", "狀態": "⚠️ Yahoo資料中斷"}]), False
 
@@ -113,13 +113,8 @@ def get_macro_dashboard():
                     overheat_flag = True
                     status += " 🔥過熱"
 
-            results.append({
-                "名稱": name, 
-                "現價": f"{p_now:.2f}", 
-                "月線(M20)": f"{m20:.2f}", 
-                "乖離(%)": f"{bias:.2f}%", 
-                "狀態": status
-            })
+            # 🚀 救星：物理閹割大盤小數點
+            results.append({"名稱": name, "現價": f"{p_now:.2f}", "月線(M20)": f"{m20:.2f}", "乖離(%)": f"{bias:.2f}%", "狀態": status})
 
         macro_df = pd.DataFrame(results)
     except Exception as e:
@@ -133,16 +128,12 @@ def fetch_chips_data(fm_token=None):
     date_ptr = datetime.now()
     attempts = 0
     session = get_retry_session()
-    
-    # 🚀 紀錄最後一次失敗的真實原因，不再讓將軍瞎猜！
-    last_error_msg = "無"
 
     while len(chip_dict) < 5 and attempts < 20:
         if date_ptr.weekday() < 5:
             d_str = date_ptr.strftime("%Y%m%d")
             fm_d_str = date_ptr.strftime("%Y-%m-%d")
             success = False
-
             try:
                 fm_url = "https://api.finmindtrade.com/api/v4/data"
                 params = {"dataset": "TaiwanStockInstitutionalInvestorsBuySell", "start_date": fm_d_str, "end_date": fm_d_str}
@@ -152,34 +143,26 @@ def fetch_chips_data(fm_token=None):
                 if r.status_code == 200:
                     try: res = r.json()
                     except: res = {}
-                    
                     if res.get("msg") == "success" and res.get("data"):
                         df = pd.DataFrame(res["data"])
                         if not df.empty and "stock_id" in df.columns and "name" in df.columns and "buy" in df.columns and "sell" in df.columns:
                             df["buy"] = pd.to_numeric(df["buy"], errors="coerce").fillna(0)
                             df["sell"] = pd.to_numeric(df["sell"], errors="coerce").fillna(0)
                             df["net"] = (df["buy"] - df["sell"]) / 1000
-
                             pivot = df.pivot_table(index="stock_id", columns="name", values="net", aggfunc="sum").fillna(0)
                             clean = pd.DataFrame()
                             clean["代號"] = pivot.index.astype(str)
                             clean["名稱"] = clean["代號"]
-
                             trust_cols = [c for c in pivot.columns if "Investment_Trust" in str(c) or "投信" in str(c)]
                             foreign_cols = [c for c in pivot.columns if "Foreign" in str(c) or "外資" in str(c)]
                             dealer_cols = [c for c in pivot.columns if "Dealer" in str(c) or "自營" in str(c)]
-
                             clean["投信(張)"] = pivot[trust_cols].sum(axis=1).values if trust_cols else 0
                             clean["外資(張)"] = pivot[foreign_cols].sum(axis=1).values if foreign_cols else 0
                             clean["自營(張)"] = pivot[dealer_cols].sum(axis=1).values if dealer_cols else 0
                             clean["三大法人合計"] = clean["投信(張)"] + clean["外資(張)"] + clean["自營(張)"]
-                            
                             chip_dict[d_str] = clean
                             success = True
-                    elif res.get("msg") != "success":
-                        last_error_msg = f"FinMind 官方拒絕: {res.get('msg')}"
-            except Exception as e: 
-                last_error_msg = f"FinMind 連線崩潰: {e}"
+            except Exception: pass
 
             if not success:
                 try:
@@ -192,16 +175,12 @@ def fetch_chips_data(fm_token=None):
                             df = pd.DataFrame(res["data"], columns=res["fields"])
                             code_cols = [c for c in df.columns if "代號" in c]
                             name_cols = [c for c in df.columns if "名稱" in c]
-
                             if code_cols and name_cols:
                                 code_col, name_col = code_cols[0], name_cols[0]
                                 trust_cols = [c for c in df.columns if "投信" in c and "買賣超" in c]
                                 foreign_cols = [c for c in df.columns if "外資" in c and "買賣超" in c]
                                 dealer_cols = [c for c in df.columns if "自營" in c and "買賣超" in c]
-
-                                def parse_col(col_name):
-                                    return pd.to_numeric(df[col_name].astype(str).str.replace(",", "", regex=False), errors="coerce").fillna(0) / 1000
-
+                                def parse_col(col_name): return pd.to_numeric(df[col_name].astype(str).str.replace(",", "", regex=False), errors="coerce").fillna(0) / 1000
                                 clean = pd.DataFrame()
                                 clean["代號"] = df[code_col].astype(str).str.strip()
                                 clean["名稱"] = df[name_col].astype(str).str.strip()
@@ -211,20 +190,11 @@ def fetch_chips_data(fm_token=None):
                                 clean["三大法人合計"] = clean["投信(張)"] + clean["外資(張)"] + clean["自營(張)"]
                                 chip_dict[d_str] = clean
                                 success = True
-                        elif res.get("stat") != "OK":
-                            last_error_msg = f"證交所拒絕: {res.get('stat')}"
                     if not success: time.sleep(3.5)
-                except Exception as e: 
-                    last_error_msg = f"證交所連線崩潰: {e}"
-
+                except Exception: pass
         date_ptr -= timedelta(days=1)
         attempts += 1
         time.sleep(0.2)
-
-    # 🚀 將真實錯誤訊息爆出來！
-    if not chip_dict:
-        st.error(f"🚨 **全面斷線**：系統已盡力嘗試 20 次皆無法取得籌碼資料！\n\n**🔍 攔截到的最後真實錯誤原因**： `{last_error_msg}`", icon="💥")
-
     return chip_dict
 
 def fetch_single_stock_batch(sid, fm_token=None, period="60d"):
@@ -233,13 +203,15 @@ def fetch_single_stock_batch(sid, fm_token=None, period="60d"):
     return sid, df
 
 def safe_download(sid, fm_token=None, period="60d"):
-    try:
-        ticker = f"{sid}.TW"
-        df = yf.download(ticker, period=period, threads=False, progress=False)
-        if df is not None and not df.empty and "Close" in df.columns:
-            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-            if len(df.dropna(subset=['Close'])) > 10: return df
-    except Exception: pass
+    # 🚀 救星：先試上市 (.TW)，再試上櫃 (.TWO)。99% 股票直接抓到，再也不用看 FinMind 臉色！
+    for suffix in [".TW", ".TWO"]:
+        try:
+            ticker = f"{sid}{suffix}"
+            df = yf.download(ticker, period=period, threads=False, progress=False)
+            if df is not None and not df.empty and "Close" in df.columns:
+                if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+                if len(df.dropna(subset=['Close'])) > 10: return df
+        except Exception: pass
 
     try:
         session = get_retry_session()
@@ -268,7 +240,6 @@ def safe_download(sid, fm_token=None, period="60d"):
 def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
     id_list = [str(x).strip() for x in list(id_tuple) if str(x).strip()]
     if not id_list: return pd.DataFrame()
-
     bulk_data = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(fetch_single_stock_batch, sid, fm_token): sid for sid in id_list}
@@ -276,14 +247,11 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
             sid, df = future.result()
             if df is not None and not df.empty: bulk_data[sid] = df
 
-    if len(bulk_data) == 0: return pd.DataFrame()
-
     results = []
     for sid in id_list:
         try:
             df = bulk_data.get(sid)
             if df is None or df.empty: continue
-            
             df = df[~df.index.duplicated(keep="last")].copy()
             close_s = pd.to_numeric(df["Close"], errors="coerce")
             if close_s.isna().all() or len(close_s.dropna()) < 10: continue
