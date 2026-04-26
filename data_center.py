@@ -126,9 +126,12 @@ def fetch_chips_data(fm_token=None):
     session = get_retry_session()
 
     while len(chip_dict) < 5 and attempts < 20:
-        if date_ptr.weekday() < 5: 
+        if date_ptr.weekday() < 5:
+            d_str = date_ptr.strftime("%Y%m%d")
             fm_d_str = date_ptr.strftime("%Y-%m-%d")
-            
+            success = False
+
+            # 1. 先抓 FinMind
             try:
                 fm_url = "https://api.finmindtrade.com/api/v4/data"
                 params = {
@@ -136,64 +139,147 @@ def fetch_chips_data(fm_token=None):
                     "start_date": fm_d_str,
                     "end_date": fm_d_str,
                 }
+
                 if fm_token and str(fm_token).strip():
                     params["token"] = str(fm_token).strip()
 
                 r = session.get(fm_url, params=params, timeout=15, verify=False)
-                
+
                 if r.status_code == 200:
-                    # 🛡️ 終極防毒面具：強制攔截 JSON 解析錯誤！
                     try:
                         res = r.json()
-                    except Exception as json_e:
-                        print(f"[{fm_d_str}] 敵軍丟出毒氣彈 (非JSON格式): {json_e}")
-                        res = {} # 直接設定為空字典，跳過這天的處理
+                    except Exception:
+                        res = {}
 
                     if res.get("msg") == "success" and res.get("data"):
                         df = pd.DataFrame(res["data"])
-                        
-                        if (not df.empty and 
-                            "stock_id" in df.columns and 
-                            "name" in df.columns and 
-                            "buy" in df.columns and 
-                            "sell" in df.columns):
-                            
+
+                        if (
+                            not df.empty
+                            and "stock_id" in df.columns
+                            and "name" in df.columns
+                            and "buy" in df.columns
+                            and "sell" in df.columns
+                        ):
                             df["buy"] = pd.to_numeric(df["buy"], errors="coerce").fillna(0)
                             df["sell"] = pd.to_numeric(df["sell"], errors="coerce").fillna(0)
                             df["net"] = (df["buy"] - df["sell"]) / 1000
-                            
-                            pivoted = df.pivot_table(
-                                index="stock_id", 
-                                columns="name", 
-                                values="net", 
+
+                            pivot = df.pivot_table(
+                                index="stock_id",
+                                columns="name",
+                                values="net",
                                 aggfunc="sum"
                             ).fillna(0)
-                            
-                            for col in ["Foreign_Investor", "Investment_Trust", "Dealer_self"]:
-                                if col not in pivoted.columns:
-                                    pivoted[col] = 0
 
-                            pivoted["三大法人合計"] = pivoted["Foreign_Investor"] + pivoted["Investment_Trust"] + pivoted["Dealer_self"]
-                            
-                            pivoted = pivoted.rename(columns={
-                                "Foreign_Investor": "外資(張)", 
-                                "Investment_Trust": "投信(張)", 
-                                "Dealer_self": "自營(張)"
-                            }).reset_index().rename(columns={"stock_id": "代號"})
-                            
-                            pivoted["代號"] = pivoted["代號"].astype(str)
-                            
-                            chip_dict[fm_d_str] = pivoted
-                        else:
-                            print(f"[{fm_d_str}] 資料欄位殘缺，直接跳過。")
-                            
+                            clean = pd.DataFrame()
+                            clean["代號"] = pivot.index.astype(str)
+                            clean["名稱"] = clean["代號"]
+
+                            trust_cols = [
+                                c for c in pivot.columns
+                                if "Investment_Trust" in str(c) or "投信" in str(c)
+                            ]
+                            foreign_cols = [
+                                c for c in pivot.columns
+                                if "Foreign" in str(c) or "外資" in str(c)
+                            ]
+                            dealer_cols = [
+                                c for c in pivot.columns
+                                if "Dealer" in str(c) or "自營" in str(c)
+                            ]
+
+                            clean["投信(張)"] = pivot[trust_cols].sum(axis=1).values if trust_cols else 0
+                            clean["外資(張)"] = pivot[foreign_cols].sum(axis=1).values if foreign_cols else 0
+                            clean["自營(張)"] = pivot[dealer_cols].sum(axis=1).values if dealer_cols else 0
+                            clean["三大法人合計"] = (
+                                clean["投信(張)"] +
+                                clean["外資(張)"] +
+                                clean["自營(張)"]
+                            )
+
+                            chip_dict[d_str] = clean
+                            success = True
+                            print(f"✅ FinMind 法人資料成功：{fm_d_str}")
+
             except Exception as e:
-                print(f"FinMind chip failed for {fm_d_str}: {e}")
+                print(f"FinMind chip failed {fm_d_str}: {e}")
+
+            # 2. FinMind 失敗，改抓 TWSE T86 備援
+            if not success:
+                try:
+                    twse_url = (
+                        "https://www.twse.com.tw/rwd/zh/fund/T86"
+                        f"?date={d_str}"
+                        "&selectType=ALLBUT0999"
+                        "&response=json"
+                    )
+
+                    r = session.get(twse_url, timeout=15, verify=False)
+
+                    if r.status_code == 200:
+                        try:
+                            res = r.json()
+                        except Exception:
+                            res = {}
+
+                        if res.get("stat") == "OK" and res.get("data") and res.get("fields"):
+                            df = pd.DataFrame(res["data"], columns=res["fields"])
+
+                            code_cols = [c for c in df.columns if "代號" in c]
+                            name_cols = [c for c in df.columns if "名稱" in c]
+
+                            if not code_cols or not name_cols:
+                                print(f"TWSE 欄位異常：{d_str}")
+                            else:
+                                code_col = code_cols[0]
+                                name_col = name_cols[0]
+
+                                trust_cols = [
+                                    c for c in df.columns
+                                    if "投信" in c and "買賣超" in c
+                                ]
+                                foreign_cols = [
+                                    c for c in df.columns
+                                    if "外資" in c and "買賣超" in c
+                                ]
+                                dealer_cols = [
+                                    c for c in df.columns
+                                    if "自營" in c and "買賣超" in c
+                                ]
+
+                                def parse_col(col_name):
+                                    return pd.to_numeric(
+                                        df[col_name].astype(str).str.replace(",", "", regex=False),
+                                        errors="coerce"
+                                    ).fillna(0) / 1000
+
+                                clean = pd.DataFrame()
+                                clean["代號"] = df[code_col].astype(str).str.strip()
+                                clean["名稱"] = df[name_col].astype(str).str.strip()
+
+                                clean["投信(張)"] = sum(parse_col(c) for c in trust_cols) if trust_cols else 0
+                                clean["外資(張)"] = sum(parse_col(c) for c in foreign_cols) if foreign_cols else 0
+                                clean["自營(張)"] = sum(parse_col(c) for c in dealer_cols) if dealer_cols else 0
+                                clean["三大法人合計"] = (
+                                    clean["投信(張)"] +
+                                    clean["外資(張)"] +
+                                    clean["自營(張)"]
+                                )
+
+                                chip_dict[d_str] = clean
+                                print(f"✅ TWSE 法人資料成功：{d_str}")
+                        else:
+                            print(f"TWSE 無資料：{d_str} / {res.get('stat')}")
+
+                except Exception as e:
+                    print(f"TWSE chip failed {d_str}: {e}")
 
         date_ptr -= timedelta(days=1)
         attempts += 1
-        time.sleep(0.15) 
+        time.sleep(0.15)
 
+    print(f"法人資料總共抓到 {len(chip_dict)} 天")
     return chip_dict
 
 def fetch_single_stock_batch(sid, fm_token=None):
