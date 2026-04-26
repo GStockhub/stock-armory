@@ -133,6 +133,9 @@ def fetch_chips_data(fm_token=None):
     date_ptr = datetime.now()
     attempts = 0
     session = get_retry_session()
+    
+    # 🚀 紀錄最後一次失敗的真實原因，不再讓將軍瞎猜！
+    last_error_msg = "無"
 
     while len(chip_dict) < 5 and attempts < 20:
         if date_ptr.weekday() < 5:
@@ -173,7 +176,10 @@ def fetch_chips_data(fm_token=None):
                             
                             chip_dict[d_str] = clean
                             success = True
-            except Exception: pass
+                    elif res.get("msg") != "success":
+                        last_error_msg = f"FinMind 官方拒絕: {res.get('msg')}"
+            except Exception as e: 
+                last_error_msg = f"FinMind 連線崩潰: {e}"
 
             if not success:
                 try:
@@ -205,22 +211,27 @@ def fetch_chips_data(fm_token=None):
                                 clean["三大法人合計"] = clean["投信(張)"] + clean["外資(張)"] + clean["自營(張)"]
                                 chip_dict[d_str] = clean
                                 success = True
+                        elif res.get("stat") != "OK":
+                            last_error_msg = f"證交所拒絕: {res.get('stat')}"
                     if not success: time.sleep(3.5)
-                except Exception: pass
+                except Exception as e: 
+                    last_error_msg = f"證交所連線崩潰: {e}"
 
         date_ptr -= timedelta(days=1)
         attempts += 1
         time.sleep(0.2)
 
+    # 🚀 將真實錯誤訊息爆出來！
+    if not chip_dict:
+        st.error(f"🚨 **全面斷線**：系統已盡力嘗試 20 次皆無法取得籌碼資料！\n\n**🔍 攔截到的最後真實錯誤原因**： `{last_error_msg}`", icon="💥")
+
     return chip_dict
 
-# 🚀 修復：加入 period="60d" 引數，對齊 AAR 的要求
 def fetch_single_stock_batch(sid, fm_token=None, period="60d"):
     sid = str(sid).strip()
     df = safe_download(sid, fm_token, period=period)
     return sid, df
 
-# 🚀 修復：加入 period="60d" 引數，對齊 AAR 的要求
 def safe_download(sid, fm_token=None, period="60d"):
     try:
         ticker = f"{sid}.TW"
@@ -233,7 +244,6 @@ def safe_download(sid, fm_token=None, period="60d"):
     try:
         session = get_retry_session()
         url = "https://api.finmindtrade.com/api/v4/data"
-        # 判斷如果是 1y，就抓 365 天前
         days_back = 365 if period == "1y" else 90
         start_d = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
         payload = {"dataset": "TaiwanStockPrice", "data_id": sid, "start_date": start_d}
