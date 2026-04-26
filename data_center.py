@@ -13,7 +13,7 @@ from urllib3.util.retry import Retry
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- 🚀 建立帶有重試機制的 Requests Session (留給 FinMind 和 Google Sheet 用) ---
+# --- 🚀 建立帶有重試機制的 Requests Session ---
 def get_retry_session():
     session = requests.Session()
     retry = Retry(
@@ -60,19 +60,41 @@ def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
         print(f"Read CSV Error: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600, show_spinner=False)
+# 🚀 修復：改用穩定的官方 API 抓取產業與股票名稱，不再依賴失效的 Github 網址
+@st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
-    url = "https://raw.githubusercontent.com/FinMind/FinMind/master/data/TaiwanStockInfo.csv"
+    ind_map, name_map = {}, {}
+    session = get_retry_session()
     try:
-        df = pd.read_csv(url)
-        df["stock_id"] = df["stock_id"].astype(str)
-        return dict(zip(df["stock_id"], df["industry_category"])), dict(zip(df["stock_id"], df["stock_name"]))
-    except Exception:
-        return {}, {}
+        url = "https://api.finmindtrade.com/api/v4/data"
+        params = {"dataset": "TaiwanStockInfo"}
+        r = session.get(url, params=params, timeout=10, verify=False)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("msg") == "success" and "data" in data:
+                df = pd.DataFrame(data["data"])
+                df["stock_id"] = df["stock_id"].astype(str)
+                ind_map = dict(zip(df["stock_id"], df["industry_category"]))
+                name_map = dict(zip(df["stock_id"], df["stock_name"]))
+                return ind_map, name_map
+    except Exception: pass
+
+    # 備援：如果 FinMind 當機，改抓證交所官方開源資料
+    try:
+        twse_url = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
+        r = session.get(twse_url, timeout=10, verify=False)
+        if r.status_code == 200:
+            twse_df = pd.DataFrame(r.json())
+            if not twse_df.empty:
+                for _, row in twse_df.iterrows():
+                    ind_map[str(row["公司代號"])] = str(row["產業別"])
+                    name_map[str(row["公司代號"])] = str(row["公司名稱"])
+    except Exception: pass
+    
+    return ind_map, name_map
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_macro_dashboard():
-    # ⚠️ 注意：這裡不再把 session 傳給 yfinance
     indices = {"^TWII": "台股加權", "^IXIC": "那斯達克", "^GSPC": "標普500", "^VIX": "恐慌指數", "USDTWD=X": "美元/台幣"}
     results = []
     score = 0
@@ -80,11 +102,10 @@ def get_macro_dashboard():
     overheat_flag = False
 
     try:
-        # 🚀 移除 session=session，順應 yfinance 新機制
         data = yf.download(list(indices.keys()), period="60d", threads=False, progress=False)
         
         if data.empty or "Close" not in data.columns:
-            return 5, pd.DataFrame([{"名稱": "系統", "現價": 0, "月線(M20)": 0, "乖離(%)": 0, "狀態": "⚠️ Yahoo資料中斷"}]), False
+            return 5, pd.DataFrame([{"名稱": "系統", "現價": "0", "月線(M20)": "0", "乖離(%)": "0", "狀態": "⚠️ Yahoo資料中斷"}]), False
 
         for tk, name in indices.items():
             if tk not in data["Close"].columns: continue
@@ -110,12 +131,19 @@ def get_macro_dashboard():
                     overheat_flag = True
                     status += " 🔥過熱"
 
-            results.append({"名稱": name, "現價": round(p_now, 2), "月線(M20)": round(m20, 2), "乖離(%)": round(bias, 2), "狀態": status})
+            # 🚀 修復：強制將大盤浮點數轉換為帶有 2 位小數的文字，杜絕 Streamlit 小數點暴走
+            results.append({
+                "名稱": name, 
+                "現價": f"{p_now:.2f}", 
+                "月線(M20)": f"{m20:.2f}", 
+                "乖離(%)": f"{bias:.2f}%", 
+                "狀態": status
+            })
 
         macro_df = pd.DataFrame(results)
     except Exception as e:
         print(f"Macro Error: {e}")
-        return 5, pd.DataFrame([{"名稱": "系統", "現價": 0, "月線(M20)": 0, "乖離(%)": 0, "狀態": f"⚠️ {e}"}]), False
+        return 5, pd.DataFrame([{"名稱": "系統", "現價": "0", "月線(M20)": "0", "乖離(%)": "0", "狀態": f"⚠️ {e}"}]), False
         
     return max(0, min(10, int(score))), macro_df, overheat_flag
 
@@ -290,7 +318,6 @@ def fetch_single_stock_batch(sid, fm_token=None):
 
 def safe_download(sid, fm_token=None):
     try:
-        # 🚀 移除 session=session，順應 yfinance 新機制
         ticker = f"{sid}.TW"
         df = yf.download(ticker, period="60d", threads=False, progress=False)
         if df is not None and not df.empty and "Close" in df.columns:
