@@ -199,68 +199,140 @@ with t_rank:
         if intel_df is None:
             st.error("🚨 **資料斷線警告**：Yahoo 與 FinMind 皆無回應。請稍後重整或確認 API 額度！", icon="💀")
         elif not intel_df.empty:
-            final_rank = pd.merge(today_df, intel_df, on="代號")
+            final_rank = pd.merge(
+    today_df,
+    intel_df,
+    on="代號",
+    suffixes=("_chip", "_intel")
+)
 
-            def calculate_quant_score(row):
-                score = 50
-                if row["勝率(%)"] > 50: score += (row["勝率(%)"] - 50) * 1.5
-                elif row["勝率(%)"] < 50: score -= (50 - row["勝率(%)"]) * 1.5
-                
-                streak = row["連買"]
-                if 3 <= streak <= 7: score += 20
-                elif 8 <= streak <= 10: score += 10
-                elif streak >= 12: score -= 15
-                elif streak > 0: score += streak * 2
-                
-                score += row["均報(%)"] * 10 + row["安全指數"] * 2
-                
-                if row.get("vol_ratio", 0) > 2.5 and row.get("close_position", 1) < 0.4: score -= 25
-                    
-                t = row["戰術型態"]
-                if "🔥" in t: score += 25
-                elif "🚀" in t: score += 15
-                elif "🛡️" in t: score += 10
-                elif "⚠️" in t: score -= 15
-                
-                if row["乖離(%)"] > 8: score -= (row["乖離(%)"] - 5) * 3
-                if MACRO_SCORE <= 5: 
-                    score -= 15
-                    if row["乖離(%)"] > 5: score -= 20
-                return round(score, 1)
+# 🛡️ 防止後面 UI 還在讀「名稱_x」而爆炸
+if "名稱_x" not in final_rank.columns:
+    if "名稱_chip" in final_rank.columns:
+        final_rank["名稱_x"] = final_rank["名稱_chip"]
+    elif "名稱" in final_rank.columns:
+        final_rank["名稱_x"] = final_rank["名稱"]
+    elif "名稱_intel" in final_rank.columns:
+        final_rank["名稱_x"] = final_rank["名稱_intel"]
+    else:
+        final_rank["名稱_x"] = final_rank["代號"]
 
-            final_rank["Quant_Score"] = final_rank.apply(calculate_quant_score, axis=1)
-            
-            def determine_phase(row):
-                if row.get("vol_ratio", 0) > 2.5 and row.get("close_position", 1) < 0.4: return "💀 第三段 (爆量出貨)"
-                elif row["連買"] >= 10: return "⚠️ 第三段 (過熱末升)"
-                elif "🚀" in row["戰術型態"] or "🔥" in row["戰術型態"]: return "🔥 第一段 (主升起漲)"
-                elif "🛡️" in row["戰術型態"]: return "🛡️ 第二段 (均線回踩)"
-                else: return "⏳ 觀望醞釀"
-            
-            final_rank["生命週期"] = final_rank.apply(determine_phase, axis=1)
+def determine_phase(row):
+    if row.get("vol_ratio", 0) > 2.5 and row.get("close_position", 1) < 0.4:
+        return "💀 第三段 (爆量出貨)"
+    elif row["連買"] >= 10:
+        return "⚠️ 第三段 (過熱末升)"
+    elif "🚀" in row["戰術型態"] or "🔥" in row["戰術型態"]:
+        return "🔥 第一段 (主升起漲)"
+    elif "🛡️" in row["戰術型態"]:
+        return "🛡️ 第二段 (均線回踩)"
+    else:
+        return "⏳ 觀望醞釀"
 
-            rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
+final_rank["生命週期"] = final_rank.apply(determine_phase, axis=1)
 
-            s_mask = (rank_sorted["Quant_Score"] >= 85) & (rank_sorted["基本達標"] == True)
-            a_mask = (~s_mask) & (rank_sorted["Quant_Score"] >= 65) & (rank_sorted["基本達標"] == True)
-            b_mask = (~s_mask) & (~a_mask) & (rank_sorted["Quant_Score"] >= 45)
-            c_mask = (~s_mask) & (~a_mask) & (~b_mask)
+def calculate_quant_score(row):
+    score = 50
 
-            s_tier, a_tier, b_tier, c_tier = rank_sorted[s_mask].head(3).copy(), rank_sorted[a_mask].head(3).copy(), rank_sorted[b_mask].head(7).copy(), rank_sorted[c_mask].copy()
-            s_tier["評級"], a_tier["評級"], b_tier["評級"], c_tier["評級"] = "S", "A", "B", "C"
-            master_list = pd.concat([s_tier, a_tier, b_tier, c_tier]).reset_index(drop=True)
-            
-            master_list = master_list[master_list["現價"] > master_list["停損價"]]
-            master_list = master_list.head(20)
-            master_list["名次"] = range(1, len(master_list) + 1)
+    if row["勝率(%)"] > 50:
+        score += (row["勝率(%)"] - 50) * 1.5
+    elif row["勝率(%)"] < 50:
+        score -= (50 - row["勝率(%)"]) * 1.5
 
-            if not master_list.empty:
-                def calc_suggested_lots(row):
-                    suggested_shares = min(risk_amount / row["原始風險差額"], (total_capital * 0.15) / row["現價"]) if row["原始風險差額"] > 0 else 0
-                    if MACRO_SCORE <= 5 or OVERHEAT_FLAG: suggested_shares *= 0.5
-                    return format_lots(suggested_shares)
+    streak = row["連買"]
 
-                master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
+    # 🛡️ 投信連買改成「3～7天最香，太久反而扣分」
+    if 3 <= streak <= 7:
+        score += 20
+    elif 8 <= streak <= 10:
+        score += 10
+    elif streak >= 12:
+        score -= 15
+    else:
+        score += 0
+
+    score += row["均報(%)"] * 10 + row["安全指數"] * 2
+
+    # 💀 爆量但收爛：視為出貨警報
+    if row.get("vol_ratio", 0) > 2.5 and row.get("close_position", 1) < 0.4:
+        score -= 25
+
+    t = row["戰術型態"]
+
+    if "🔥" in t:
+        score += 25
+    elif "🚀" in t:
+        score += 15
+    elif "🛡️" in t:
+        score += 10
+    elif "⚠️" in t:
+        score -= 15
+
+    # 🧬 生命週期正式納入分數
+    phase = row["生命週期"]
+
+    if "第一段" in phase:
+        score += 15
+    elif "第二段" in phase:
+        score += 8
+    elif "第三段" in phase:
+        score -= 25
+
+    if row["乖離(%)"] > 8:
+        score -= (row["乖離(%)"] - 5) * 3
+
+    if MACRO_SCORE <= 5:
+        score -= 15
+        if row["乖離(%)"] > 5:
+            score -= 20
+
+    return round(score, 1)
+
+final_rank["Quant_Score"] = final_rank.apply(calculate_quant_score, axis=1)
+
+rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
+
+s_mask = (rank_sorted["Quant_Score"] >= 85) & (rank_sorted["基本達標"] == True)
+a_mask = (~s_mask) & (rank_sorted["Quant_Score"] >= 65) & (rank_sorted["基本達標"] == True)
+b_mask = (~s_mask) & (~a_mask) & (rank_sorted["Quant_Score"] >= 45)
+c_mask = (~s_mask) & (~a_mask) & (~b_mask)
+
+s_tier = rank_sorted[s_mask].head(3).copy()
+a_tier = rank_sorted[a_mask].head(3).copy()
+b_tier = rank_sorted[b_mask].head(7).copy()
+c_tier = rank_sorted[c_mask].copy()
+
+s_tier["評級"] = "S"
+a_tier["評級"] = "A"
+b_tier["評級"] = "B"
+c_tier["評級"] = "C"
+
+master_list = pd.concat([s_tier, a_tier, b_tier, c_tier]).reset_index(drop=True)
+
+master_list = master_list[master_list["現價"] > master_list["停損價"]]
+master_list = master_list.head(20)
+master_list["名次"] = range(1, len(master_list) + 1)
+
+if not master_list.empty:
+    def calc_suggested_lots(row):
+        if row["原始風險差額"] > 0:
+            suggested_shares = min(
+                risk_amount / row["原始風險差額"],
+                (total_capital * 0.15) / row["現價"]
+            )
+        else:
+            suggested_shares = 0
+
+        if MACRO_SCORE <= 5 or OVERHEAT_FLAG:
+            suggested_shares *= 0.5
+
+        # 🛡️ 高價股保命裝甲：超過3000元自動再砍半
+        if row["現價"] > 3000:
+            suggested_shares *= 0.5
+
+        return format_lots(suggested_shares)
+
+    master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
 
                 holding_rows = []
                 if not m_df.empty:
