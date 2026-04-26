@@ -16,17 +16,15 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # --- 🚀 建立帶有重試機制的 Requests Session ---
 def get_retry_session():
     session = requests.Session()
-    # 設定重試策略：總共重試 3 次，遇到 429 (太多請求), 500, 502, 503, 504 錯誤時重試
     retry = Retry(
         total=3,
-        backoff_factor=0.5, # 每次重試的間隔時間會增加 (0.5s, 1s, 2s...)
+        backoff_factor=0.5, 
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=["HEAD", "GET", "OPTIONS"]
     )
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
-    # 加入更逼真的瀏覽器偽裝
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -74,9 +72,7 @@ def load_industry_map():
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_macro_dashboard():
-    # 使用我們強化的 Session 給 yfinance
     session = get_retry_session()
-    
     indices = {"^TWII": "台股加權", "^IXIC": "那斯達克", "^GSPC": "標普500", "^VIX": "恐慌指數", "USDTWD=X": "美元/台幣"}
     results = []
     score = 0
@@ -84,8 +80,6 @@ def get_macro_dashboard():
     overheat_flag = False
 
     try:
-        # 下載資料
-        # 注意：我們使用 threads=False 並加入 session，以減少被 Yahoo 擋的機率
         data = yf.download(list(indices.keys()), period="60d", session=session, threads=False, progress=False)
         
         if data.empty or "Close" not in data.columns:
@@ -153,6 +147,12 @@ def fetch_chips_data(fm_token=None):
     for d in valid_dates:
         try:
             df = raw_data[d].copy()
+            
+            # 🛡️ 終極防呆：如果 FinMind 給的資料是空的，或是漏給了最重要的 'name' 欄位，直接跳過這天的資料，不要崩潰！
+            if df.empty or "name" not in df.columns or "stock_id" not in df.columns:
+                print(f"[{d}] FinMind 資料異常，缺少必要欄位！跳過此日。")
+                continue
+
             df["buy"] = pd.to_numeric(df["buy"], errors="coerce").fillna(0)
             df["sell"] = pd.to_numeric(df["sell"], errors="coerce").fillna(0)
             df["net"] = (df["buy"] - df["sell"]) / 1000
@@ -180,20 +180,17 @@ def fetch_chips_data(fm_token=None):
 
     return chip_db
 
-# --- 單檔股票抓取引擎 (結合 Yahoo 與 FinMind，加上防護) ---
 def fetch_single_stock_batch(sid, fm_token=None):
     sid = str(sid).strip()
     df = safe_download(sid, fm_token)
     return sid, df
 
 def safe_download(sid, fm_token=None):
-    # 第一階段：嘗試從 Yahoo Finance 獲取資料 (加上 session 與偽裝)
     try:
         session = get_retry_session()
         ticker = f"{sid}.TW"
         df = yf.download(ticker, period="60d", session=session, threads=False, progress=False)
         if df is not None and not df.empty and "Close" in df.columns:
-            # 確保欄位名稱平坦化，避免 MultiIndex 造成錯誤
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             if len(df.dropna(subset=['Close'])) > 10:
@@ -201,7 +198,6 @@ def safe_download(sid, fm_token=None):
     except Exception as e:
         print(f"Yahoo download failed for {sid}: {e}")
 
-    # 第二階段：如果 Yahoo 失敗或回傳空值，改用 FinMind 備援 (加上 session 與防呆)
     try:
         session = get_retry_session()
         url = "https://api.finmindtrade.com/api/v4/data"
@@ -210,7 +206,6 @@ def safe_download(sid, fm_token=None):
         if fm_token: payload["token"] = fm_token
         
         resp = session.get(url, params=payload, timeout=10)
-        # 加入狀態碼判斷，如果不是 200 就代表出錯了，不要硬去 json()
         if resp.status_code == 200:
             data = resp.json()
             if data.get("msg") == "success" and data.get("data"):
@@ -219,7 +214,6 @@ def safe_download(sid, fm_token=None):
                 fm_df = fm_df.set_index("date").rename(columns={
                     "open": "Open", "max": "High", "min": "Low", "close": "Close", "Trading_Volume": "Volume"
                 })
-                # 簡單確保資料完整性
                 if not fm_df.empty and len(fm_df) > 10:
                     return fm_df
         else:
@@ -235,7 +229,6 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
     if not id_list: return pd.DataFrame()
 
     bulk_data = {}
-    # 使用 ThreadPoolExecutor 平行抓取
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(fetch_single_stock_batch, sid, fm_token): sid for sid in id_list}
         for future in concurrent.futures.as_completed(futures):
