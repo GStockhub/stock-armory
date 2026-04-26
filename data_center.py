@@ -118,7 +118,6 @@ def get_macro_dashboard():
         
     return max(0, min(10, int(score))), macro_df, overheat_flag
 
-# 🚀 【GPT 終極防護融合版】更改了 TTL 強制打破壞資料快取！
 @st.cache_data(ttl=14400, show_spinner=False)
 def fetch_chips_data(fm_token=None):
     chip_dict = {}
@@ -126,9 +125,8 @@ def fetch_chips_data(fm_token=None):
     attempts = 0
     session = get_retry_session()
 
-    # 🛡️ 採用 GPT 的神級戰術：不抓滿 5 天有效資料，絕不退兵 (最多嘗試 20 天)
     while len(chip_dict) < 5 and attempts < 20:
-        if date_ptr.weekday() < 5:  # 只抓平日 (週一到週五)
+        if date_ptr.weekday() < 5: 
             fm_d_str = date_ptr.strftime("%Y-%m-%d")
             
             try:
@@ -144,12 +142,16 @@ def fetch_chips_data(fm_token=None):
                 r = session.get(fm_url, params=params, timeout=15, verify=False)
                 
                 if r.status_code == 200:
-                    res = r.json()
-                    
+                    # 🛡️ 終極防毒面具：強制攔截 JSON 解析錯誤！
+                    try:
+                        res = r.json()
+                    except Exception as json_e:
+                        print(f"[{fm_d_str}] 敵軍丟出毒氣彈 (非JSON格式): {json_e}")
+                        res = {} # 直接設定為空字典，跳過這天的處理
+
                     if res.get("msg") == "success" and res.get("data"):
                         df = pd.DataFrame(res["data"])
                         
-                        # 🛡️ 結合 GPT 的終極防護：極度嚴格檢查所有必要欄位
                         if (not df.empty and 
                             "stock_id" in df.columns and 
                             "name" in df.columns and 
@@ -167,7 +169,6 @@ def fetch_chips_data(fm_token=None):
                                 aggfunc="sum"
                             ).fillna(0)
                             
-                            # 確保三大法人的欄位一定存在，避免後續加總崩潰
                             for col in ["Foreign_Investor", "Investment_Trust", "Dealer_self"]:
                                 if col not in pivoted.columns:
                                     pivoted[col] = 0
@@ -182,18 +183,16 @@ def fetch_chips_data(fm_token=None):
                             
                             pivoted["代號"] = pivoted["代號"].astype(str)
                             
-                            # 只有真正成功處理完，才加入字典
                             chip_dict[fm_d_str] = pivoted
                         else:
-                            print(f"[{fm_d_str}] 資料欄位殘缺 (可能是假日或 FinMind 異常)，直接跳過。")
+                            print(f"[{fm_d_str}] 資料欄位殘缺，直接跳過。")
                             
             except Exception as e:
                 print(f"FinMind chip failed for {fm_d_str}: {e}")
 
-        # 時間往前推一天，繼續嘗試
         date_ptr -= timedelta(days=1)
         attempts += 1
-        time.sleep(0.15)  # 稍微等待避免被鎖 IP
+        time.sleep(0.15) 
 
     return chip_dict
 
@@ -224,7 +223,12 @@ def safe_download(sid, fm_token=None):
         
         resp = session.get(url, params=payload, timeout=10)
         if resp.status_code == 200:
-            data = resp.json()
+            # 🛡️ 股價抓取也加上防毒面具
+            try:
+                data = resp.json()
+            except Exception:
+                data = {}
+
             if data.get("msg") == "success" and data.get("data"):
                 fm_df = pd.DataFrame(data["data"])
                 fm_df["date"] = pd.to_datetime(fm_df["date"])
