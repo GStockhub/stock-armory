@@ -74,8 +74,8 @@ except: fee_discount = 1.0
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v30</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極光學透視裝甲 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v30.1</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極光學透視裝甲 ✕ 實戰化升級 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -96,7 +96,7 @@ def format_lots(shares):
 
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
-if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量！", icon="🌋")
+if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！可能劇烈拉回，已限縮 AI 建議買量！", icon="🌋")
 
 with st.spinner("情報兵正在部署防線..."):
     chip_db = fetch_chips_data(FM_TOKEN)
@@ -127,7 +127,6 @@ else:
 if sheet_url:
     try:
         sheet_df = read_remote_csv(sheet_url, dtype=str)
-        # 🚀 救星：模糊比對欄位名稱，不管叫代號、代碼，只要有這兩字就抓！
         code_col = next((c for c in sheet_df.columns if any(k in c for k in ["代號", "代碼"])), None)
         if code_col: sheet_df = sheet_df.rename(columns={code_col: "代號"})
             
@@ -199,19 +198,18 @@ with t_rank:
         if intel_df is None:
             st.error("🚨 **資料斷線警告**：Yahoo 與 FinMind 皆無回應。請稍後重整或確認 API 額度！", icon="💀")
         elif not intel_df.empty:
-            final_rank = pd.merge(today_df,intel_df,on="代號",suffixes=("_chip", "_intel")
-            )
+            # 🚀 徹底解決名稱欄位衝突問題 (問題1修復)
+            final_rank = pd.merge(today_df, intel_df, on="代號", suffixes=("_chip", "_intel"))
 
-            # 🛡️ 防止後面 UI 還在讀「名稱_x」而爆炸
-            if "名稱_x" not in final_rank.columns:
-                if "名稱_chip" in final_rank.columns:
-                    final_rank["名稱_x"] = final_rank["名稱_chip"]
-                elif "名稱" in final_rank.columns:
-                    final_rank["名稱_x"] = final_rank["名稱"]
-                elif "名稱_intel" in final_rank.columns:
-                    final_rank["名稱_x"] = final_rank["名稱_intel"]
-                else:
-                    final_rank["名稱_x"] = final_rank["代號"]
+            if "名稱_chip" in final_rank.columns:
+                final_rank = final_rank.rename(columns={"名稱_chip": "名稱"})
+            elif "名稱_x" in final_rank.columns:
+                final_rank = final_rank.rename(columns={"名稱_x": "名稱"})
+            
+            if "名稱_intel" in final_rank.columns:
+                final_rank = final_rank.drop(columns=["名稱_intel"])
+            if "名稱_y" in final_rank.columns:
+                final_rank = final_rank.drop(columns=["名稱_y"])
 
             def determine_phase(row):
                 if row.get("vol_ratio", 0) > 2.5 and row.get("close_position", 1) < 0.4:
@@ -237,7 +235,7 @@ with t_rank:
 
                 streak = row["連買"]
 
-                # 🛡️ 投信連買改成「3～7天最香，太久反而扣分」
+                # 🛡️ 投信連買改成「3～7天最香，太久反而扣分」 (問題2修復)
                 if 3 <= streak <= 7:
                     score += 20
                 elif 8 <= streak <= 10:
@@ -245,11 +243,11 @@ with t_rank:
                 elif streak >= 12:
                     score -= 15
                 else:
-                    score += 0
+                    score += 0  # 1~2天直接不加分，過濾假訊號
 
                 score += row["均報(%)"] * 10 + row["安全指數"] * 2
 
-                # 💀 爆量但收爛：視為出貨警報
+                # 💀 爆量但收爛：視為出貨警報 (問題3已於底層支援)
                 if row.get("vol_ratio", 0) > 2.5 and row.get("close_position", 1) < 0.4:
                     score -= 25
 
@@ -264,7 +262,7 @@ with t_rank:
                 elif "⚠️" in t:
                     score -= 15
 
-                # 🧬 生命週期正式納入分數
+                # 🧬 生命週期正式納入分數 (建議修復)
                 phase = row["生命週期"]
 
                 if "第一段" in phase:
@@ -322,7 +320,7 @@ with t_rank:
                     if MACRO_SCORE <= 5 or OVERHEAT_FLAG:
                         suggested_shares *= 0.5
 
-                    # 🛡️ 高價股保命裝甲：超過3000元自動再砍半
+                    # 🛡️ 高價股保命裝甲：超過3000元自動再砍半 (問題5修復)
                     if row["現價"] > 3000:
                         suggested_shares *= 0.5
 
@@ -357,7 +355,7 @@ with t_rank:
                 export_rows = []
                 tier_names = {"S": "🥇 S級狙擊", "A": "🥈 A級狙擊", "B": "⚔️ B級穩健", "C": "📡 C級潛伏"}
                 for _, r in master_list.iterrows():
-                    export_rows.append({"戰區": tier_names.get(r["評級"], ""), "代號": r["代號"], "名稱": r["名稱_x"], "階段": r["生命週期"], "戰術行動": "👀 列入觀察" if r["評級"] == "C" else f"建議買 {r['建議買量(張)']} 張", "量化評分": f"{r['Quant_Score']:.1f}", "現價": f"{r['現價']:.2f}", "ATR停損": f"{r['停損價']:.2f}", "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r["產業"]})
+                    export_rows.append({"戰區": tier_names.get(r["評級"], ""), "代號": r["代號"], "名稱": r["名稱"], "階段": r["生命週期"], "戰術行動": "👀 列入觀察" if r["評級"] == "C" else f"建議買 {r['建議買量(張)']} 張", "量化評分": f"{r['Quant_Score']:.1f}", "現價": f"{r['現價']:.2f}", "ATR停損": f"{r['停損價']:.2f}", "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r["產業"]})
                 
                 final_export = []
                 if holding_rows:
@@ -384,7 +382,7 @@ with t_rank:
                         if idx < 3: 
                             with cols_s[idx]:
                                 card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {COLORS["primary"]}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]};">'
-                                card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: center; gap: 6px; overflow: hidden;"><span class="tier-badge badge-s">🥇 S級</span><h3 class="stock-title" style="color: {COLORS["primary"]};">{r["名稱_x"]} ({r["代號"]})</h3></div>'
+                                card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: center; gap: 6px; overflow: hidden;"><span class="tier-badge badge-s">🥇 S級</span><h3 class="stock-title" style="color: {COLORS["primary"]};">{r["名稱"]} ({r["代號"]})</h3></div>'
                                 card_html += f'<p style="color: #A0A0A0; margin: 0 0 8px 0; font-size: 12px;">{r["產業"]} | 投信連買 {r["連買"]} 天</p>'
                                 card_html += f'<div style="background-color: {COLORS["bg"]}; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid {COLORS["green"]};">'
                                 card_html += f'<div class="info-row"><span class="info-label" style="font-weight:bold; color: {COLORS["text"]};">🎯 量化評分</span><span class="info-value" style="font-size: 16px; color: {COLORS["text"]}; font-weight:bold;">{r["Quant_Score"]} 分</span></div>'
@@ -403,7 +401,7 @@ with t_rank:
                         if idx < 3: 
                             with cols_a[idx]:
                                 card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {COLORS["accent"]}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]};">'
-                                card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: center; gap: 6px; overflow: hidden;"><span class="tier-badge badge-a">🥈 A級</span><h3 class="stock-title" style="color: {COLORS["accent"]};">{r["名稱_x"]} ({r["代號"]})</h3></div>'
+                                card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: center; gap: 6px; overflow: hidden;"><span class="tier-badge badge-a">🥈 A級</span><h3 class="stock-title" style="color: {COLORS["accent"]};">{r["名稱"]} ({r["代號"]})</h3></div>'
                                 card_html += f'<p style="color: #A0A0A0; margin: 0 0 8px 0; font-size: 12px;">{r["產業"]} | 投信連買 {r["連買"]} 天</p>'
                                 card_html += f'<div style="background-color: {COLORS["bg"]}; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid {COLORS["green"]};">'
                                 card_html += f'<div class="info-row"><span class="info-label" style="font-weight:bold; color: {COLORS["text"]};">🎯 量化評分</span><span class="info-value" style="font-size: 16px; color: {COLORS["text"]}; font-weight:bold;">{r["Quant_Score"]} 分</span></div>'
@@ -419,8 +417,8 @@ with t_rank:
             st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
             if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
             else:
-                disp_b = ui_b[["名次", "評級", "代號", "名稱_x", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
-                disp_b = disp_b.rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分", "停損價": "ATR停損"})
+                disp_b = ui_b[["名次", "評級", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
+                disp_b = disp_b.rename(columns={"Quant_Score": "量化評分", "停損價": "ATR停損"})
                 disp_b["現價"] = disp_b["現價"].apply(lambda x: f"{x:.2f}")
                 disp_b["ATR停損"] = disp_b["ATR停損"].apply(lambda x: f"{x:.2f}")
                 disp_b["量化評分"] = disp_b["量化評分"].apply(lambda x: f"{x:.1f}")
@@ -435,8 +433,8 @@ with t_rank:
             st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
             if ui_c.empty: st.info("💡 今日無 C 級潛伏標的。")
             else:
-                disp_c = ui_c[["名次", "評級", "代號", "名稱_x", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]].copy()
-                disp_c = disp_c.rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分"})
+                disp_c = ui_c[["名次", "評級", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]].copy()
+                disp_c = disp_c.rename(columns={"Quant_Score": "量化評分"})
                 disp_c["現價"] = disp_c["現價"].apply(lambda x: f"{x:.2f}")
                 disp_c["量化評分"] = disp_c["量化評分"].apply(lambda x: f"{x:.1f}")
                 disp_c["乖離(%)"] = disp_c["乖離(%)"].apply(lambda x: f"{x:.1f}%")
@@ -477,18 +475,27 @@ with t_cmd:
             total_pnl = 0
             active_fee_rate = 0.001425 * fee_discount
             
+            # 🚀 引入 AAR 同等級的模糊讀取機制 (問題4修復)
+            def get_cmd_val(row_data, possible_keys, default=0.0):
+                for col in row_data.index:
+                    if any(k in str(col) for k in possible_keys):
+                        val = row_data[col]
+                        if pd.notna(val) and str(val).strip() != '':
+                            try: return float(str(val).replace(',', '').strip())
+                            except: pass
+                return default
+
             html_cards = '<div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">'
             for _, r in m_df.iterrows():
                 try:
                     p_now_raw = r.get('現價', 0)
                     p_now = float(p_now_raw) if pd.notna(p_now_raw) and str(p_now_raw).strip() != '' else 0.0
-                    p_cost_raw = r.get('成本價', r.get('成本', r.get('買進價', 0)))
-                    qty_raw = r.get('庫存張數', r.get('張數', r.get('庫存', 0)))
                     
-                    p_cost = float(str(p_cost_raw).replace(',', '').strip()) if pd.notna(p_cost_raw) and str(p_cost_raw).strip() != '' else 0.0
-                    qty = float(str(qty_raw).replace(',', '').strip()) if pd.notna(qty_raw) and str(qty_raw).strip() != '' else 0.0
+                    # 🚀 無腦讀取成本與庫存，杜絕 KeyError
+                    p_cost = get_cmd_val(r, ["成本價", "成本", "買進價", "成交均價", "建倉成本", "買價"])
+                    qty = get_cmd_val(r, ["庫存張數", "張數", "庫存", "股數", "數量"])
                     
-                    if p_now > 0:
+                    if p_now > 0 and qty > 0:
                         buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
                         sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
                         pnl = sell_revenue_net - buy_cost_total
@@ -544,4 +551,4 @@ with t_hist:
     st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V30 (透視裝甲版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V30.1 (實戰防禦極限版)</p>", unsafe_allow_html=True)
