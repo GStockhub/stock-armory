@@ -331,7 +331,7 @@ if not master_list.empty:
     master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
 
     holding_rows = []
-                if not m_df.empty:
+    if not m_df.empty:
                     for _, r in m_df.iterrows():
                         try:
                             p_now = float(r.get('現價', 0) or 0)
