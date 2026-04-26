@@ -71,7 +71,7 @@ fee_discount = configs["fee_discount"]
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v27.6</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 破曉神盾 ✕ 幽靈斬首 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 破曉神盾 ✕ 全境淨化 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -85,9 +85,11 @@ def risk_color(val):
         return f'color: {COLORS["primary"]}; font-weight: bold;'
     except: return ""
 
+# 🚀 修復：強制將買量鎖定最多 1 位小數 (解決 6.852 的亂碼問題)
 def format_lots(shares):
     lots = int(shares) / 1000
-    return "0" if lots <= 0 else f"{lots:.3f}".rstrip("0").rstrip(".")
+    if lots <= 0: return "0"
+    return f"{lots:.1f}".rstrip("0").rstrip(".")
 
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
@@ -119,6 +121,14 @@ if len(chip_db) >= 1:
         try:
             sheet_df = read_remote_csv(sheet_url, dtype=str)
             sheet_df.columns = sheet_df.columns.str.replace('\ufeff', '', regex=False).str.strip()
+            
+            # 🚀 修復防呆：不管使用者的 CSV 欄位叫「股票代號」、「證券代號」，系統自動幫它轉成「代號」
+            col_mapping = {}
+            for col in sheet_df.columns:
+                if any(x in col for x in ["代號", "股票代號", "證券代號", "股票代碼"]): col_mapping[col] = "代號"
+            if col_mapping:
+                sheet_df = sheet_df.rename(columns=col_mapping)
+                
             h_df = sheet_df[sheet_df["分類"] == "持股"].copy() if "分類" in sheet_df.columns else sheet_df.copy()
             if not h_df.empty and "代號" in h_df.columns:
                 h_df["代號"] = h_df["代號"].astype(str).str.strip()
@@ -208,7 +218,6 @@ if len(chip_db) >= 1:
                 s_tier["評級"], a_tier["評級"], b_tier["評級"], c_tier["評級"] = "S", "A", "B", "C"
                 master_list = pd.concat([s_tier, a_tier, b_tier, c_tier]).reset_index(drop=True)
                 
-                # 🛡️【緊急防呆裝甲】剔除「現價 <= 停損價」的幽靈標的
                 master_list = master_list[master_list["現價"] > master_list["停損價"]]
                 
                 master_list = master_list.head(20)
@@ -222,7 +231,6 @@ if len(chip_db) >= 1:
 
                     master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
 
-                    # 🚀 救星：把「現役持股」撈進來放在上半部
                     holding_rows = []
                     if not m_df.empty:
                         for _, r in m_df.iterrows():
@@ -252,7 +260,6 @@ if len(chip_db) >= 1:
                     for _, r in master_list.iterrows():
                         export_rows.append({"戰區": tier_names.get(r["評級"], ""), "代號": r["代號"], "名稱": r["名稱_x"], "戰術行動": "👀 列入觀察" if r["評級"] == "C" else f"建議買 {r['建議買量(張)']} 張", "量化評分": r["Quant_Score"], "現價": round(r["現價"], 2), "ATR停損": round(r["停損價"], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r["產業"]})
                     
-                    # 🚀 合併清單：現役持股 -> 兩行空白 -> 明日目標
                     final_export = []
                     if holding_rows:
                         final_export.extend(holding_rows)
@@ -260,7 +267,7 @@ if len(chip_db) >= 1:
                             "戰區": "", "代號": "", "名稱": "", "戰術行動": "",
                             "量化評分": "", "現價": "", "ATR停損": "", "次要數據": "", "產業": ""
                         }
-                        final_export.extend([empty_row, empty_row]) # 隔兩行
+                        final_export.extend([empty_row, empty_row]) 
                         
                     final_export.extend(export_rows)
 
@@ -314,24 +321,36 @@ if len(chip_db) >= 1:
                                     card_html += '</div></div>'
                                     st.markdown(card_html.replace('\n', ''), unsafe_allow_html=True)
 
+                # 🚀 修復：將 B 級與 C 級表格的小數點進行「物理閹割成文字」，徹底防範 Streamlit 亂碼
                 st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
-                    styled_b = (ui_b[["名次", "評級", "代號", "名稱_x", "產業", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]]
-                        .rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分", "停損價": "ATR停損"})
-                        .style.set_properties(**table_style)
-                        .format({"現價": "{:.2f}", "ATR停損": "{:.2f}", "勝率(%)": "{:.1f}%", "量化評分": "{:.1f}"})
+                    disp_b = ui_b[["名次", "評級", "代號", "名稱_x", "產業", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
+                    disp_b = disp_b.rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分", "停損價": "ATR停損"})
+                    
+                    disp_b["現價"] = disp_b["現價"].round(2)
+                    disp_b["ATR停損"] = disp_b["ATR停損"].round(2)
+                    disp_b["量化評分"] = disp_b["量化評分"].round(1)
+                    raw_win_rate = disp_b["勝率(%)"].copy()
+                    disp_b["勝率(%)"] = disp_b["勝率(%)"].apply(lambda x: f"{x:.1f}%")
+
+                    styled_b = (disp_b.style.set_properties(**table_style)
                         .map(risk_color, subset=["量化評分"])
-                        .map(lambda x: f'color: {COLORS["green"]}; font-weight: bold;' if x > 60 else '', subset=["勝率(%)"]))
+                        .apply(lambda x: [f'color: {COLORS["green"]}; font-weight: bold;' if v > 60 else '' for v in raw_win_rate], subset=["勝率(%)"]))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
                 st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
                 if ui_c.empty: st.info("💡 今日無 C 級潛伏標的。")
                 else:
-                    styled_c = (ui_c[["名次", "評級", "代號", "名稱_x", "產業", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]]
-                        .rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分"})
-                        .style.set_properties(**table_style)
-                        .format({"現價": "{:.2f}", "勝率(%)": "{:.1f}%", "乖離(%)": "{:.1f}%", "量化評分": "{:.1f}"})
+                    disp_c = ui_c[["名次", "評級", "代號", "名稱_x", "產業", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]].copy()
+                    disp_c = disp_c.rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分"})
+                    
+                    disp_c["現價"] = disp_c["現價"].round(2)
+                    disp_c["量化評分"] = disp_c["量化評分"].round(1)
+                    disp_c["乖離(%)"] = disp_c["乖離(%)"].apply(lambda x: f"{x:.1f}%")
+                    disp_c["勝率(%)"] = disp_c["勝率(%)"].apply(lambda x: f"{x:.1f}%")
+
+                    styled_c = (disp_c.style.set_properties(**table_style)
                         .map(risk_color, subset=["量化評分"]))
                     st.dataframe(styled_c, use_container_width=True, hide_index=True)
             else:
@@ -393,7 +412,7 @@ if len(chip_db) >= 1:
                         ret_col = COLORS['red'] if pnl > 0 else (COLORS['green'] if pnl < 0 else COLORS['text'])
                         
                         if p_now == 0.0 or m10 == 0.0:
-                            struct, coach, border_col, glow_class = "⚪ 訊號不足", "無法取得完整均線數據，請手動確認走勢。", COLORS['border'], ""
+                            struct, coach, border_col, glow_class = "⚪ 訊號不足", "無法取得完整均線數據，請手 manual 確認走勢。", COLORS['border'], ""
                         elif p_now > m5 and m5 > m10:
                             struct = f"🚀 多頭排列 (現價 > M5)"
                             if ret >= 10: coach = "👑 <b>【S級抱緊】</b> 趨勢極強！<b>跌破 M5 前絕對不賣！</b>"
