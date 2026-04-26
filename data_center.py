@@ -205,7 +205,6 @@ def fetch_chips_data(fm_token=None):
                                 clean["三大法人合計"] = clean["投信(張)"] + clean["外資(張)"] + clean["自營(張)"]
                                 chip_dict[d_str] = clean
                                 success = True
-                    # 🚀 救命防呆：如果去打證交所，強制睡 3.5 秒，絕對不能讓 IP 被封鎖！
                     if not success: time.sleep(3.5)
                 except Exception: pass
 
@@ -215,15 +214,17 @@ def fetch_chips_data(fm_token=None):
 
     return chip_dict
 
-def fetch_single_stock_batch(sid, fm_token=None):
+# 🚀 修復：加入 period="60d" 引數，對齊 AAR 的要求
+def fetch_single_stock_batch(sid, fm_token=None, period="60d"):
     sid = str(sid).strip()
-    df = safe_download(sid, fm_token)
+    df = safe_download(sid, fm_token, period=period)
     return sid, df
 
-def safe_download(sid, fm_token=None):
+# 🚀 修復：加入 period="60d" 引數，對齊 AAR 的要求
+def safe_download(sid, fm_token=None, period="60d"):
     try:
         ticker = f"{sid}.TW"
-        df = yf.download(ticker, period="60d", threads=False, progress=False)
+        df = yf.download(ticker, period=period, threads=False, progress=False)
         if df is not None and not df.empty and "Close" in df.columns:
             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
             if len(df.dropna(subset=['Close'])) > 10: return df
@@ -232,7 +233,9 @@ def safe_download(sid, fm_token=None):
     try:
         session = get_retry_session()
         url = "https://api.finmindtrade.com/api/v4/data"
-        start_d = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+        # 判斷如果是 1y，就抓 365 天前
+        days_back = 365 if period == "1y" else 90
+        start_d = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
         payload = {"dataset": "TaiwanStockPrice", "data_id": sid, "start_date": start_d}
         if fm_token: payload["token"] = fm_token
         
