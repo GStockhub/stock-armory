@@ -8,28 +8,74 @@ from data_center import read_remote_csv, safe_download, load_industry_map
 # 🚀 終極日期解析器：暴力斬斷尾巴，並封殺 1970 年的幽靈數字
 def parse_tw_date(d_str):
     try:
-        d_str = str(d_str).strip()
-        if not d_str or d_str.lower() in ["nan", "nat", "none", "0"]: 
+        raw = str(d_str).strip()
+
+        if not raw or raw.lower() in ["nan", "nat", "none", "0", "-"]:
             return pd.NaT
-        
-        # 物理斬斷尾巴：只取空白或 'T' 前面的純日期部分
-        d_str = d_str.split(" ")[0].split("T")[0]
-        d_str = d_str.replace("/", "-").replace(".", "-")
-        
-        parts = d_str.split("-")
+
+        raw = raw.split(" ")[0].split("T")[0]
+        raw = raw.replace("/", "-").replace(".", "-")
+
+        # 先處理 Excel 日期序號，例如 45400、45580
+        if re.fullmatch(r"\d{5}", raw):
+            serial = int(raw)
+            if 30000 <= serial <= 60000:
+                dt = pd.to_datetime("1899-12-30") + pd.to_timedelta(serial, unit="D")
+                if 2000 <= dt.year <= datetime.now().year + 1:
+                    return dt
+            return pd.NaT
+
+        # 處理 8 碼西元日期，例如 20260423
+        if re.fullmatch(r"\d{8}", raw):
+            y = int(raw[:4])
+            m = int(raw[4:6])
+            d = int(raw[6:8])
+            dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
+            if pd.notna(dt) and 2000 <= dt.year <= datetime.now().year + 1:
+                return dt
+            return pd.NaT
+
+        # 處理 7 碼民國日期，例如 1140423
+        if re.fullmatch(r"\d{7}", raw):
+            y = int(raw[:3]) + 1911
+            m = int(raw[3:5])
+            d = int(raw[5:7])
+            dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
+            if pd.notna(dt) and 2000 <= dt.year <= datetime.now().year + 1:
+                return dt
+            return pd.NaT
+
+        parts = raw.split("-")
+
         if len(parts) == 3:
             y = int(parts[0])
-            if y < 1911: y += 1911
-            d_str = f"{y}-{str(parts[1]).zfill(2)}-{str(parts[2]).zfill(2)}"
-            
-        dt = pd.to_datetime(d_str, errors='coerce')
-        
-        # 🚀 絕對防禦：如果算出來是 1970 年 (電腦元年)，直接視為無效，避免跑出兩萬天！
-        if dt is not pd.NaT and dt.year < 2000:
+            m = int(parts[1])
+            d = int(parts[2])
+
+            # 民國年，例如 114-04-23
+            if y < 1911:
+                y += 1911
+
+            dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
+
+        elif len(parts) == 2:
+            y = datetime.now().year
+            m = int(parts[0])
+            d = int(parts[1])
+            dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
+
+        else:
+            dt = pd.to_datetime(raw, errors="coerce")
+
+        if pd.isna(dt):
             return pd.NaT
-            
+
+        if dt.year < 2000 or dt.year > datetime.now().year + 1:
+            return pd.NaT
+
         return dt
-    except Exception: 
+
+    except Exception:
         return pd.NaT
 
 def extract_number(val_str):
@@ -155,7 +201,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 pnl = sell_rev - buy_cost
                 roi = (pnl / buy_cost) * 100 if buy_cost > 0 else 0
 
-                held_days = (sell_date - buy_date).days if is_sold and pd.notna(sell_date) else (datetime.now() - buy_date).days
+                if is_sold and pd.notna(sell_date):
+                    held_days = (sell_date - buy_date).days
+                else:
+                    held_days = (pd.Timestamp(datetime.now()) - buy_date).days
+                    if held_days < 0 or held_days > 3650:
+                        held_days = 0
 
                 demon = ""
                 comment = ""
