@@ -9,17 +9,15 @@ def parse_tw_date(d_str):
     try:
         d_str = str(d_str).strip().replace("/", "-").replace(".", "-")
         if not d_str: return pd.NaT
+        # 🚀 救星：無腦解析所有奇怪的日期格式 (包含 113-05-10 或 5/10)
         parts = d_str.split("-")
-        if len(parts) == 3:
+        if len(parts) == 3 and len(parts[0]) <= 3:
             y = int(parts[0])
             if y < 1911: y += 1911
-            return pd.to_datetime(f"{y}-{parts[1]}-{parts[2]}")
-        elif len(parts) == 2:
-            return pd.to_datetime(f"{datetime.now().year}-{parts[0]}-{parts[1]}")
-        return pd.to_datetime(d_str)
+            d_str = f"{y}-{parts[1]}-{parts[2]}"
+        return pd.to_datetime(d_str, errors='coerce')
     except Exception: return pd.NaT
 
-# 🚀 全新超強解析器：無視所有空格、$符號，暴力把數字抽出來
 def extract_number(val_str):
     try:
         s = str(val_str).replace(',', '').strip()
@@ -32,9 +30,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     if not aar_sheet_url:
         st.info("請在左側邊欄輸入【交易日誌】CSV 網址。")
         return
-
-    try:
-        df = read_remote_csv(aar_sheet_url, dtype=str)
+    try: df = read_remote_csv(aar_sheet_url, dtype=str)
     except Exception as e:
         st.error(f"系統錯誤: {e}")
         return
@@ -43,15 +39,16 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         st.info("交易日誌沒有資料。")
         return
 
-    df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
-
+    # 🚀 救星：終極模糊比對，只要欄位名稱「包含」關鍵字，就算有隱形符號也能抓到！
     def get_val(row, possible_keys, default=""):
-        for k in possible_keys:
-            if k in row and pd.notna(row[k]): return str(row[k]).strip()
+        for col in row.index:
+            for k in possible_keys:
+                if k in str(col):
+                    if pd.notna(row[col]): return str(row[col]).strip()
         return default
 
     results = []
-    skipped_rows = [] # 🚀 專門收集被「偷偷跳過」的犯人名單
+    skipped_rows = []
     total_pnl = 0.0
     win_trades = 0
     total_closed_trades = 0
@@ -64,17 +61,19 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     with st.spinner("🧠 AAR 戰術教練正在深度覆盤您的交易歷史..."):
         for i, row in df.iterrows():
             try:
-                sid_raw = get_val(row, ["代號"])
+                sid_raw = get_val(row, ["代號", "股票代號", "證券代號", "股票代碼", "stock_id"])
                 sid = str(sid_raw).strip()
-                if not sid: continue
+                if not sid: 
+                    skipped_rows.append({"行數 (Excel)": i+2, "代號": "未知", "原因": "找不到【代號】欄位 (請檢查表頭)"})
+                    continue
 
-                buy_date_raw = get_val(row, ["買進日期"])
-                buy_price_raw = get_val(row, ["買進價"])
-                shares_raw = get_val(row, ["張數"])
-                user_demon = get_val(row, ["心理標籤"])
+                buy_date_raw = get_val(row, ["買進日期", "買進日", "日期", "建倉日"])
+                buy_price_raw = get_val(row, ["買進價", "成本價", "成本", "買價", "均價"])
+                shares_raw = get_val(row, ["張數", "庫存張數", "庫存", "股數", "數量"])
+                user_demon = get_val(row, ["心理標籤", "心魔", "標籤", "心理狀態"])
 
                 if not buy_date_raw or not buy_price_raw or not shares_raw:
-                    skipped_rows.append({"行數 (Excel)": i+2, "代號": sid, "原因": f"缺少必要欄位 (買日:{buy_date_raw}, 買價:{buy_price_raw}, 張數:{shares_raw})"})
+                    skipped_rows.append({"行數": i+2, "代號": sid, "原因": f"缺少數值 (買日:{buy_date_raw}, 買價:{buy_price_raw}, 張數:{shares_raw})"})
                     continue
 
                 buy_date = parse_tw_date(buy_date_raw)
@@ -82,16 +81,16 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 shares = extract_number(shares_raw)
 
                 if pd.isna(buy_date) or buy_price <= 0 or shares <= 0:
-                    skipped_rows.append({"行數 (Excel)": i+2, "代號": sid, "原因": f"數值格式無法辨識 (日期:{buy_date_raw}, 價格:{buy_price}, 張數:{shares})"})
+                    skipped_rows.append({"行數": i+2, "代號": sid, "原因": f"數值無法辨識 (日:{buy_date_raw}, 價:{buy_price}, 張:{shares})"})
                     continue
 
-                sell_date_raw = get_val(row, ["賣出日期"])
-                sell_price_raw = get_val(row, ["賣出價"])
+                sell_date_raw = get_val(row, ["賣出日期", "賣出日", "平倉日"])
+                sell_price_raw = get_val(row, ["賣出價", "賣價", "平倉價"])
                 is_sold = sell_date_raw != "" and sell_price_raw != ""
 
                 hist = safe_download(sid, fm_token, period="1y")
                 if hist is None or hist.empty:
-                    skipped_rows.append({"行數 (Excel)": i+2, "代號": sid, "原因": "Yahoo與FinMind皆抓不到該股歷史報價"})
+                    skipped_rows.append({"行數": i+2, "代號": sid, "原因": "Yahoo/FinMind 皆抓不到歷史報價(可能是已下市或代碼錯誤)"})
                     continue
                 
                 hist.index = pd.to_datetime(hist.index).tz_localize(None)
@@ -118,10 +117,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 pnl = sell_rev - buy_cost
                 roi = (pnl / buy_cost) * 100 if buy_cost > 0 else 0
-
                 held_days = (sell_date - buy_date).days if is_sold and pd.notna(sell_date) else (datetime.now() - buy_date).days
 
-                # === 深度診斷與心魔判定 ===
                 demon = ""
                 comment = ""
 
@@ -181,11 +178,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
                         demon = "⚓ 凹單"
 
-                if user_demon:
-                    demon = f"👤 {user_demon}"
-
-                if demon and "紀律" not in demon and "完美" not in demon:
-                    demons.append(demon)
+                if user_demon: demon = f"👤 {user_demon}"
+                if demon and "紀律" not in demon and "完美" not in demon: demons.append(demon)
 
                 buy_str = buy_date.strftime("%m-%d")
                 sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
@@ -202,7 +196,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     "淨利": int(pnl),
                 })
             except Exception as e:
-                skipped_rows.append({"行數 (Excel)": i+2, "代號": sid_raw, "原因": f"底層運算當機: {e}"})
+                skipped_rows.append({"行數": i+2, "代號": sid_raw, "原因": f"底層運算當機: {e}"})
                 continue
 
     win_rate = (win_trades / total_closed_trades * 100) if total_closed_trades > 0 else 0
@@ -221,14 +215,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 🚀 X光透視偵錯面板：把被跳過的犯人名單全部抖出來！
+    # 🚀 X光透視偵錯面板：把被偷偷跳過的資料全部印出來，不再死無對證！
     if skipped_rows:
         with st.expander(f"⚠️ 系統跳過了 {len(skipped_rows)} 筆格式異常的資料，點擊查看詳細原因", expanded=True):
             st.dataframe(pd.DataFrame(skipped_rows), use_container_width=True)
 
     if results:
         res_df = pd.DataFrame(results)
-        
         def grade_color(val):
             if 'S級' in str(val): return f"color: {COLORS['primary']}; font-weight: bold;"
             if 'C級' in str(val): return f"color: {COLORS['green']}; font-weight: bold;"
@@ -237,7 +230,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             return f"color: {COLORS['subtext']};"
 
         table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
-        
         styled = (
             res_df.style.set_properties(**table_style)
             .format({"報酬率(%)": "{:.2f}%", "淨利": "{:,.0f}"})
@@ -246,19 +238,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap'})
         )
         
-        st.dataframe(
-            styled, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={
-                "代號": st.column_config.TextColumn(width="small"),
-                "名稱": st.column_config.TextColumn(width="small"),
-                "診斷詳情": st.column_config.TextColumn(width="large"),
-                "評級": st.column_config.TextColumn(width="small"),
-                "買進日": st.column_config.TextColumn(width="small"),
-                "賣出日": st.column_config.TextColumn(width="small"),
-                "持有天數": st.column_config.NumberColumn(width="small"),
-            }
-        )
+        st.dataframe(styled, use_container_width=True, hide_index=True, column_config={"診斷詳情": st.column_config.TextColumn(width="large")})
     else:
-        st.info("AAR 解析完畢後，沒有可分析的有效資料。請查看上方的警告面板了解原因。")
+        st.info("AAR 解析完畢後，沒有可分析的有效資料。請查看上方的【⚠️ 系統跳過】面板了解原因。")
