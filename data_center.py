@@ -13,7 +13,7 @@ from urllib3.util.retry import Retry
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- 🚀 建立帶有重試機制的 Requests Session ---
+# --- 🚀 建立帶有重試機制的 Requests Session (留給 FinMind 和 Google Sheet 用) ---
 def get_retry_session():
     session = requests.Session()
     retry = Retry(
@@ -72,7 +72,7 @@ def load_industry_map():
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_macro_dashboard():
-    session = get_retry_session()
+    # ⚠️ 注意：這裡不再把 session 傳給 yfinance
     indices = {"^TWII": "台股加權", "^IXIC": "那斯達克", "^GSPC": "標普500", "^VIX": "恐慌指數", "USDTWD=X": "美元/台幣"}
     results = []
     score = 0
@@ -80,7 +80,8 @@ def get_macro_dashboard():
     overheat_flag = False
 
     try:
-        data = yf.download(list(indices.keys()), period="60d", session=session, threads=False, progress=False)
+        # 🚀 移除 session=session，順應 yfinance 新機制
+        data = yf.download(list(indices.keys()), period="60d", threads=False, progress=False)
         
         if data.empty or "Close" not in data.columns:
             return 5, pd.DataFrame([{"名稱": "系統", "現價": 0, "月線(M20)": 0, "乖離(%)": 0, "狀態": "⚠️ Yahoo資料中斷"}]), False
@@ -289,9 +290,9 @@ def fetch_single_stock_batch(sid, fm_token=None):
 
 def safe_download(sid, fm_token=None):
     try:
-        session = get_retry_session()
+        # 🚀 移除 session=session，順應 yfinance 新機制
         ticker = f"{sid}.TW"
-        df = yf.download(ticker, period="60d", session=session, threads=False, progress=False)
+        df = yf.download(ticker, period="60d", threads=False, progress=False)
         if df is not None and not df.empty and "Close" in df.columns:
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
@@ -309,7 +310,6 @@ def safe_download(sid, fm_token=None):
         
         resp = session.get(url, params=payload, timeout=10)
         if resp.status_code == 200:
-            # 🛡️ 股價抓取也加上防毒面具
             try:
                 data = resp.json()
             except Exception:
