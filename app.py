@@ -290,7 +290,7 @@ with t_rank:
                 export_rows = []
                 tier_names = {"S": "🥇 S級狙擊", "A": "🥈 A級狙擊", "B": "⚔️ B級穩健", "C": "📡 C級潛伏"}
                 for _, r in master_list.iterrows():
-                    export_rows.append({"戰區": tier_names.get(r["評級"], ""), "代號": r["代號"], "名稱": r["名稱_x"], "階段": r["生命週期"], "戰術行動": "👀 列入觀察" if r["評級"] == "C" else f"建議買 {r['建議買量(張)']} 張", "量化評分": r["Quant_Score"], "現價": round(r["現價"], 2), "ATR停損": round(r["停損價"], 2), "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r["產業"]})
+                    export_rows.append({"戰區": tier_names.get(r["評級"], ""), "代號": r["代號"], "名稱": r["名稱_x"], "階段": r["生命週期"], "戰術行動": "👀 列入觀察" if r["評級"] == "C" else f"建議買 {r['建議買量(張)']} 張", "量化評分": f"{r['Quant_Score']:.1f}", "現價": f"{r['現價']:.2f}", "ATR停損": f"{r['停損價']:.2f}", "次要數據": f"勝率 {r['勝率(%)']:.1f}%", "產業": r["產業"]})
                 
                 final_export = []
                 if holding_rows:
@@ -355,9 +355,9 @@ with t_rank:
             else:
                 disp_b = ui_b[["名次", "評級", "代號", "名稱_x", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
                 disp_b = disp_b.rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分", "停損價": "ATR停損"})
-                disp_b["現價"] = disp_b["現價"].round(2)
-                disp_b["ATR停損"] = disp_b["ATR停損"].round(2)
-                disp_b["量化評分"] = disp_b["量化評分"].round(1)
+                disp_b["現價"] = disp_b["現價"].apply(lambda x: f"{x:.2f}")
+                disp_b["ATR停損"] = disp_b["ATR停損"].apply(lambda x: f"{x:.2f}")
+                disp_b["量化評分"] = disp_b["量化評分"].apply(lambda x: f"{x:.1f}")
                 raw_win_rate = disp_b["勝率(%)"].copy()
                 disp_b["勝率(%)"] = disp_b["勝率(%)"].apply(lambda x: f"{x:.1f}%")
 
@@ -371,8 +371,8 @@ with t_rank:
             else:
                 disp_c = ui_c[["名次", "評級", "代號", "名稱_x", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]].copy()
                 disp_c = disp_c.rename(columns={"名稱_x": "名稱", "Quant_Score": "量化評分"})
-                disp_c["現價"] = disp_c["現價"].round(2)
-                disp_c["量化評分"] = disp_c["量化評分"].round(1)
+                disp_c["現價"] = disp_c["現價"].apply(lambda x: f"{x:.2f}")
+                disp_c["量化評分"] = disp_c["量化評分"].apply(lambda x: f"{x:.1f}")
                 disp_c["乖離(%)"] = disp_c["乖離(%)"].apply(lambda x: f"{x:.1f}%")
                 disp_c["勝率(%)"] = disp_c["勝率(%)"].apply(lambda x: f"{x:.1f}%")
 
