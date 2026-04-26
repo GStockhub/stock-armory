@@ -176,7 +176,7 @@ with t_rank:
                 else: st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
 
     st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
-    st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊 (軟性權重模型)</span>", unsafe_allow_html=True)
+    st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
 
     with st.expander("🌍 國際大盤數值"):
         if not MACRO_DF.empty:
