@@ -60,38 +60,34 @@ def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
         print(f"Read CSV Error: {e}")
         return pd.DataFrame()
 
-# 🚀 修復：改用穩定的官方 API 抓取產業與股票名稱，不再依賴失效的 Github 網址
+# 🚀 統帥專屬：讀取自建的產業地圖 CSV
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
-    ind_map, name_map = {}, {}
-    session = get_retry_session()
-    try:
-        url = "https://api.finmindtrade.com/api/v4/data"
-        params = {"dataset": "TaiwanStockInfo"}
-        r = session.get(url, params=params, timeout=10, verify=False)
-        if r.status_code == 200:
-            data = r.json()
-            if data.get("msg") == "success" and "data" in data:
-                df = pd.DataFrame(data["data"])
-                df["stock_id"] = df["stock_id"].astype(str)
-                ind_map = dict(zip(df["stock_id"], df["industry_category"]))
-                name_map = dict(zip(df["stock_id"], df["stock_name"]))
-                return ind_map, name_map
-    except Exception: pass
-
-    # 備援：如果 FinMind 當機，改抓證交所官方開源資料
-    try:
-        twse_url = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
-        r = session.get(twse_url, timeout=10, verify=False)
-        if r.status_code == 200:
-            twse_df = pd.DataFrame(r.json())
-            if not twse_df.empty:
-                for _, row in twse_df.iterrows():
-                    ind_map[str(row["公司代號"])] = str(row["產業別"])
-                    name_map[str(row["公司代號"])] = str(row["公司名稱"])
-    except Exception: pass
+    # 💡 提示：如果您的 industry_map.csv 已經放在 Streamlit 資料夾裡，它會自動讀取。
+    # 💡 如果您想從 Github 直接讀取，請將下方引號內的網址替換為您的 Github Raw 網址
+    custom_csv_url = "" 
     
-    return ind_map, name_map
+    try:
+        if custom_csv_url.startswith("http"):
+            df = pd.read_csv(custom_csv_url, dtype=str)
+        else:
+            # 讀取本地端檔案 industry_map.csv
+            df = pd.read_csv("industry_map.csv", dtype=str)
+            
+        # 清理隱藏字元與空白
+        df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
+        df["代號"] = df["代號"].astype(str).str.strip()
+        df["產業"] = df["產業"].astype(str).str.strip()
+        df["名稱"] = df["名稱"].astype(str).str.strip()
+        
+        ind_map = dict(zip(df["代號"], df["產業"]))
+        name_map = dict(zip(df["代號"], df["名稱"]))
+        
+        print(f"✅ 成功載入統帥專屬產業地圖！共 {len(ind_map)} 檔股票。")
+        return ind_map, name_map
+    except Exception as e:
+        print(f"❌ 讀取自建產業地圖失敗: {e}")
+        return {}, {}
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_macro_dashboard():
@@ -131,7 +127,6 @@ def get_macro_dashboard():
                     overheat_flag = True
                     status += " 🔥過熱"
 
-            # 🚀 修復：強制將大盤浮點數轉換為帶有 2 位小數的文字，杜絕 Streamlit 小數點暴走
             results.append({
                 "名稱": name, 
                 "現價": f"{p_now:.2f}", 
@@ -160,7 +155,6 @@ def fetch_chips_data(fm_token=None):
             fm_d_str = date_ptr.strftime("%Y-%m-%d")
             success = False
 
-            # 1. 先抓 FinMind
             try:
                 fm_url = "https://api.finmindtrade.com/api/v4/data"
                 params = {
@@ -234,7 +228,6 @@ def fetch_chips_data(fm_token=None):
             except Exception as e:
                 print(f"FinMind chip failed {fm_d_str}: {e}")
 
-            # 2. FinMind 失敗，改抓 TWSE T86 備援
             if not success:
                 try:
                     twse_url = (
