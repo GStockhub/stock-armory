@@ -13,7 +13,6 @@ from urllib3.util.retry import Retry
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- 🚀 建立帶有重試機制的 Requests Session ---
 def get_retry_session():
     session = requests.Session()
     retry = Retry(
@@ -60,21 +59,10 @@ def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
         print(f"Read CSV Error: {e}")
         return pd.DataFrame()
 
-# 🚀 統帥專屬：讀取自建的產業地圖 CSV
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_industry_map():
-    # 💡 提示：如果您的 industry_map.csv 已經放在 Streamlit 資料夾裡，它會自動讀取。
-    # 💡 如果您想從 Github 直接讀取，請將下方引號內的網址替換為您的 Github Raw 網址
-    custom_csv_url = "" 
-    
     try:
-        if custom_csv_url.startswith("http"):
-            df = pd.read_csv(custom_csv_url, dtype=str)
-        else:
-            # 讀取本地端檔案 industry_map.csv
-            df = pd.read_csv("industry_map.csv", dtype=str)
-            
-        # 清理隱藏字元與空白
+        df = pd.read_csv("industry_map.csv", dtype=str)
         df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
         df["代號"] = df["代號"].astype(str).str.strip()
         df["產業"] = df["產業"].astype(str).str.strip()
@@ -82,8 +70,6 @@ def load_industry_map():
         
         ind_map = dict(zip(df["代號"], df["產業"]))
         name_map = dict(zip(df["代號"], df["名稱"]))
-        
-        print(f"✅ 成功載入統帥專屬產業地圖！共 {len(ind_map)} 檔股票。")
         return ind_map, name_map
     except Exception as e:
         print(f"❌ 讀取自建產業地圖失敗: {e}")
@@ -137,7 +123,6 @@ def get_macro_dashboard():
 
         macro_df = pd.DataFrame(results)
     except Exception as e:
-        print(f"Macro Error: {e}")
         return 5, pd.DataFrame([{"名稱": "系統", "現價": "0", "月線(M20)": "0", "乖離(%)": "0", "狀態": f"⚠️ {e}"}]), False
         
     return max(0, min(10, int(score))), macro_df, overheat_flag
@@ -157,151 +142,77 @@ def fetch_chips_data(fm_token=None):
 
             try:
                 fm_url = "https://api.finmindtrade.com/api/v4/data"
-                params = {
-                    "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
-                    "start_date": fm_d_str,
-                    "end_date": fm_d_str,
-                }
-
-                if fm_token and str(fm_token).strip():
-                    params["token"] = str(fm_token).strip()
+                params = {"dataset": "TaiwanStockInstitutionalInvestorsBuySell", "start_date": fm_d_str, "end_date": fm_d_str}
+                if fm_token and str(fm_token).strip(): params["token"] = str(fm_token).strip()
 
                 r = session.get(fm_url, params=params, timeout=15, verify=False)
-
                 if r.status_code == 200:
-                    try:
-                        res = r.json()
-                    except Exception:
-                        res = {}
-
+                    try: res = r.json()
+                    except: res = {}
+                    
                     if res.get("msg") == "success" and res.get("data"):
                         df = pd.DataFrame(res["data"])
-
-                        if (
-                            not df.empty
-                            and "stock_id" in df.columns
-                            and "name" in df.columns
-                            and "buy" in df.columns
-                            and "sell" in df.columns
-                        ):
+                        if not df.empty and "stock_id" in df.columns and "name" in df.columns and "buy" in df.columns and "sell" in df.columns:
                             df["buy"] = pd.to_numeric(df["buy"], errors="coerce").fillna(0)
                             df["sell"] = pd.to_numeric(df["sell"], errors="coerce").fillna(0)
                             df["net"] = (df["buy"] - df["sell"]) / 1000
 
-                            pivot = df.pivot_table(
-                                index="stock_id",
-                                columns="name",
-                                values="net",
-                                aggfunc="sum"
-                            ).fillna(0)
-
+                            pivot = df.pivot_table(index="stock_id", columns="name", values="net", aggfunc="sum").fillna(0)
                             clean = pd.DataFrame()
                             clean["代號"] = pivot.index.astype(str)
                             clean["名稱"] = clean["代號"]
 
-                            trust_cols = [
-                                c for c in pivot.columns
-                                if "Investment_Trust" in str(c) or "投信" in str(c)
-                            ]
-                            foreign_cols = [
-                                c for c in pivot.columns
-                                if "Foreign" in str(c) or "外資" in str(c)
-                            ]
-                            dealer_cols = [
-                                c for c in pivot.columns
-                                if "Dealer" in str(c) or "自營" in str(c)
-                            ]
+                            trust_cols = [c for c in pivot.columns if "Investment_Trust" in str(c) or "投信" in str(c)]
+                            foreign_cols = [c for c in pivot.columns if "Foreign" in str(c) or "外資" in str(c)]
+                            dealer_cols = [c for c in pivot.columns if "Dealer" in str(c) or "自營" in str(c)]
 
                             clean["投信(張)"] = pivot[trust_cols].sum(axis=1).values if trust_cols else 0
                             clean["外資(張)"] = pivot[foreign_cols].sum(axis=1).values if foreign_cols else 0
                             clean["自營(張)"] = pivot[dealer_cols].sum(axis=1).values if dealer_cols else 0
-                            clean["三大法人合計"] = (
-                                clean["投信(張)"] +
-                                clean["外資(張)"] +
-                                clean["自營(張)"]
-                            )
-
+                            clean["三大法人合計"] = clean["投信(張)"] + clean["外資(張)"] + clean["自營(張)"]
+                            
                             chip_dict[d_str] = clean
                             success = True
-                            print(f"✅ FinMind 法人資料成功：{fm_d_str}")
-
-            except Exception as e:
-                print(f"FinMind chip failed {fm_d_str}: {e}")
+            except Exception: pass
 
             if not success:
                 try:
-                    twse_url = (
-                        "https://www.twse.com.tw/rwd/zh/fund/T86"
-                        f"?date={d_str}"
-                        "&selectType=ALLBUT0999"
-                        "&response=json"
-                    )
-
+                    twse_url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={d_str}&selectType=ALLBUT0999&response=json"
                     r = session.get(twse_url, timeout=15, verify=False)
-
                     if r.status_code == 200:
-                        try:
-                            res = r.json()
-                        except Exception:
-                            res = {}
-
+                        try: res = r.json()
+                        except: res = {}
                         if res.get("stat") == "OK" and res.get("data") and res.get("fields"):
                             df = pd.DataFrame(res["data"], columns=res["fields"])
-
                             code_cols = [c for c in df.columns if "代號" in c]
                             name_cols = [c for c in df.columns if "名稱" in c]
 
-                            if not code_cols or not name_cols:
-                                print(f"TWSE 欄位異常：{d_str}")
-                            else:
-                                code_col = code_cols[0]
-                                name_col = name_cols[0]
-
-                                trust_cols = [
-                                    c for c in df.columns
-                                    if "投信" in c and "買賣超" in c
-                                ]
-                                foreign_cols = [
-                                    c for c in df.columns
-                                    if "外資" in c and "買賣超" in c
-                                ]
-                                dealer_cols = [
-                                    c for c in df.columns
-                                    if "自營" in c and "買賣超" in c
-                                ]
+                            if code_cols and name_cols:
+                                code_col, name_col = code_cols[0], name_cols[0]
+                                trust_cols = [c for c in df.columns if "投信" in c and "買賣超" in c]
+                                foreign_cols = [c for c in df.columns if "外資" in c and "買賣超" in c]
+                                dealer_cols = [c for c in df.columns if "自營" in c and "買賣超" in c]
 
                                 def parse_col(col_name):
-                                    return pd.to_numeric(
-                                        df[col_name].astype(str).str.replace(",", "", regex=False),
-                                        errors="coerce"
-                                    ).fillna(0) / 1000
+                                    return pd.to_numeric(df[col_name].astype(str).str.replace(",", "", regex=False), errors="coerce").fillna(0) / 1000
 
                                 clean = pd.DataFrame()
                                 clean["代號"] = df[code_col].astype(str).str.strip()
                                 clean["名稱"] = df[name_col].astype(str).str.strip()
-
                                 clean["投信(張)"] = sum(parse_col(c) for c in trust_cols) if trust_cols else 0
                                 clean["外資(張)"] = sum(parse_col(c) for c in foreign_cols) if foreign_cols else 0
                                 clean["自營(張)"] = sum(parse_col(c) for c in dealer_cols) if dealer_cols else 0
-                                clean["三大法人合計"] = (
-                                    clean["投信(張)"] +
-                                    clean["外資(張)"] +
-                                    clean["自營(張)"]
-                                )
-
+                                clean["三大法人合計"] = clean["投信(張)"] + clean["外資(張)"] + clean["自營(張)"]
                                 chip_dict[d_str] = clean
-                                print(f"✅ TWSE 法人資料成功：{d_str}")
-                        else:
-                            print(f"TWSE 無資料：{d_str} / {res.get('stat')}")
-
-                except Exception as e:
-                    print(f"TWSE chip failed {d_str}: {e}")
+                                success = True
+                    # 🚀 救命防呆：如果去打證交所，強制睡 3.5 秒，絕對不能讓 IP 被封鎖！
+                    if not success: time.sleep(3.5)
+                except Exception: pass
 
         date_ptr -= timedelta(days=1)
         attempts += 1
-        time.sleep(0.15)
+        time.sleep(0.2)
 
-    print(f"法人資料總共抓到 {len(chip_dict)} 天")
     return chip_dict
 
 def fetch_single_stock_batch(sid, fm_token=None):
@@ -314,12 +225,9 @@ def safe_download(sid, fm_token=None):
         ticker = f"{sid}.TW"
         df = yf.download(ticker, period="60d", threads=False, progress=False)
         if df is not None and not df.empty and "Close" in df.columns:
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-            if len(df.dropna(subset=['Close'])) > 10:
-                return df
-    except Exception as e:
-        print(f"Yahoo download failed for {sid}: {e}")
+            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+            if len(df.dropna(subset=['Close'])) > 10: return df
+    except Exception: pass
 
     try:
         session = get_retry_session()
@@ -330,23 +238,16 @@ def safe_download(sid, fm_token=None):
         
         resp = session.get(url, params=payload, timeout=10)
         if resp.status_code == 200:
-            try:
-                data = resp.json()
-            except Exception:
-                data = {}
-
+            try: data = resp.json()
+            except: data = {}
             if data.get("msg") == "success" and data.get("data"):
                 fm_df = pd.DataFrame(data["data"])
                 fm_df["date"] = pd.to_datetime(fm_df["date"])
                 fm_df = fm_df.set_index("date").rename(columns={
                     "open": "Open", "max": "High", "min": "Low", "close": "Close", "Trading_Volume": "Volume"
                 })
-                if not fm_df.empty and len(fm_df) > 10:
-                    return fm_df
-        else:
-            print(f"FinMind API Error for {sid}: Status Code {resp.status_code}")
-    except Exception as e:
-         print(f"FinMind backup failed for {sid}: {e}")
+                if not fm_df.empty and len(fm_df) > 10: return fm_df
+    except Exception: pass
          
     return None
 
@@ -360,8 +261,7 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
         futures = {executor.submit(fetch_single_stock_batch, sid, fm_token): sid for sid in id_list}
         for future in concurrent.futures.as_completed(futures):
             sid, df = future.result()
-            if df is not None and not df.empty:
-                bulk_data[sid] = df
+            if df is not None and not df.empty: bulk_data[sid] = df
 
     if len(bulk_data) == 0: return pd.DataFrame()
 
@@ -373,7 +273,6 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
             
             df = df[~df.index.duplicated(keep="last")].copy()
             close_s = pd.to_numeric(df["Close"], errors="coerce")
-            
             if close_s.isna().all() or len(close_s.dropna()) < 10: continue
 
             p_now = float(close_s.iloc[-1])
@@ -396,8 +295,6 @@ def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
 
             ind = TWSE_IND_MAP.get(sid, "未知")
             results.append({"代號": sid, "產業": ind, "現價": round(p_now, 2), "M5": round(m5, 2), "M10": round(m10, 2), "ATR": round(atr_now, 2)})
-        except Exception as e:
-            print(f"Holding intel error for {sid}: {e}")
-            continue
+        except Exception: continue
 
     return pd.DataFrame(results)
