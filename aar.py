@@ -64,14 +64,14 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     with st.spinner("🧠 AAR 戰術教練正在深度覆盤您的交易歷史..."):
         for i, row in df.iterrows():
             try:
-                sid_raw = get_val(row, ["代號", "股票代號", "證券代號", "股票代碼", "stock_id"])
+                sid_raw = get_val(row, ["代號"])
                 sid = str(sid_raw).strip()
                 if not sid: continue
 
-                buy_date_raw = get_val(row, ["買進日期", "買進日", "日期", "建倉日"])
-                buy_price_raw = get_val(row, ["買進價", "成本價", "成本", "買價", "均價"])
-                shares_raw = get_val(row, ["張數", "庫存張數", "庫存", "股數", "數量"])
-                user_demon = get_val(row, ["心理標籤", "心魔", "標籤", "心理狀態"])
+                buy_date_raw = get_val(row, ["買進日期"])
+                buy_price_raw = get_val(row, ["買進價"])
+                shares_raw = get_val(row, ["張數"])
+                user_demon = get_val(row, ["心理標籤"])
 
                 if not buy_date_raw or not buy_price_raw or not shares_raw:
                     skipped_rows.append({"行數 (Excel)": i+2, "代號": sid, "原因": f"缺少必要欄位 (買日:{buy_date_raw}, 買價:{buy_price_raw}, 張數:{shares_raw})"})
@@ -85,8 +85,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     skipped_rows.append({"行數 (Excel)": i+2, "代號": sid, "原因": f"數值格式無法辨識 (日期:{buy_date_raw}, 價格:{buy_price}, 張數:{shares})"})
                     continue
 
-                sell_date_raw = get_val(row, ["賣出日期", "賣出日", "平倉日"])
-                sell_price_raw = get_val(row, ["賣出價", "賣價", "平倉價"])
+                sell_date_raw = get_val(row, ["賣出日期"])
+                sell_price_raw = get_val(row, ["賣出價"])
                 is_sold = sell_date_raw != "" and sell_price_raw != ""
 
                 hist = safe_download(sid, fm_token, period="1y")
