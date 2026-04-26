@@ -302,7 +302,8 @@ def level2_quant_engine(id_tuple, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_t
                 "代號": sid, "名稱": TWSE_NAME_MAP.get(sid, sid), "產業": ind, "現價": p_now, "成交量": vol_now, "今日放量": (vol_now > vol_ma5 * 1.4),
                 "M5": m5, "M10": m10, "M20": m20, "乖離(%)": bias, "ATR": atr_now, "基本達標": bool(is_candidate), "安全指數": max(1, min(10, int(s_score))),
                 "勝率(%)": round(win_rate, 1), "均報(%)": round(avg_ret, 2), "停損價": round(stop_price, 2), "停利價": round(p_now + 2.0 * atr_now, 2),
-                "原始風險差額": round(raw_risk, 4), "戰術型態": tactic_label
+                "原始風險差額": round(raw_risk, 4), "戰術型態": tactic_label,
+                "vol_ratio": round(vol_ratio, 2), "close_position": round(close_position, 2)
             })
         except Exception: continue
     return pd.DataFrame(intel_results)
