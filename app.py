@@ -199,11 +199,7 @@ with t_rank:
         if intel_df is None:
             st.error("🚨 **資料斷線警告**：Yahoo 與 FinMind 皆無回應。請稍後重整或確認 API 額度！", icon="💀")
         elif not intel_df.empty:
-            final_rank = pd.merge(
-    today_df,
-    intel_df,
-    on="代號",
-    suffixes=("_chip", "_intel")
+            final_rank = pd.merge(today_df,intel_df,on="代號",suffixes=("_chip", "_intel")
 )
 
 # 🛡️ 防止後面 UI 還在讀「名稱_x」而爆炸
@@ -334,7 +330,7 @@ if not master_list.empty:
 
     master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
 
-                holding_rows = []
+    holding_rows = []
                 if not m_df.empty:
                     for _, r in m_df.iterrows():
                         try:
@@ -343,7 +339,6 @@ if not master_list.empty:
                             qty = float(str(r.get("庫存張數", r.get("張數", r.get("庫存", 0)))).replace(",", "") or 0)
                             atr = float(r.get('ATR', p_now * 0.03))
                             dynamic_sl = float(r.get('停損價', p_cost - 1.5 * atr))
-                            
                             holding_rows.append({
                                 "戰區": "🛡️ 現役持股",
                                 "代號": r.get("代號", ""),
