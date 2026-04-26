@@ -33,7 +33,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         st.info("交易日誌沒有資料。")
         return
 
-    # 🚀 物理消滅隱形 BOM 亂碼，關閉 regex=False 防止崩潰
     df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip()
 
     def get_val(row, possible_keys, default=""):
@@ -54,7 +53,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     with st.spinner("🧠 AAR 戰術教練正在深度覆盤您的交易歷史..."):
         for _, row in df.iterrows():
             try:
-                # 🚀 修復：不管表單寫的是代碼、股票代碼、還是證券代號，全部通殺攔截
                 sid_raw = get_val(row, ["代號", "股票代號", "證券代號", "股票代碼", "stock_id"])
                 sid = str(sid_raw).strip()
                 if not sid: continue
@@ -62,6 +60,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 buy_date_raw = get_val(row, ["買進日期", "買進日", "日期", "建倉日"])
                 buy_price_raw = get_val(row, ["買進價", "成本價", "成本", "買價", "均價"])
                 shares_raw = get_val(row, ["張數", "庫存張數", "庫存", "股數", "數量"])
+                
+                # 🚀 讀取大將軍手動記錄的專屬心魔！
+                user_demon = get_val(row, ["心理標籤", "心魔", "標籤", "心理狀態"])
 
                 if not buy_date_raw or not buy_price_raw or not shares_raw: continue
 
@@ -75,6 +76,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 sell_price_raw = get_val(row, ["賣出價", "賣價", "平倉價"])
                 is_sold = sell_date_raw != "" and sell_price_raw != ""
 
+                # 現在 safe_download 已經準備好接收 period="1y" 這個引數了！
                 hist = safe_download(sid, fm_token, period="1y")
                 if hist is None or hist.empty: continue
                 
@@ -164,6 +166,10 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     else: 
                         comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
                         demon = "⚓ 凹單"
+
+                # 🚀 如果大將軍有寫心理標籤，強制優先覆蓋系統的自動判定！
+                if user_demon:
+                    demon = f"👤 {user_demon}"
 
                 if demon and "紀律" not in demon and "完美" not in demon:
                     demons.append(demon)
