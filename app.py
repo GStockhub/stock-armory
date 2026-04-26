@@ -90,9 +90,13 @@ def risk_color(val):
         return f'color: {COLORS["primary"]}; font-weight: bold;'
     except: return ""
 
+# 🚀 修正版：強制只留 1 位小數，無條件捨去過多的零頭
 def format_lots(shares):
     lots = int(shares) / 1000
-    return "0" if lots <= 0 else f"{lots:.3f}".rstrip("0").rstrip(".")
+    if lots <= 0:
+        return "0"
+    # 只留 1 位小數，如果是整數 (如 2.0) 就會自動去掉變成 2
+    return f"{lots:.1f}".rstrip("0").rstrip(".")
 
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
