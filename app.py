@@ -26,7 +26,7 @@ SYS_PWD = st.secrets.get("sys_pwd", "1023")
 FM_TOKEN = st.secrets.get("fm_token", "")
 
 if auth_status != "verified_auth":
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V32 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V32.2 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -74,8 +74,8 @@ except: fee_discount = 1.0
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v32</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 短打狙擊 ✕ 絕對防禦 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v32.2</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 短打狙擊 ✕ 真人操盤直覺 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -157,13 +157,13 @@ with t_rank:
                 if res:
                     p_now, m5, m10, bias, win_rate, sl_price = res["現價"], res["M5"], res["M10"], res["乖離"], res["勝率"], res["停損價"]
                     if p_now < m10:
-                        grade_color, grade_text, advice = COLORS["red"], "🛑 嚴禁接刀(D級)", f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底。"
+                        grade_color, grade_text, advice = COLORS["red"], "🛑 嚴禁接刀 (D級)", f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底。"
                     elif bias > 7:
-                        grade_color, grade_text, advice = COLORS["accent"], "⚠️ 追高警告(C級)", f"乖離率高達 {bias:.1f}%。除非爆量真突破，否則等回拉 M5。"
+                        grade_color, grade_text, advice = COLORS["accent"], "⚠️ 追高警告 (C級)", f"乖離率高達 {bias:.1f}%。除非爆量真突破，否則等回拉 M5。"
                     elif p_now > m5 and win_rate >= 50:
-                        grade_color, grade_text, advice = COLORS["primary"], "👑 准許出兵(S/A級)", f"多頭結構且回測勝率達 {win_rate:.0f}%！防守底線設於 {sl_price:.1f}。"
+                        grade_color, grade_text, advice = COLORS["primary"], "👑 准許出兵 (S/A級)", f"多頭結構且回測勝率達 {win_rate:.0f}%！防守底線設於 {sl_price:.1f}。"
                     else:
-                        grade_color, grade_text, advice = COLORS["green"], "⚖️ 穩健觀察(B級)", f"結構普通 (勝率 {win_rate:.0f}%)。若資金充裕可小量試單，防守底線設於 {sl_price:.1f}。"
+                        grade_color, grade_text, advice = COLORS["green"], "⚖️ 穩健觀察 (B級)", f"結構普通 (勝率 {win_rate:.0f}%)。若資金充裕可小量試單，防守底線設於 {sl_price:.1f}。"
 
                     st.markdown(f"""
                     <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:6px; margin-bottom:10px;">
@@ -210,25 +210,36 @@ with t_rank:
             if "名稱_y" in final_rank.columns:
                 final_rank = final_rank.drop(columns=["名稱_y"])
 
+            # 🚀 主力建倉漸進式判斷
             def determine_phase(row):
-                if row.get("vol_ratio", 0) > 1.8 and row.get("close_position", 1) < 0.4:
-                    return "💀 3rd 爆量出貨"
-                elif row["連買"] >= 10:
-                    return "⚠️ 3rd 過熱末升"
+                vol_ratio = row.get("vol_ratio", 0)
+                close_pos = row.get("close_position", 1)
+                streak = row["連買"]
+
+                # 爆量出貨優先判死刑
+                if vol_ratio > 1.8 and close_pos < 0.4:
+                    return "💀 第三段 (爆量出貨)"
+                # 14天以上：高機率末升段
+                elif streak >= 14:
+                    return "💀 第三段 (高機率末升)"
+                # 11~13天：提高警覺
+                elif streak >= 11:
+                    return "⚠️ 第三段 (提高警覺)"
+                # 第一段：起漲主升
                 elif "🚀" in row["戰術型態"] or "🔥" in row["戰術型態"]:
-                    return "🔥 1st 主升起漲"
+                    return "🔥 第一段 (主升起漲)"
+                # 第二段：均線回踩
                 elif "🛡️" in row["戰術型態"]:
-                    return "🛡️ 2nd 均線回踩"
+                    return "🛡️ 第二段 (均線回踩)"
                 else:
                     return "⏳ 觀望醞釀"
 
             final_rank["生命週期"] = final_rank.apply(determine_phase, axis=1)
 
-            # 🔪【核心大腦重構】：V32 極致短打波段邏輯
+            # 🔪【核心大腦重構】：V32.2 極致短打波段 ✕ 真人直覺
             def calculate_quant_score(row):
                 score = 50
 
-                # 🔪 進階 5：勝率權重降級 (波段更看動能)
                 if row["勝率(%)"] > 50:
                     score += (row["勝率(%)"] - 50) * 0.5
                 elif row["勝率(%)"] < 50:
@@ -239,14 +250,13 @@ with t_rank:
                     score += 20
                 elif 8 <= streak <= 10:
                     score += 10
-                elif streak >= 12:
+                elif streak >= 14:  # 🚀 小優化 1：配合 phase，14天才開始扣分，11~13天完美當黃燈！
                     score -= 15
                 else:
                     score += 0  
 
                 score += row["均報(%)"] * 10 + row["安全指數"] * 2
 
-                # 🔪 必改 1：爆量門檻提高至 1.8 倍，嚴格過濾假突破
                 vol_ratio = row.get("vol_ratio", 0)
                 close_pos = row.get("close_position", 1)
                 
@@ -261,17 +271,21 @@ with t_rank:
                 elif "🛡️" in t: score += 10
                 elif "⚠️" in t: score -= 15
 
-                # 🔪 必改 3 & 進階 7：生命週期定生死，重賞起漲與優質回踩
                 phase = row["生命週期"]
                 if "第一段" in phase:
                     score += 20
                 elif "第二段" in phase:
                     score += 8
-                    # 回踩不破且收紅/相對高點 (第二買點)
                     if close_pos > 0.6:
                         score += 10
-                elif "第三段" in phase:
+                
+                # 🚀 小優化 2：第三段分級執法，這才是真人的靈活直覺！
+                elif "爆量出貨" in phase:
+                    score -= 35
+                elif "高機率末升" in phase:
                     score -= 30
+                elif "提高警覺" in phase:
+                    score -= 15
 
                 if row["乖離(%)"] > 8:
                     score -= (row["乖離(%)"] - 5) * 3
@@ -281,7 +295,6 @@ with t_rank:
                     if row["乖離(%)"] > 5:
                         score -= 20
 
-                # 🔪 進階 6：牛皮股過濾 + 電信/金融永久降權
                 vol_m20 = row.get("vol_ma20", 2000)
                 atr_pct = row.get("atr_percent", 3.0)
                 ind = str(row.get("產業", ""))
@@ -291,7 +304,6 @@ with t_rank:
                     score -= 30  
                 if atr_pct < 2.0:
                     score -= 30  
-                # 電信、金融保險無情排除
                 if "金融" in ind or "保險" in ind or name in ["中華電", "台灣大", "遠傳"]:
                     score -= 20
 
@@ -301,7 +313,6 @@ with t_rank:
 
             rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
 
-            # 🔪 必改 2 & 必改 4：S級門檻極度拉高至 88，且第三段絕對禁止追高！
             is_phase_3 = rank_sorted["生命週期"].str.contains("第三段", na=False)
             
             s_mask = (rank_sorted["Quant_Score"] >= 88) & (rank_sorted["基本達標"] == True) & (~is_phase_3)
@@ -566,4 +577,4 @@ with t_hist:
     st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V32 (寧缺勿濫短波段特化版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V32.2 (真人直覺精雕版)</p>", unsafe_allow_html=True)
