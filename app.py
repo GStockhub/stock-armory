@@ -212,13 +212,13 @@ with t_rank:
 
             def determine_phase(row):
                 if row.get("vol_ratio", 0) > 1.8 and row.get("close_position", 1) < 0.4:
-                    return "💀 3rd(爆量出貨)"
+                    return "💀 3rd 爆量出貨"
                 elif row["連買"] >= 10:
-                    return "⚠️ 3rd(過熱末升)"
+                    return "⚠️ 3rd 過熱末升"
                 elif "🚀" in row["戰術型態"] or "🔥" in row["戰術型態"]:
-                    return "🔥 1st(主升起漲)"
+                    return "🔥 1st 主升起漲"
                 elif "🛡️" in row["戰術型態"]:
-                    return "🛡️ 2nd(均線回踩)"
+                    return "🛡️ 2nd 均線回踩"
                 else:
                     return "⏳ 觀望醞釀"
 
