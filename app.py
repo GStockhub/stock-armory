@@ -157,13 +157,13 @@ with t_rank:
                 if res:
                     p_now, m5, m10, bias, win_rate, sl_price = res["現價"], res["M5"], res["M10"], res["乖離"], res["勝率"], res["停損價"]
                     if p_now < m10:
-                        grade_color, grade_text, advice = COLORS["red"], "🛑 嚴禁接刀 (D級)", f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底。"
+                        grade_color, grade_text, advice = COLORS["red"], "🛑 嚴禁接刀(D級)", f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底。"
                     elif bias > 7:
-                        grade_color, grade_text, advice = COLORS["accent"], "⚠️ 追高警告 (C級)", f"乖離率高達 {bias:.1f}%。除非爆量真突破，否則等回拉 M5。"
+                        grade_color, grade_text, advice = COLORS["accent"], "⚠️ 追高警告(C級)", f"乖離率高達 {bias:.1f}%。除非爆量真突破，否則等回拉 M5。"
                     elif p_now > m5 and win_rate >= 50:
-                        grade_color, grade_text, advice = COLORS["primary"], "👑 准許出兵 (S/A級)", f"多頭結構且回測勝率達 {win_rate:.0f}%！防守底線設於 {sl_price:.1f}。"
+                        grade_color, grade_text, advice = COLORS["primary"], "👑 准許出兵(S/A級)", f"多頭結構且回測勝率達 {win_rate:.0f}%！防守底線設於 {sl_price:.1f}。"
                     else:
-                        grade_color, grade_text, advice = COLORS["green"], "⚖️ 穩健觀察 (B級)", f"結構普通 (勝率 {win_rate:.0f}%)。若資金充裕可小量試單，防守底線設於 {sl_price:.1f}。"
+                        grade_color, grade_text, advice = COLORS["green"], "⚖️ 穩健觀察(B級)", f"結構普通 (勝率 {win_rate:.0f}%)。若資金充裕可小量試單，防守底線設於 {sl_price:.1f}。"
 
                     st.markdown(f"""
                     <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:6px; margin-bottom:10px;">
@@ -212,13 +212,13 @@ with t_rank:
 
             def determine_phase(row):
                 if row.get("vol_ratio", 0) > 1.8 and row.get("close_position", 1) < 0.4:
-                    return "💀 第三段 (爆量出貨)"
+                    return "💀 3rd(爆量出貨)"
                 elif row["連買"] >= 10:
-                    return "⚠️ 第三段 (過熱末升)"
+                    return "⚠️ 3rd(過熱末升)"
                 elif "🚀" in row["戰術型態"] or "🔥" in row["戰術型態"]:
-                    return "🔥 第一段 (主升起漲)"
+                    return "🔥 1st(主升起漲)"
                 elif "🛡️" in row["戰術型態"]:
-                    return "🛡️ 第二段 (均線回踩)"
+                    return "🛡️ 2nd(均線回踩)"
                 else:
                     return "⏳ 觀望醞釀"
 
