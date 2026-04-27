@@ -26,7 +26,7 @@ SYS_PWD = st.secrets.get("sys_pwd", "1023")
 FM_TOKEN = st.secrets.get("fm_token", "")
 
 if auth_status != "verified_auth":
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V31 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V32 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -74,8 +74,8 @@ except: fee_discount = 1.0
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v31</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 狼性波段 ✕ 絕對防禦 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v32</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 短打狙擊 ✕ 絕對防禦 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -84,7 +84,7 @@ MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
 def risk_color(val):
     try:
         v = float(val)
-        if v >= 85: return f'color: {COLORS["green"]}; font-weight: bold;'
+        if v >= 88: return f'color: {COLORS["green"]}; font-weight: bold;'
         elif v < 45: return f'color: {COLORS["red"]}; font-weight: bold;'
         return f'color: {COLORS["primary"]}; font-weight: bold;'
     except: return ""
@@ -96,7 +96,7 @@ def format_lots(shares):
 
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
-if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！可能劇烈拉回，已限縮 AI 建議買量！", icon="🌋")
+if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量！", icon="🌋")
 
 with st.spinner("情報兵正在部署防線..."):
     chip_db = fetch_chips_data(FM_TOKEN)
@@ -210,30 +210,29 @@ with t_rank:
             if "名稱_y" in final_rank.columns:
                 final_rank = final_rank.drop(columns=["名稱_y"])
 
-            # 🚀 第幾段判斷：加入更精準的出貨判定
             def determine_phase(row):
-                if row.get("vol_ratio", 0) > 1.5 and row.get("close_position", 1) < 0.4:
-                    return "💀 第三段(爆量出貨)"
+                if row.get("vol_ratio", 0) > 1.8 and row.get("close_position", 1) < 0.4:
+                    return "💀 第三段 (爆量出貨)"
                 elif row["連買"] >= 10:
-                    return "⚠️ 第三段(過熱末升)"
+                    return "⚠️ 第三段 (過熱末升)"
                 elif "🚀" in row["戰術型態"] or "🔥" in row["戰術型態"]:
-                    return "🔥 第一段(主升起漲)"
+                    return "🔥 第一段 (主升起漲)"
                 elif "🛡️" in row["戰術型態"]:
-                    return "🛡️ 第二段(均線回踩)"
+                    return "🛡️ 第二段 (均線回踩)"
                 else:
                     return "⏳ 觀望醞釀"
 
             final_rank["生命週期"] = final_rank.apply(determine_phase, axis=1)
 
-            # 🔪【核心大腦重構】：V31 狼性計分邏輯
+            # 🔪【核心大腦重構】：V32 極致短打波段邏輯
             def calculate_quant_score(row):
                 score = 50
 
-                # 🔪 手術 4：調降「純歷史勝率」權重 (1.5 -> 1.0)
+                # 🔪 進階 5：勝率權重降級 (波段更看動能)
                 if row["勝率(%)"] > 50:
-                    score += (row["勝率(%)"] - 50) * 1.0
+                    score += (row["勝率(%)"] - 50) * 0.5
                 elif row["勝率(%)"] < 50:
-                    score -= (50 - row["勝率(%)"]) * 1.0
+                    score -= (50 - row["勝率(%)"]) * 0.5
 
                 streak = row["連買"]
                 if 3 <= streak <= 7:
@@ -243,18 +242,18 @@ with t_rank:
                 elif streak >= 12:
                     score -= 15
                 else:
-                    score += 0  # 1~2天不加分，過濾假訊號
+                    score += 0  
 
                 score += row["均報(%)"] * 10 + row["安全指數"] * 2
 
-                # 🔪 手術 3：重賞爆量收高，重罰爆量上影線
+                # 🔪 必改 1：爆量門檻提高至 1.8 倍，嚴格過濾假突破
                 vol_ratio = row.get("vol_ratio", 0)
                 close_pos = row.get("close_position", 1)
                 
-                if vol_ratio > 1.5 and close_pos > 0.7:
-                    score += 15 # 爆量收高，主力真鎖碼
-                elif vol_ratio > 1.5 and close_pos < 0.4:
-                    score -= 25 # 爆量留長上影線，主力出貨
+                if vol_ratio > 1.8 and close_pos > 0.7:
+                    score += 15
+                elif vol_ratio > 1.8 and close_pos < 0.4:
+                    score -= 25
 
                 t = row["戰術型態"]
                 if "🔥" in t: score += 25
@@ -262,12 +261,15 @@ with t_rank:
                 elif "🛡️" in t: score += 10
                 elif "⚠️" in t: score -= 15
 
-                # 🔪 手術 2：生命週期直接定生死
+                # 🔪 必改 3 & 進階 7：生命週期定生死，重賞起漲與優質回踩
                 phase = row["生命週期"]
                 if "第一段" in phase:
-                    score += 15
+                    score += 20
                 elif "第二段" in phase:
                     score += 8
+                    # 回踩不破且收紅/相對高點 (第二買點)
+                    if close_pos > 0.6:
+                        score += 10
                 elif "第三段" in phase:
                     score -= 30
 
@@ -279,14 +281,19 @@ with t_rank:
                     if row["乖離(%)"] > 5:
                         score -= 20
 
-                # 🔪 手術 1：設立「牛皮股 / 殭屍股」極刑防護網
+                # 🔪 進階 6：牛皮股過濾 + 電信/金融永久降權
                 vol_m20 = row.get("vol_ma20", 2000)
                 atr_pct = row.get("atr_percent", 3.0)
+                ind = str(row.get("產業", ""))
+                name = str(row.get("名稱", ""))
                 
                 if vol_m20 < 1500:
-                    score -= 30  # 流動性太差，剔除
+                    score -= 30  
                 if atr_pct < 2.0:
-                    score -= 30  # 波動率太低，沒肉吃，剔除
+                    score -= 30  
+                # 電信、金融保險無情排除
+                if "金融" in ind or "保險" in ind or name in ["中華電", "台灣大", "遠傳"]:
+                    score -= 20
 
                 return round(score, 1)
 
@@ -294,7 +301,10 @@ with t_rank:
 
             rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
 
-            s_mask = (rank_sorted["Quant_Score"] >= 85) & (rank_sorted["基本達標"] == True)
+            # 🔪 必改 2 & 必改 4：S級門檻極度拉高至 88，且第三段絕對禁止追高！
+            is_phase_3 = rank_sorted["生命週期"].str.contains("第三段", na=False)
+            
+            s_mask = (rank_sorted["Quant_Score"] >= 88) & (rank_sorted["基本達標"] == True) & (~is_phase_3)
             a_mask = (~s_mask) & (rank_sorted["Quant_Score"] >= 65) & (rank_sorted["基本達標"] == True)
             b_mask = (~s_mask) & (~a_mask) & (rank_sorted["Quant_Score"] >= 45)
             c_mask = (~s_mask) & (~a_mask) & (~b_mask)
@@ -556,4 +566,4 @@ with t_hist:
     st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V31 (狼性波段狙擊版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V32 (寧缺勿濫短波段特化版)</p>", unsafe_allow_html=True)
