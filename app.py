@@ -26,7 +26,7 @@ SYS_PWD = st.secrets.get("sys_pwd", "1023")
 FM_TOKEN = st.secrets.get("fm_token", "")
 
 if auth_status != "verified_auth":
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V30 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V31 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -74,8 +74,8 @@ except: fee_discount = 1.0
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v30.1</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 終極光學透視裝甲 ✕ 實戰化升級 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v31</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 狼性波段 ✕ 絕對防禦 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -198,7 +198,6 @@ with t_rank:
         if intel_df is None:
             st.error("🚨 **資料斷線警告**：Yahoo 與 FinMind 皆無回應。請稍後重整或確認 API 額度！", icon="💀")
         elif not intel_df.empty:
-            # 🚀 徹底解決名稱欄位衝突問題 (問題1修復)
             final_rank = pd.merge(today_df, intel_df, on="代號", suffixes=("_chip", "_intel"))
 
             if "名稱_chip" in final_rank.columns:
@@ -211,31 +210,32 @@ with t_rank:
             if "名稱_y" in final_rank.columns:
                 final_rank = final_rank.drop(columns=["名稱_y"])
 
+            # 🚀 第幾段判斷：加入更精準的出貨判定
             def determine_phase(row):
-                if row.get("vol_ratio", 0) > 2.5 and row.get("close_position", 1) < 0.4:
-                    return "💀 第三段 (爆量出貨)"
+                if row.get("vol_ratio", 0) > 1.5 and row.get("close_position", 1) < 0.4:
+                    return "💀 第三段(爆量出貨)"
                 elif row["連買"] >= 10:
-                    return "⚠️ 第三段 (過熱末升)"
+                    return "⚠️ 第三段(過熱末升)"
                 elif "🚀" in row["戰術型態"] or "🔥" in row["戰術型態"]:
-                    return "🔥 第一段 (主升起漲)"
+                    return "🔥 第一段(主升起漲)"
                 elif "🛡️" in row["戰術型態"]:
-                    return "🛡️ 第二段 (均線回踩)"
+                    return "🛡️ 第二段(均線回踩)"
                 else:
                     return "⏳ 觀望醞釀"
 
             final_rank["生命週期"] = final_rank.apply(determine_phase, axis=1)
 
+            # 🔪【核心大腦重構】：V31 狼性計分邏輯
             def calculate_quant_score(row):
                 score = 50
 
+                # 🔪 手術 4：調降「純歷史勝率」權重 (1.5 -> 1.0)
                 if row["勝率(%)"] > 50:
-                    score += (row["勝率(%)"] - 50) * 1.5
+                    score += (row["勝率(%)"] - 50) * 1.0
                 elif row["勝率(%)"] < 50:
-                    score -= (50 - row["勝率(%)"]) * 1.5
+                    score -= (50 - row["勝率(%)"]) * 1.0
 
                 streak = row["連買"]
-
-                # 🛡️ 投信連買改成「3～7天最香，太久反而扣分」 (問題2修復)
                 if 3 <= streak <= 7:
                     score += 20
                 elif 8 <= streak <= 10:
@@ -243,34 +243,33 @@ with t_rank:
                 elif streak >= 12:
                     score -= 15
                 else:
-                    score += 0  # 1~2天直接不加分，過濾假訊號
+                    score += 0  # 1~2天不加分，過濾假訊號
 
                 score += row["均報(%)"] * 10 + row["安全指數"] * 2
 
-                # 💀 爆量但收爛：視為出貨警報 (問題3已於底層支援)
-                if row.get("vol_ratio", 0) > 2.5 and row.get("close_position", 1) < 0.4:
-                    score -= 25
+                # 🔪 手術 3：重賞爆量收高，重罰爆量上影線
+                vol_ratio = row.get("vol_ratio", 0)
+                close_pos = row.get("close_position", 1)
+                
+                if vol_ratio > 1.5 and close_pos > 0.7:
+                    score += 15 # 爆量收高，主力真鎖碼
+                elif vol_ratio > 1.5 and close_pos < 0.4:
+                    score -= 25 # 爆量留長上影線，主力出貨
 
                 t = row["戰術型態"]
+                if "🔥" in t: score += 25
+                elif "🚀" in t: score += 15
+                elif "🛡️" in t: score += 10
+                elif "⚠️" in t: score -= 15
 
-                if "🔥" in t:
-                    score += 25
-                elif "🚀" in t:
-                    score += 15
-                elif "🛡️" in t:
-                    score += 10
-                elif "⚠️" in t:
-                    score -= 15
-
-                # 🧬 生命週期正式納入分數 (建議修復)
+                # 🔪 手術 2：生命週期直接定生死
                 phase = row["生命週期"]
-
                 if "第一段" in phase:
                     score += 15
                 elif "第二段" in phase:
                     score += 8
                 elif "第三段" in phase:
-                    score -= 25
+                    score -= 30
 
                 if row["乖離(%)"] > 8:
                     score -= (row["乖離(%)"] - 5) * 3
@@ -279,6 +278,15 @@ with t_rank:
                     score -= 15
                     if row["乖離(%)"] > 5:
                         score -= 20
+
+                # 🔪 手術 1：設立「牛皮股 / 殭屍股」極刑防護網
+                vol_m20 = row.get("vol_ma20", 2000)
+                atr_pct = row.get("atr_percent", 3.0)
+                
+                if vol_m20 < 1500:
+                    score -= 30  # 流動性太差，剔除
+                if atr_pct < 2.0:
+                    score -= 30  # 波動率太低，沒肉吃，剔除
 
                 return round(score, 1)
 
@@ -320,7 +328,6 @@ with t_rank:
                     if MACRO_SCORE <= 5 or OVERHEAT_FLAG:
                         suggested_shares *= 0.5
 
-                    # 🛡️ 高價股保命裝甲：超過3000元自動再砍半 (問題5修復)
                     if row["現價"] > 3000:
                         suggested_shares *= 0.5
 
@@ -475,7 +482,6 @@ with t_cmd:
             total_pnl = 0
             active_fee_rate = 0.001425 * fee_discount
             
-            # 🚀 引入 AAR 同等級的模糊讀取機制 (問題4修復)
             def get_cmd_val(row_data, possible_keys, default=0.0):
                 for col in row_data.index:
                     if any(k in str(col) for k in possible_keys):
@@ -491,7 +497,6 @@ with t_cmd:
                     p_now_raw = r.get('現價', 0)
                     p_now = float(p_now_raw) if pd.notna(p_now_raw) and str(p_now_raw).strip() != '' else 0.0
                     
-                    # 🚀 無腦讀取成本與庫存，杜絕 KeyError
                     p_cost = get_cmd_val(r, ["成本價", "成本", "買進價", "成交均價", "建倉成本", "買價"])
                     qty = get_cmd_val(r, ["庫存張數", "張數", "庫存", "股數", "數量"])
                     
@@ -551,4 +556,4 @@ with t_hist:
     st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V30.1 (實戰防禦極限版)</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V31 (狼性波段狙擊版)</p>", unsafe_allow_html=True)
