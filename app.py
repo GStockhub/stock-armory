@@ -57,14 +57,29 @@ if auth_status != "verified_auth":
     st.stop()
 st.markdown("""
 <style>
-.tier-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap !important; }
+/* 標籤絕對保護區：強制不換行、大小固定，不受標題長度影響 */
+.tier-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap !important; flex-shrink: 0; }
 .badge-s { background-color: rgba(255, 75, 75, 0.1); color: #FF4B4B; border: 1px solid #FF4B4B; }
 .badge-a { background-color: rgba(255, 165, 0, 0.1); color: #FFA500; border: 1px solid #FFA500; }
+
 .tier-card { border-radius: 6px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; margin-bottom: 12px; }
 .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; width: 100%; }
 .info-label { font-size: 13px; opacity: 0.8; white-space: nowrap; }
 .info-value { font-size: 13px; font-weight: 500; text-align: right; white-space: nowrap; }
-.stock-title { margin: 0; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 🚀 長檔名自適應區：字體微縮、自動換行、最多兩行 */
+.stock-title { 
+    margin: 0; 
+    font-size: clamp(14px, 1.1rem, 18px); /* 自適應：平常18px，空間不夠自動縮到14px */
+    line-height: 1.25; 
+    white-space: normal; 
+    word-break: break-word; /* 允許長檔名或代碼自動切斷換行 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* 極限防護：最多換2行，超過顯示... 絕對不把卡片撐爆 */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 @media (max-width: 768px) {
     .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
     .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
@@ -510,52 +525,6 @@ with t_chip:
 
 with t_cmd:
     st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
-
-    # ===================================================
-    # 📊 月度目標進度條
-    # ===================================================
-    with st.expander("🎯 月度作戰目標追蹤", expanded=True):
-        mg_col1, mg_col2, mg_col3 = st.columns(3)
-        with mg_col1:
-            monthly_goal_pct = st.number_input("本月目標報酬 (%)", value=8.7, step=0.5, min_value=0.1, max_value=50.0)
-        with mg_col2:
-            current_month_pnl = st.number_input("本月已實現損益 (元)", value=0, step=1000)
-        with mg_col3:
-            from datetime import datetime as _dt
-            now = _dt.now()
-            total_days = 30
-            elapsed_days = now.day
-            remaining_days = total_days - elapsed_days
-            st.metric("本月剩餘天數", f"{remaining_days} 天")
-
-        monthly_goal_amt = total_capital * (monthly_goal_pct / 100)
-        progress_pct = min((current_month_pnl / monthly_goal_amt * 100) if monthly_goal_amt > 0 else 0, 100)
-        still_need = max(monthly_goal_amt - current_month_pnl, 0)
-        daily_need = still_need / remaining_days if remaining_days > 0 else 0
-
-        prog_color = COLORS["green"] if progress_pct >= 100 else (COLORS["primary"] if progress_pct >= 50 else COLORS["red"])
-        bar_width = max(min(progress_pct, 100), 2)
-
-        st.markdown(f"""
-        <div style='margin:12px 0;'>
-          <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
-            <span style='color:{COLORS["subtext"]}; font-size:13px;'>進度 {progress_pct:.1f}%</span>
-            <span style='color:{COLORS["text"]}; font-size:13px;'>{current_month_pnl:,.0f} / {monthly_goal_amt:,.0f} 元</span>
-          </div>
-          <div style='background:{COLORS["border"]}; border-radius:6px; height:14px;'>
-            <div style='background:{prog_color}; width:{bar_width:.1f}%; height:14px; border-radius:6px; transition:width 0.3s;'></div>
-          </div>
-          <div style='display:flex; justify-content:space-between; margin-top:8px; font-size:12px; color:{COLORS["subtext"]};'>
-            <span>還差 <b style='color:{COLORS["text"]}'>{still_need:,.0f} 元</b></span>
-            <span>每日需賺 <b style='color:{prog_color}'>{daily_need:,.0f} 元</b></span>
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if progress_pct >= 100:
-            st.success("🎉 本月目標已達成！請考慮降低操作頻率鎖住戰果。")
-        elif remaining_days <= 5 and progress_pct < 60:
-            st.error(f"🚨 月末警告：本月僅完成 {progress_pct:.0f}%，剩餘 {remaining_days} 天。建議保守操作，優先保住現有獲利。")
 
     if not sheet_url:
         st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
