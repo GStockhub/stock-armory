@@ -280,7 +280,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
                         demon = "⚓ 凹單"
                         
-                        if user_demon:
+                if user_demon:
                     # 🚀 括號斬斷器：遇到半形 ( 或全形 （ 就切斷，只保留前面的主標題
                     clean_demon = str(user_demon).split("(")[0].split("（")[0].strip()
                     demon = f"👤 {clean_demon}"
