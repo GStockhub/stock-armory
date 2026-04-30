@@ -6,7 +6,6 @@ def render_sidebar():
         st.markdown("### ⚙️ 紀律設定")
         st.markdown("---")
         
-        # 1. 👑 拔除囉唆括號，清爽俐落！(預設奶茶極簡)
         theme_options = {
             "milktea_light": "☀️ 奶茶極簡",
             "gold": "👑 皇家黑金",
@@ -33,10 +32,28 @@ def render_sidebar():
             }
             st.error("⚠️ 偵測到雲端 `theme.py` 尚未更新！目前使用緊急備用色碼。")
 
-        # 2. 📝 輸入欄位
-        sheet_url = st.text_input("輸入【持股部位】CSV 網址：", value="", placeholder="貼上持股分頁網址")
-        aar_sheet_url = st.text_input("輸入【交易日誌】CSV 網址：", value="", placeholder="貼上日誌分頁網址(供AAR使用)")
-        
+        # ===================================================
+        # 🔗 網址設定：優先從 Secrets 自動帶入，可手動覆蓋
+        # ===================================================
+        default_sheet_url = st.secrets.get("sheet_url", "")
+        default_aar_url   = st.secrets.get("aar_sheet_url", "")
+
+        # 顯示連線狀態提示
+        if default_sheet_url:
+            st.success("✅ 持股部位已從 Secrets 自動連線", icon="🔗")
+        if default_aar_url:
+            st.success("✅ 交易日誌已從 Secrets 自動連線", icon="🔗")
+
+        if not default_sheet_url and not default_aar_url:
+            st.caption("💡 可在 Streamlit Secrets 設定 `sheet_url` 與 `aar_sheet_url`，免手動貼網址。")
+
+        with st.expander("🔧 手動覆蓋網址（選填）", expanded=not default_sheet_url):
+            manual_sheet_url    = st.text_input("【持股部位】CSV 網址", value="", placeholder="貼上網址可覆蓋 Secrets 設定")
+            manual_aar_url      = st.text_input("【交易日誌】CSV 網址", value="", placeholder="貼上網址可覆蓋 Secrets 設定")
+
+        sheet_url     = manual_sheet_url.strip() if manual_sheet_url.strip() else default_sheet_url
+        aar_sheet_url = manual_aar_url.strip()   if manual_aar_url.strip()   else default_aar_url
+
         st.markdown("---")
         st.markdown("#### 💰 資金控管")
         total_capital = st.number_input("作戰本金 (元)", value=200000, step=10000)
