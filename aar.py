@@ -424,7 +424,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             column_config={
                 "代號": st.column_config.TextColumn(width="small"),
                 "名稱": st.column_config.TextColumn(width="small"),
-                "診斷詳情": st.column_config.TextColumn(width="large"),
+                "診斷詳情": st.column_config.TextColumn(width="medium"),
                 "評級": st.column_config.TextColumn(width="small"),
                 "買進日": st.column_config.TextColumn(width="small"),
                 "賣出日": st.column_config.TextColumn(width="small"),
