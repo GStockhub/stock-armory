@@ -64,7 +64,10 @@ st.markdown("""
 .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; width: 100%; }
 .info-label { font-size: 13px; opacity: 0.8; white-space: nowrap; }
 .info-value { font-size: 13px; font-weight: 500; text-align: right; white-space: nowrap; }
-.stock-title { margin: 0; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 🚀 這裡微臣修改了！解除不換行封印，讓長檔名 ETF 可以自動換行顯示 */
+.stock-title { margin: 0; font-size: 17px; line-height: 1.3; white-space: normal; word-wrap: break-word; }
+
 @media (max-width: 768px) {
     .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
     .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
