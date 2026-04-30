@@ -311,6 +311,74 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     top_demon = pd.Series(demons).mode()[0] if demons else "無"
     p_color = COLORS["red"] if total_pnl > 0 else COLORS["green"]
 
+    # ===================================================
+    # 🧠 個人化統計：從你的真實日誌反推最佳模式
+    # ===================================================
+    if results:
+        res_df_stat = pd.DataFrame(results)
+        closed_stat = res_df_stat[res_df_stat["賣出日"] != "-"].copy()
+        closed_stat["報酬率_num"] = pd.to_numeric(closed_stat["報酬率(%)"], errors="coerce")
+        closed_stat["淨利_num"] = pd.to_numeric(closed_stat["淨利"], errors="coerce")
+        closed_stat["持有天數_num"] = pd.to_numeric(closed_stat["持有天數"], errors="coerce")
+
+        with st.expander("🧠 個人化勝率分析 (從你的歷史反推最佳模式)", expanded=True):
+            st.markdown(f"<div style='color:{COLORS['subtext']}; font-size:13px; margin-bottom:16px;'>以下分析基於你的 <b style='color:{COLORS['text']}'>{len(closed_stat)}</b> 筆平倉紀錄，協助系統認識你。</div>", unsafe_allow_html=True)
+
+            pcol1, pcol2 = st.columns(2)
+
+            with pcol1:
+                st.markdown(f"<b style='color:{COLORS['text']}'>📅 持倉天數 vs 勝率</b>", unsafe_allow_html=True)
+                def day_bucket(d):
+                    if d <= 2: return "1-2天 (隔日沖)"
+                    elif d <= 5: return "3-5天 (短線甜蜜點)"
+                    elif d <= 10: return "6-10天 (短波段)"
+                    else: return "11天以上"
+
+                if not closed_stat.empty:
+                    closed_stat["天數區間"] = closed_stat["持有天數_num"].apply(day_bucket)
+                    day_grp = closed_stat.groupby("天數區間").apply(
+                        lambda x: pd.Series({
+                            "筆數": len(x),
+                            "勝率(%)": (x["報酬率_num"] > 0).mean() * 100,
+                            "平均報酬(%)": x["報酬率_num"].mean()
+                        })
+                    ).reset_index()
+                    order = ["1-2天 (隔日沖)", "3-5天 (短線甜蜜點)", "6-10天 (短波段)", "11天以上"]
+                    day_grp["排序"] = day_grp["天數區間"].apply(lambda x: order.index(x) if x in order else 99)
+                    day_grp = day_grp.sort_values("排序").drop(columns=["排序"])
+                    for _, row_g in day_grp.iterrows():
+                        wr = row_g["勝率(%)"]
+                        avg_r = row_g["平均報酬(%)"]
+                        cnt = int(row_g["筆數"])
+                        bar_color = COLORS["green"] if wr >= 70 else (COLORS["primary"] if wr >= 50 else COLORS["red"])
+                        st.markdown(f"<div style='margin-bottom:10px;'><div style='display:flex; justify-content:space-between; font-size:13px;'><span style='color:{COLORS['text']}'>{row_g['天數區間']}</span><span style='color:{bar_color}; font-weight:bold;'>{wr:.0f}% ({cnt}筆)</span></div><div style='background:{COLORS['border']}; border-radius:4px; height:8px; margin-top:4px;'><div style='background:{bar_color}; width:{min(wr,100):.0f}%; height:8px; border-radius:4px;'></div></div><div style='font-size:11px; color:{COLORS['subtext']}; margin-top:2px;'>平均報酬 {avg_r:+.2f}%</div></div>", unsafe_allow_html=True)
+
+            with pcol2:
+                st.markdown(f"<b style='color:{COLORS['text']}'>⚖️ Kelly Criterion 個人化建議倉位</b>", unsafe_allow_html=True)
+                if not closed_stat.empty and len(closed_stat) >= 5:
+                    wins = closed_stat[closed_stat["報酬率_num"] > 0]["報酬率_num"]
+                    losses = closed_stat[closed_stat["報酬率_num"] <= 0]["報酬率_num"].abs()
+                    p_win = len(wins) / len(closed_stat)
+                    avg_win_pct = wins.mean() / 100 if len(wins) > 0 else 0.03
+                    avg_loss_pct = losses.mean() / 100 if len(losses) > 0 else 0.03
+                    b_ratio = avg_win_pct / avg_loss_pct if avg_loss_pct > 0 else 1
+                    kelly_full = (p_win * b_ratio - (1 - p_win)) / b_ratio if b_ratio > 0 else 0
+                    kelly_half = max(kelly_full * 0.5, 0)
+                    kelly_color = COLORS["green"] if kelly_half > 0.1 else (COLORS["primary"] if kelly_half > 0 else COLORS["red"])
+                    st.markdown(f"<div style='background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:8px; padding:14px;'><div style='font-size:12px; color:{COLORS['subtext']}; margin-bottom:8px;'>基於你的 {len(closed_stat)} 筆真實交易</div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>真實勝率</span><span style='color:{COLORS['text']}; font-weight:bold;'>{p_win*100:.1f}%</span></div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>平均盈虧比</span><span style='color:{COLORS['text']}; font-weight:bold;'>1 : {b_ratio:.2f}</span></div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>Full Kelly</span><span style='color:{COLORS['primary']};'>{kelly_full*100:.1f}%</span></div><div style='display:flex; justify-content:space-between; padding-top:8px; border-top:1px solid {COLORS['border']};'><span style='color:{COLORS['text']}; font-weight:bold; font-size:14px;'>建議單筆倉位 (半Kelly)</span><span style='color:{kelly_color}; font-weight:bold; font-size:18px;'>{kelly_half*100:.1f}%</span></div><div style='font-size:11px; color:{COLORS['subtext']}; margin-top:6px;'>半Kelly為保守安全值，Full Kelly風險過高不建議直接使用</div></div>", unsafe_allow_html=True)
+                else:
+                    st.info("至少需要 5 筆平倉紀錄才能計算 Kelly 建議倉位。")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f"<b style='color:{COLORS['text']}'>🚨 心魔分布</b>", unsafe_allow_html=True)
+            if demons:
+                demon_counts = pd.Series(demons).value_counts()
+                total_d = len(demons)
+                for dm, cnt in demon_counts.items():
+                    pct = cnt / total_d * 100
+                    dm_color = COLORS["red"] if "凹單" in dm else (COLORS["accent"] if "恐高" in dm else COLORS["primary"])
+                    st.markdown(f"<div style='margin-bottom:8px;'><div style='display:flex; justify-content:space-between; font-size:13px;'><span style='color:{COLORS['text']}'>{dm}</span><span style='color:{dm_color}; font-weight:bold;'>{cnt}次 ({pct:.0f}%)</span></div><div style='background:{COLORS['border']}; border-radius:4px; height:6px; margin-top:3px;'><div style='background:{dm_color}; width:{pct:.0f}%; height:6px; border-radius:4px;'></div></div></div>", unsafe_allow_html=True)
+
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"<div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['primary']};'><div style='color:{COLORS['subtext']}; font-size:14px;'>已平倉總淨利</div><div style='font-size:24px; font-weight:bold; color:{p_color};'>{total_pnl:,.0f}</div></div>", unsafe_allow_html=True)

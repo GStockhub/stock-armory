@@ -64,10 +64,7 @@ st.markdown("""
 .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; width: 100%; }
 .info-label { font-size: 13px; opacity: 0.8; white-space: nowrap; }
 .info-value { font-size: 13px; font-weight: 500; text-align: right; white-space: nowrap; }
-
-/* 🚀 這裡微臣修改了！解除不換行封印，讓長檔名 ETF 可以自動換行顯示 */
-.stock-title { margin: 0; font-size: 17px; line-height: 1.3; white-space: normal; word-wrap: break-word; }
-
+.stock-title { margin: 0; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 768px) {
     .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
     .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
@@ -513,7 +510,53 @@ with t_chip:
 
 with t_cmd:
     st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
-    
+
+    # ===================================================
+    # 📊 月度目標進度條
+    # ===================================================
+    with st.expander("🎯 月度作戰目標追蹤", expanded=True):
+        mg_col1, mg_col2, mg_col3 = st.columns(3)
+        with mg_col1:
+            monthly_goal_pct = st.number_input("本月目標報酬 (%)", value=8.7, step=0.5, min_value=0.1, max_value=50.0)
+        with mg_col2:
+            current_month_pnl = st.number_input("本月已實現損益 (元)", value=0, step=1000)
+        with mg_col3:
+            from datetime import datetime as _dt
+            now = _dt.now()
+            total_days = 30
+            elapsed_days = now.day
+            remaining_days = total_days - elapsed_days
+            st.metric("本月剩餘天數", f"{remaining_days} 天")
+
+        monthly_goal_amt = total_capital * (monthly_goal_pct / 100)
+        progress_pct = min((current_month_pnl / monthly_goal_amt * 100) if monthly_goal_amt > 0 else 0, 100)
+        still_need = max(monthly_goal_amt - current_month_pnl, 0)
+        daily_need = still_need / remaining_days if remaining_days > 0 else 0
+
+        prog_color = COLORS["green"] if progress_pct >= 100 else (COLORS["primary"] if progress_pct >= 50 else COLORS["red"])
+        bar_width = max(min(progress_pct, 100), 2)
+
+        st.markdown(f"""
+        <div style='margin:12px 0;'>
+          <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
+            <span style='color:{COLORS["subtext"]}; font-size:13px;'>進度 {progress_pct:.1f}%</span>
+            <span style='color:{COLORS["text"]}; font-size:13px;'>{current_month_pnl:,.0f} / {monthly_goal_amt:,.0f} 元</span>
+          </div>
+          <div style='background:{COLORS["border"]}; border-radius:6px; height:14px;'>
+            <div style='background:{prog_color}; width:{bar_width:.1f}%; height:14px; border-radius:6px; transition:width 0.3s;'></div>
+          </div>
+          <div style='display:flex; justify-content:space-between; margin-top:8px; font-size:12px; color:{COLORS["subtext"]};'>
+            <span>還差 <b style='color:{COLORS["text"]}'>{still_need:,.0f} 元</b></span>
+            <span>每日需賺 <b style='color:{prog_color}'>{daily_need:,.0f} 元</b></span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if progress_pct >= 100:
+            st.success("🎉 本月目標已達成！請考慮降低操作頻率鎖住戰果。")
+        elif remaining_days <= 5 and progress_pct < 60:
+            st.error(f"🚨 月末警告：本月僅完成 {progress_pct:.0f}%，剩餘 {remaining_days} 天。建議保守操作，優先保住現有獲利。")
+
     if not sheet_url:
         st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
     else:
@@ -530,6 +573,27 @@ with t_cmd:
                             except: pass
                 return default
 
+            # ===================================================
+            # 🛡️ 組合層級風控：當日浮虧超過總資金 2% 觸發鎖倉警報
+            # ===================================================
+            total_float_pnl = 0
+            for _, r in m_df.iterrows():
+                try:
+                    p_now_r = float(r.get('現價', 0) or 0)
+                    p_cost_r = float(str(r.get("成本價", r.get("成本", r.get("買進價", 0)))).replace(",", "") or 0)
+                    qty_r = float(str(r.get("庫存張數", r.get("張數", r.get("庫存", 0)))).replace(",", "") or 0)
+                    if p_now_r > 0 and qty_r > 0:
+                        buy_r = p_cost_r * qty_r * 1000 * (1 + active_fee_rate)
+                        sell_r = p_now_r * qty_r * 1000 * (1 - active_fee_rate - 0.003)
+                        total_float_pnl += (sell_r - buy_r)
+                except: pass
+
+            float_loss_pct = (total_float_pnl / total_capital * 100) if total_capital > 0 else 0
+            if float_loss_pct <= -2.0:
+                st.error(f"🔒 **組合風控鎖倉警報**：當前持倉總浮虧已達 **{float_loss_pct:.1f}%**（超過本金 2% 底線）！依紀律今日停止一切新進場，專注處理虧損部位。", icon="🚨")
+            elif float_loss_pct <= -1.0:
+                st.warning(f"⚠️ **組合風控預警**：持倉總浮虧 {float_loss_pct:.1f}%，接近 2% 底線，請謹慎評估是否繼續加倉。")
+
             html_cards = '<div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">'
             for _, r in m_df.iterrows():
                 try:
@@ -538,7 +602,46 @@ with t_cmd:
                     
                     p_cost = get_cmd_val(r, ["成本價", "成本", "買進價", "成交均價", "建倉成本", "買價"])
                     qty = get_cmd_val(r, ["庫存張數", "張數", "庫存", "股數", "數量"])
-                    
+
+                    # ===================================================
+                    # ⏰ 持倉計時器：抓買進日計算持倉天數
+                    # ===================================================
+                    buy_date_raw = ""
+                    for col in r.index:
+                        if any(k in str(col) for k in ["買進日期", "買進日", "建倉日", "日期"]) and "賣" not in str(col):
+                            v = r[col]
+                            if pd.notna(v) and str(v).strip() not in ["", "nan"]:
+                                buy_date_raw = str(v).strip()
+                                break
+
+                    held_days_now = 0
+                    timer_color = COLORS["subtext"]
+                    timer_warning = ""
+                    if buy_date_raw:
+                        try:
+                            import re as _re
+                            raw_d = buy_date_raw.replace("/", "-").replace(".", "-")
+                            parts_d = raw_d.split("-")
+                            if len(parts_d) == 2:
+                                buy_dt = pd.to_datetime(f"{datetime.now().year}-{parts_d[0]}-{parts_d[1]}", errors="coerce")
+                            elif len(parts_d) == 3:
+                                y_d = int(parts_d[0])
+                                if y_d < 1911: y_d += 1911
+                                buy_dt = pd.to_datetime(f"{y_d}-{parts_d[1]}-{parts_d[2]}", errors="coerce")
+                            else:
+                                buy_dt = pd.NaT
+                            if pd.notna(buy_dt):
+                                held_days_now = (pd.Timestamp(datetime.now()) - buy_dt).days
+                                if held_days_now > 5:
+                                    timer_color = COLORS["red"]
+                                    timer_warning = f" ⚠️ 已持 {held_days_now} 天！超出甜蜜點"
+                                elif held_days_now >= 3:
+                                    timer_color = COLORS["primary"]
+                                    timer_warning = f" (已持 {held_days_now} 天)"
+                                else:
+                                    timer_warning = f" (已持 {held_days_now} 天)"
+                        except: pass
+
                     if p_now > 0 and qty > 0:
                         buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
                         sell_revenue_net = (p_now * qty * 1000) - int((p_now * qty * 1000) * active_fee_rate) - int((p_now * qty * 1000) * 0.003)
@@ -550,6 +653,19 @@ with t_cmd:
                     m5, m10 = float(r.get('M5', 0)) if pd.notna(r.get('M5', 0)) else 0.0, float(r.get('M10', 0)) if pd.notna(r.get('M10', 0)) else 0.0
                     atr = float(r.get('ATR', p_now * 0.03))
                     dynamic_sl = float(r.get('停損價', p_cost - 1.5 * atr))
+
+                    # ===================================================
+                    # 🚨 籌碼+技術面交叉警戒：技術已轉弱但籌碼還在的最危險組合
+                    # ===================================================
+                    cross_warning = ""
+                    sid_r = str(r.get("代號", "")).strip()
+                    if not today_df.empty and sid_r:
+                        chip_row = today_df[today_df["代號"] == sid_r]
+                        if not chip_row.empty:
+                            streak_r = int(chip_row.iloc[0].get("連買", 0))
+                            trust_r = float(chip_row.iloc[0].get("投信(張)", 0))
+                            if p_now < m10 and streak_r >= 3 and trust_r > 0:
+                                cross_warning = f"🚨 <b>【最危險組合警戒】</b> 技術已跌破M10，但投信仍連買{streak_r}天！主力可能正在出貨，勿等籌碼來救你。"
                     
                     glow_class = "glow-s-tier" if (ret >= 10 and p_now > m5) else ""
                     border_col = COLORS['primary'] if glow_class else COLORS['border']
@@ -569,11 +685,16 @@ with t_cmd:
                         else:
                             struct, border_col = f"📉 貫穿動態防守 (現價 < {dynamic_sl:.1f})", COLORS['red'] if ret < 0 else COLORS['green']
                             coach = "🛡️ <b>【停利警報】</b> 趨勢轉弱，建議立刻減碼鎖住獲利！" if ret > 0 else f"💀 <b>【情緒殺預警】</b> 跌破 ATR 動態底線！請無情砍單保命，絕不攤平！"
-                    
+
+                    if cross_warning:
+                        coach = cross_warning
+                        border_col = COLORS['red']
+
                     name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                     display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
+                    timer_html = f"<span style='color:{timer_color}; font-size:12px;'>{timer_warning}</span>" if timer_warning else ""
                     
-                    html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 10px 15px; background-color: {COLORS['card']}; border-radius: 4px; margin-bottom: 8px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
+                    html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 10px 15px; background-color: {COLORS['card']}; border-radius: 4px; margin-bottom: 8px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} {timer_html}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
                 except Exception as e: continue
             html_cards += '</div>'
             
