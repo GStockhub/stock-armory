@@ -21,9 +21,11 @@ import sidebar
 st.set_page_config(page_title="我要賺大錢", page_icon="💰️", layout="wide", initial_sidebar_state="expanded")
 
 # ---------------------------------------------------------
-# 🔒 專屬門禁與 API Token（Streamlit Cloud 防爆版）
+# 🔒 專屬門禁與 API Token（Streamlit Cloud 防爆雙密碼版）
 # ---------------------------------------------------------
-SYS_PWD = st.secrets.get("sys_pwd", "1023")
+# 🚀 修改點：從 Secrets 讀取兩組密碼
+ADMIN_PWD = st.secrets.get("admin_pwd", "0989")  # 將軍密碼
+GUEST_PWD = st.secrets.get("guest_pwd", "1023")  # 友軍密碼
 FM_TOKEN = st.secrets.get("fm_token", "")
 
 try:
@@ -36,25 +38,39 @@ except Exception:
     controller = None
     auth_status = st.session_state.get("v3_auth_token", None)
 
-if auth_status != "verified_auth":
+# 🚀 修改點：判斷是否為合法的登入身分
+if auth_status not in ["admin_auth", "guest_auth"]:
     st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V32.2 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
         if st.button("🔓 驗證並解鎖", use_container_width=True) or pwd:
-            if pwd == SYS_PWD:
-                st.session_state["v3_auth_token"] = "verified_auth"
+            if pwd == ADMIN_PWD:
+                # 👑 將軍登入
+                st.session_state["v3_auth_token"] = "admin_auth"
                 try:
                     if controller is not None:
-                        controller.set("v3_auth_token", "verified_auth", max_age=2592000)
+                        controller.set("v3_auth_token", "admin_auth", max_age=2592000)
                 except Exception:
                     pass
-                st.success("✅ 身分確認：...正在為您開啟戰情室...")
+                st.success("✅ 統帥確認：...正在為您開啟專屬戰情室...")
+                time.sleep(1.2)
+                st.rerun()
+            elif pwd == GUEST_PWD:
+                # 🤝 友軍登入
+                st.session_state["v3_auth_token"] = "guest_auth"
+                try:
+                    if controller is not None:
+                        controller.set("v3_auth_token", "guest_auth", max_age=2592000)
+                except Exception:
+                    pass
+                st.success("✅ 友軍確認：...正在開啟系統...")
                 time.sleep(1.2)
                 st.rerun()
             elif pwd != "":
                 st.error("❌ 密碼錯誤！防禦系統已啟動。")
     st.stop()
+
 st.markdown("""
 <style>
 /* 標籤絕對保護區：強制不換行、大小固定，不受標題長度影響 */
@@ -90,7 +106,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-configs = sidebar.render_sidebar()
+# 🚀 修改點：將目前的登入身分傳給 sidebar，讓它決定要不要給網址
+configs = sidebar.render_sidebar(auth_status)
 COLORS = configs["COLORS"]
 sheet_url = str(configs["sheet_url"]).strip()
 aar_sheet_url = str(configs["aar_sheet_url"]).strip()
