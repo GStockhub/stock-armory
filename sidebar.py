@@ -1,7 +1,8 @@
 import streamlit as st
 import theme  
 
-def render_sidebar():
+# 🚀 修改點：接收 app.py 傳來的 auth_status 參數
+def render_sidebar(auth_status="guest_auth"):
     with st.sidebar:
         st.markdown("### ⚙️ 紀律設定")
         st.markdown("---")
@@ -33,23 +34,25 @@ def render_sidebar():
             st.error("⚠️ 偵測到雲端 `theme.py` 尚未更新！目前使用緊急備用色碼。")
 
         # ===================================================
-        # 🔗 網址設定：優先從 Secrets 自動帶入，可手動覆蓋
+        # 🔗 網址設定：依據身分給予不同待遇
         # ===================================================
-        default_sheet_url = st.secrets.get("sheet_url", "")
-        default_aar_url   = st.secrets.get("aar_sheet_url", "")
+        # 🚀 只有將軍登入，才會從 Secrets 讀取！
+        if auth_status == "admin_auth":
+            default_sheet_url = st.secrets.get("sheet_url", "")
+            default_aar_url   = st.secrets.get("aar_sheet_url", "")
+            if default_sheet_url:
+                st.success("✅ 統帥專屬：持股部位已自動連線", icon="🔗")
+            if default_aar_url:
+                st.success("✅ 統帥專屬：交易日誌已自動連線", icon="🔗")
+        else:
+            # 🤝 友軍登入，預設給空白
+            default_sheet_url = ""
+            default_aar_url   = ""
+            st.info("💡 友軍請在下方手動貼上您的 CSV 網址", icon="👋")
 
-        # 顯示連線狀態提示
-        if default_sheet_url:
-            st.success("✅ 持股部位已從 Secrets 自動連線", icon="🔗")
-        if default_aar_url:
-            st.success("✅ 交易日誌已從 Secrets 自動連線", icon="🔗")
-
-        if not default_sheet_url and not default_aar_url:
-            st.caption("💡 可在 Streamlit Secrets 設定 `sheet_url` 與 `aar_sheet_url`，免手動貼網址。")
-
-        with st.expander("🔧 手動覆蓋網址（選填）", expanded=not default_sheet_url):
-            manual_sheet_url    = st.text_input("【持股部位】CSV 網址", value="", placeholder="貼上網址可覆蓋 Secrets 設定")
-            manual_aar_url      = st.text_input("【交易日誌】CSV 網址", value="", placeholder="貼上網址可覆蓋 Secrets 設定")
+        with st.expander("🔧 手動輸入網址", expanded=not default_sheet_url):
+            manual_sheet_url    = st.text_input("【持股部位】CSV 網址", value="", placeholder="貼上您的網址")
+            manual_aar_url      = st.text_input("【交易日誌】CSV 網址", value="", placeholder="貼上您的網址")
 
         sheet_url     = manual_sheet_url.strip() if manual_sheet_url.strip() else default_sheet_url
         aar_sheet_url = manual_aar_url.strip()   if manual_aar_url.strip()   else default_aar_url
