@@ -361,6 +361,8 @@ with t_rank:
 
                                 card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {border_color}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]};">'
                                 
+                                card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {border_color}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]};">'
+                                
                                 # 🚀 關鍵修復 1：改為 align-items: flex-start (頂部對齊)，並給標籤 margin-top: 3px 完美對齊第一行文字
                                 card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: flex-start; gap: 6px; overflow: hidden;"><span class="tier-badge {badge_class}" style="margin-top: 3px;">{badge_name}</span><h3 class="stock-title" style="color: {border_color};">{r["名稱"]} ({r["代號"]})</h3></div>'
                                 
