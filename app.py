@@ -392,7 +392,7 @@ with t_rank:
                     if not ui_s.empty: render_tier_cards(ui_s, "badge-s", "🥇 S級", COLORS["primary"])
                     if not ui_a.empty: render_tier_cards(ui_a, "badge-a", "🥈 A級", COLORS["accent"])
 
-               st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
+              st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
                     # 🚀 V32.4 統帥優化：為 B 級添加極簡版輔助徽章
@@ -409,11 +409,11 @@ with t_rank:
                     disp_b = ui_b.copy()
                     disp_b["戰術型態"] = disp_b.apply(generate_b_badges, axis=1)
 
-                    disp_b = disp_b[["名次", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議量(張)", "連買"]].copy()
-                    disp_b = disp_b.rename(columns={"Quant_Score": "評分", "停損價": "停損"})
+                    disp_b = disp_b[["名次", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
+                    disp_b = disp_b.rename(columns={"Quant_Score": "量化評分", "停損價": "ATR停損"})
                     disp_b["現價"] = disp_b["現價"].apply(lambda x: f"{x:.2f}")
-                    disp_b["停損"] = disp_b["停損"].apply(lambda x: f"{x:.2f}")
-                    disp_b["評分"] = disp_b["評分"].apply(lambda x: f"{x:.1f}")
+                    disp_b["ATR停損"] = disp_b["ATR停損"].apply(lambda x: f"{x:.2f}")
+                    disp_b["量化評分"] = disp_b["量化評分"].apply(lambda x: f"{x:.1f}")
                     raw_win_rate = disp_b["勝率(%)"].copy()
                     disp_b["勝率(%)"] = disp_b["勝率(%)"].apply(lambda x: f"{x:.1f}%")
 
@@ -421,7 +421,7 @@ with t_rank:
                         .map(risk_color, subset=["量化評分"])
                         .apply(lambda x: [f'color: {COLORS["green"]}; font-weight: bold;' if v > 60 else '' for v in raw_win_rate], subset=["勝率(%)"]))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
-
+                    
                 st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
                 if ui_c.empty: st.info("💡 今日無 C 級潛伏標的。")
                 else:
