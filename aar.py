@@ -1,15 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
-
 import pandas as pd
-
 import numpy as np
-
 from datetime import datetime, timedelta
-
 import re
 import html
-
 from data_center import read_remote_csv, safe_download, load_industry_map
 
 
@@ -17,7 +12,6 @@ from data_center import read_remote_csv, safe_download, load_industry_map
 # 🚀 終極日期解析器：暴力斬斷尾巴，並封殺 1970 年的幽靈數字
 
 def parse_tw_date(d_str):
-
     try:
 
         raw = str(d_str).strip()
@@ -864,8 +858,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             </tr>
             """
 
-        row_count = len(res_df)
-        table_height = min(900, max(360, 70 + row_count * 44))
+        # 固定元件高度：讓 AAR 表格自己內部滾動，首列可凍結
+        table_height = 560
 
         aar_table_html = f"""
         <!DOCTYPE html>
@@ -882,13 +876,15 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             }}
             .aar-wrap {{
                 width: 100%;
-                overflow-x: auto;
+                height: 520px;                 /* 表格固定高度，內部自己滑 */
+                overflow: auto;                /* 同時支援上下左右捲動 */
                 border: 1px solid {COLORS['border']};
                 border-radius: 8px;
                 background: {COLORS['card']};
             }}
             table.aar-table {{
                 width: 100%;
+                min-width: 980px;              /* 避免小螢幕擠爆，但電腦版仍吃滿 */
                 border-collapse: collapse;
                 table-layout: fixed;
                 font-size: 13px;
@@ -896,17 +892,21 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 color: {COLORS['text']};
             }}
             table.aar-table th {{
+                position: sticky;              /* 首列凍結 */
+                top: 0;
+                z-index: 5;
                 background: {COLORS['card']};
                 color: {COLORS['subtext']};
                 font-weight: 700;
-                padding: 9px 8px;
+                padding: 8px 7px;
                 border-bottom: 1px solid {COLORS['border']};
                 border-right: 1px solid {COLORS['border']};
                 text-align: left;
                 white-space: nowrap;
+                box-shadow: 0 1px 0 {COLORS['border']};
             }}
             table.aar-table td {{
-                padding: 9px 8px;
+                padding: 8px 7px;
                 border-bottom: 1px solid {COLORS['border']};
                 border-right: 1px solid {COLORS['border']};
                 vertical-align: top;
@@ -915,10 +915,10 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             table.aar-table tr:last-child td {{
                 border-bottom: none;
             }}
-            .aar-code {{ width: 7%; white-space: nowrap; }}
+            .aar-code {{ width: 6%; white-space: nowrap; }}
             .aar-name {{ width: 8%; white-space: nowrap; }}
             .aar-detail {{
-                width: 42%;
+                width: 48%;                    /* 診斷詳情吃最多空間 */
                 text-align: left;
                 white-space: normal !important;
                 word-break: break-word;
@@ -927,12 +927,12 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             }}
             .aar-grade {{ width: 7%; white-space: nowrap; font-weight: 700; }}
             .aar-date {{ width: 7%; white-space: nowrap; }}
-            .aar-days {{ width: 7%; white-space: nowrap; text-align: right; }}
-            .aar-roi {{ width: 8%; white-space: nowrap; text-align: right; font-weight: 700; }}
-            .aar-pnl {{ width: 7%; white-space: nowrap; text-align: right; font-weight: 700; }}
+            .aar-days {{ width: 6%; white-space: nowrap; text-align: right; }}
+            .aar-roi {{ width: 7%; white-space: nowrap; text-align: right; font-weight: 700; }}
+            .aar-pnl {{ width: 6%; white-space: nowrap; text-align: right; font-weight: 700; }}
             @media (max-width: 900px) {{
-                table.aar-table {{ min-width: 980px; }}
-                .aar-detail {{ width: 38%; }}
+                table.aar-table {{ min-width: 1050px; }}
+                .aar-detail {{ width: 44%; }}
             }}
         </style>
         </head>
@@ -959,7 +959,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         </html>
         """
 
-        components.html(aar_table_html, height=table_height, scrolling=True)
+        components.html(aar_table_html, height=table_height, scrolling=False)
 
     else:
         st.info("AAR 解析完畢後，沒有可分析的有效資料。請查看上方的警告面板了解原因。")
