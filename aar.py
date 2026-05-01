@@ -16,7 +16,7 @@ def parse_tw_date(d_str):
         raw = raw.split(" ")[0].split("T")[0]
         raw = raw.replace("/", "-").replace(".", "-")
 
-        # 先處理 Excel 日期序號，例如 45400、45580
+        # 先處理 Excel 日期序號
         if re.fullmatch(r"\d{5}", raw):
             serial = int(raw)
             if 30000 <= serial <= 60000:
@@ -25,7 +25,7 @@ def parse_tw_date(d_str):
                     return dt
             return pd.NaT
 
-        # 處理 8 碼西元日期，例如 20260423
+        # 處理 8 碼西元日期
         if re.fullmatch(r"\d{8}", raw):
             y = int(raw[:4])
             m = int(raw[4:6])
@@ -35,7 +35,7 @@ def parse_tw_date(d_str):
                 return dt
             return pd.NaT
 
-        # 處理 7 碼民國日期，例如 1140423
+        # 處理 7 碼民國日期
         if re.fullmatch(r"\d{7}", raw):
             y = int(raw[:3]) + 1911
             m = int(raw[3:5])
@@ -52,7 +52,7 @@ def parse_tw_date(d_str):
             m = int(parts[1])
             d = int(parts[2])
 
-            # 民國年，例如 114-04-23
+            # 民國年
             if y < 1911:
                 y += 1911
 
@@ -218,7 +218,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                     post_sell_hist = hist.loc[sell_date:]
                     if not post_sell_hist.empty and len(post_sell_hist) > 1:
-                        # 🚀 統帥規矩：只抓賣出後的 20 個交易日！不再當無止盡追蹤的恐怖情人！
                         post_hist = post_sell_hist.iloc[1:21] 
                         if not post_hist.empty:
                             max_idx = post_hist['High'].idxmax()
@@ -234,11 +233,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             max_date = pd.to_datetime(max_idx)
                             min_date = pd.to_datetime(min_idx)
                             
-                            # 計算日曆天數
                             days_to_max = (max_date - s_date).days
                             days_to_min = (min_date - s_date).days
                             
-                            # 避免極端異常值 (如果還是算錯，強制轉成文字)
                             disp_days_max = str(days_to_max) if 0 <= days_to_max <= 50 else "?"
                             disp_days_min = str(days_to_min) if 0 <= days_to_min <= 50 else "?"
                             
@@ -281,7 +278,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     demon = "⚓ 凹單"
                     
             if user_demon:
-                # 🚀 括號斬斷器：遇到半形 ( 或全形 （ 就切斷，只保留前面的主標題
                 clean_demon = str(user_demon).split("(")[0].split("（")[0].strip()
                 demon = f"👤 {clean_demon}"
 
@@ -291,7 +287,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             buy_str = buy_date.strftime("%m-%d")
             sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
 
-            # 確保持有天數不會出現負數或離譜數字
             disp_held = int(held_days) if 0 <= held_days <= 10000 else 0
 
             results.append({
@@ -314,7 +309,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     p_color = COLORS["red"] if total_pnl > 0 else COLORS["green"]
 
     # ===================================================
-    # 🧠 個人化統計：從你的真實日誌反推最佳模式
+    # 🧠 個人化統計
     # ===================================================
     if results:
         res_df_stat = pd.DataFrame(results)
@@ -409,7 +404,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
         table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
         
-        # 🚀 終極霸王比例術：強迫其他欄位縮到極限，把所有版面讓給診斷詳情！
+        # 🚀 終極霸王比例術：捨棄 st.dataframe 限制，強迫其他欄位縮小，解放「診斷詳情」！
         styled = (
             res_df.style.set_properties(**table_style)
             .format({"報酬率(%)": "{:.2f}%", "淨利": "{:,.0f}"})
@@ -421,8 +416,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap', 'width': '99%'})
         )
         
-        # 🚀 殺手鐧：捨棄 st.dataframe！改用 st.table 徹底粉碎「不准換行」的死穴！
-        # 這樣一來，字太多就會自動折到下一行，您再也不需要左右拖拉了！
+        # 🚀 殺手鐧：改用 st.table 徹底粉碎 dataframe「不准換行」的死穴！
         st.table(styled)
     else:
         st.info("AAR 解析完畢後，沒有可分析的有效資料。請查看上方的警告面板了解原因。")
