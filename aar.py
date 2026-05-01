@@ -1,229 +1,113 @@
 import streamlit as st
 import streamlit.components.v1 as components
-
 import pandas as pd
-
 import numpy as np
-
 from datetime import datetime, timedelta
-
 import re
 import html
-
 from data_center import read_remote_csv, safe_download, load_industry_map
 
 
 
 # 🚀 終極日期解析器：暴力斬斷尾巴，並封殺 1970 年的幽靈數字
-
 def parse_tw_date(d_str):
-
     try:
 
         raw = str(d_str).strip()
-
-
-
         if not raw or raw.lower() in ["nan", "nat", "none", "0", "-"]:
 
             return pd.NaT
-
-
-
         raw = raw.split(" ")[0].split("T")[0]
-
         raw = raw.replace("/", "-").replace(".", "-")
-
-
-
         # 先處理 Excel 日期序號，例如 45400、45580
 
         if re.fullmatch(r"\d{5}", raw):
-
             serial = int(raw)
-
             if 30000 <= serial <= 60000:
-
                 dt = pd.to_datetime("1899-12-30") + pd.to_timedelta(serial, unit="D")
-
                 if 2000 <= dt.year <= datetime.now().year + 1:
-
                     return dt
-
             return pd.NaT
 
 
 
         # 處理 8 碼西元日期，例如 20260423
-
         if re.fullmatch(r"\d{8}", raw):
-
             y = int(raw[:4])
-
             m = int(raw[4:6])
-
             d = int(raw[6:8])
-
             dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
-
             if pd.notna(dt) and 2000 <= dt.year <= datetime.now().year + 1:
-
                 return dt
-
             return pd.NaT
 
 
 
         # 處理 7 碼民國日期，例如 1140423
-
         if re.fullmatch(r"\d{7}", raw):
-
             y = int(raw[:3]) + 1911
-
             m = int(raw[3:5])
-
             d = int(raw[5:7])
-
             dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
-
             if pd.notna(dt) and 2000 <= dt.year <= datetime.now().year + 1:
-
                 return dt
-
             return pd.NaT
-
-
 
         parts = raw.split("-")
-
-
-
         if len(parts) == 3:
-
             y = int(parts[0])
-
             m = int(parts[1])
-
             d = int(parts[2])
-
-
-
             # 民國年，例如 114-04-23
-
             if y < 1911:
-
                 y += 1911
-
-
-
             dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
-
-
-
         elif len(parts) == 2:
-
             y = datetime.now().year
-
             m = int(parts[0])
-
             d = int(parts[1])
-
             dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
-
-
-
         else:
-
             dt = pd.to_datetime(raw, errors="coerce")
-
-
-
         if pd.isna(dt):
-
             return pd.NaT
-
-
-
         if dt.year < 2000 or dt.year > datetime.now().year + 1:
-
             return pd.NaT
-
-
-
         return dt
-
-
-
     except Exception:
-
         return pd.NaT
-
-
-
 def extract_number(val_str):
-
     try:
-
         s = str(val_str).replace(',', '').strip()
-
         match = re.search(r'-?\d+\.?\d*', s)
-
         if match:
-
             return float(match.group(0))
-
         return 0.0
-
     except Exception:
-
         return 0.0
 
 
 
 # 絕對精準欄位鎖定
-
 def get_val(row, possible_keys, exclude_keys=None, default=""):
-
     if exclude_keys is None: exclude_keys = []
-
-    
-
     # 1. 絕對精準比對 (優先)
-
     for col in row.index:
-
         col_str = str(col).strip()
-
         if col_str in possible_keys:
-
             val = row[col]
-
             if pd.notna(val) and str(val).strip() != "":
-
                 return str(val).strip()
-
-                
-
     # 2. 模糊比對 (備用)
-
     for col in row.index:
-
         col_str = str(col).strip()
-
         if any(x in col_str for x in exclude_keys):
-
             continue
-
         for k in possible_keys:
-
             if k in col_str:
-
                 val = row[col]
-
                 if pd.notna(val) and str(val).strip() != "":
-
                     return str(val).strip()
-
     return default
 
 
@@ -231,19 +115,12 @@ def get_val(row, possible_keys, exclude_keys=None, default=""):
 def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
     if not aar_sheet_url:
-
         st.info("請在左側邊欄輸入【交易日誌】CSV 網址。")
-
         return
 
-
-
     try:
-
         df = read_remote_csv(aar_sheet_url, dtype=str)
-
     except Exception as e:
-
         st.error(f"系統錯誤: {e}")
 
         return
