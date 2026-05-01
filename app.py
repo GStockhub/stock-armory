@@ -65,6 +65,7 @@ if auth_status not in ["admin_auth", "guest_auth"]:
 
 st.markdown("""
 <style>
+/* 標籤絕對保護區：強制不換行、大小固定，不受標題長度影響 */
 .tier-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap !important; flex-shrink: 0; }
 .badge-s { background-color: rgba(255, 75, 75, 0.1); color: #FF4B4B; border: 1px solid #FF4B4B; }
 .badge-a { background-color: rgba(255, 165, 0, 0.1); color: #FFA500; border: 1px solid #FFA500; }
@@ -74,16 +75,15 @@ st.markdown("""
 .info-label { font-size: 13px; opacity: 0.8; white-space: nowrap; }
 .info-value { font-size: 13px; font-weight: 500; text-align: right; white-space: nowrap; }
 
-/* 🚀 長檔名終極自適應裝甲 */
+/* 🚀 長檔名自適應區：字體微縮、自動換行、最多兩行 */
 .stock-title { 
     margin: 0; 
-    /* 字體會根據螢幕寬度自動伸縮，電腦版最大 18px，手機版極限縮小至 14px */
-    font-size: clamp(14px, 3.5vw, 18px); 
-    line-height: 1.35; 
+    font-size: clamp(14px, 1.1rem, 18px); /* 自適應：平常18px，空間不夠自動縮到14px */
+    line-height: 1.25; 
     white-space: normal; 
-    word-break: break-word; /* 允許長字串物理切斷換行 */
+    word-break: break-word; /* 允許長檔名或代碼自動切斷換行 */
     display: -webkit-box;
-    -webkit-line-clamp: 2; /* 嚴格限制最多兩行，絕不撐爆版面 */
+    -webkit-line-clamp: 2; /* 極限防護：最多換2行，超過顯示... 絕對不把卡片撐爆 */
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
