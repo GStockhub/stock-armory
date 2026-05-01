@@ -361,12 +361,17 @@ with t_rank:
 
                                 card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {border_color}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]}; height: 100%; display: flex; flex-direction: column;">'
                                 
-                                # 🚀 關鍵修復：分離標籤與標題，賦予標籤「絕對不壓縮」屬性
-                                card_html += f'<div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">'
-                                # flex-shrink: 0 是剛性裝甲，保證標籤永遠維持原始大小
-                                card_html += f'<div style="flex-shrink: 0; padding-top: 2px;"><span class="tier-badge {badge_class}">{badge_name}</span></div>'
-                                # flex-grow: 1 讓標題自動填滿剩餘空間，配合 CSS 裡的 clamp 自動縮小換行
-                                card_html += f'<div style="flex-grow: 1; min-width: 0;"><h3 class="stock-title" style="color: {border_color}; margin: 0;">{r["名稱"]} ({r["代號"]})</h3></div>'
+                                # 🚀 終極修復：確保標籤與標題和諧共處
+                                card_html += f'<div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; width: 100%;">'
+                                
+                                # 🛡️ 標籤裝甲：flex: 0 0 auto 絕對禁止縮放，且給予固定寬度或讓他自己決定內容寬度
+                                card_html += f'<div style="flex: 0 0 auto; padding-top: 3px;"><span class="tier-badge {badge_class}">{badge_name}</span></div>'
+                                
+                                # 📜 標題自適應：flex: 1 1 auto 填滿剩餘空間，加上 min-width: 0 允許內部文字被壓縮與換行
+                                card_html += f'<div style="flex: 1 1 auto; min-width: 0;">'
+                                # 使用 clamp 設定字體大小，當空間被壓縮時，字體可以縮小到 13px
+                                card_html += f'<h3 style="color: {border_color}; margin: 0; font-size: clamp(13px, 1.1vw + 10px, 19px); line-height: 1.25; word-wrap: break-word;">{r["名稱"]} <span style="white-space: nowrap;">({r["代號"]})</span></h3>'
+                                card_html += f'</div>'
                                 card_html += f'</div>'
                                 
                                 card_html += f'<div style="min-height: 22px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">{badges}</div>'
