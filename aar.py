@@ -397,7 +397,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         with st.expander(f"⚠️ 系統跳過了 {len(skipped_rows)} 筆格式異常的資料，點擊查看詳細原因", expanded=False):
             st.dataframe(pd.DataFrame(skipped_rows), use_container_width=True)
 
-    if results:
+   if results:
         res_df = pd.DataFrame(results)
         
         def grade_color(val):
@@ -409,30 +409,20 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
         table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
         
+        # 🚀 終極霸王比例術：強迫其他欄位縮到極限，把所有版面讓給診斷詳情！
         styled = (
             res_df.style.set_properties(**table_style)
             .format({"報酬率(%)": "{:.2f}%", "淨利": "{:,.0f}"})
             .map(lambda x: f"color:{COLORS['red']}; font-weight:bold;" if x > 0 else (f"color:{COLORS['green']}; font-weight:bold;" if x < 0 else ""), subset=["淨利", "報酬率(%)"])
             .map(grade_color, subset=["評級"])
-            .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap'})
+            # 🛡️ 壓制其他欄位：強制不換行 (nowrap) 並且寬度設為 1%，把它們逼到最小極限
+            .set_properties(subset=["代號", "名稱", "評級", "買進日", "賣出日", "持有天數", "報酬率(%)", "淨利"], **{'white-space': 'nowrap', 'width': '1%'})
+            # 🛡️ 徹底解放診斷詳情：強制左對齊，寬度設為 99%，吃掉畫面上所有剩下的空間並允許自動向下換行！
+            .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap', 'width': '99%'})
         )
         
-       # 🚀 V32.4 統帥優化：挑戰極限！強制把不重要的欄位壓到最小
-        st.dataframe(
-            styled, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={
-                "代號": st.column_config.TextColumn("代號", width=60),     # 強制縮小到 60px
-                "名稱": st.column_config.TextColumn("名稱", width=80),     # 強制縮小到 80px
-                "診斷詳情": st.column_config.TextColumn("診斷詳情", width="large"), # 依舊給予最大權重
-                "評級": st.column_config.TextColumn("評級", width=60),     # 強制縮小
-                "買進日": st.column_config.TextColumn("買進日", width=70),   # 強制縮小
-                "賣出日": st.column_config.TextColumn("賣出日", width=70),   # 強制縮小
-                "持有天數": st.column_config.NumberColumn("持有天數", width=70), # 強制縮小
-                "報酬率(%)": st.column_config.TextColumn("報酬率(%)", width=80),# 強制縮小
-                "淨利": st.column_config.NumberColumn("淨利", width=80)    # 強制縮小
-            }
-        )
+        # 🚀 殺手鐧：捨棄 st.dataframe！改用 st.table 徹底粉碎「不准換行」的死穴！
+        # 這樣一來，字太多就會自動折到下一行，您再也不需要左右拖拉了！
+        st.table(styled)
     else:
         st.info("AAR 解析完畢後，沒有可分析的有效資料。請查看上方的警告面板了解原因。")
