@@ -269,45 +269,45 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         else:
                             grade = "👑 S級" if roi > 0 else "⚔️ B級"
                             comment = "⏳ 剛平倉，無足夠的後續交易日可供覆盤"
-                    else:
-                        grade = "👑 S級" if roi > 0 else "⚔️ B級"
-                        comment = "⏳ 剛平倉，無足夠的後續交易日可供覆盤"
                 else:
-                    grade = "⚪ 戰鬥中"
-                    if latest_price > m5 > m10: comment = "🚀 強勢多頭排列，跌破 M5 前死抱不賣！"
-                    elif latest_price >= m10: comment = "⏳ 均線收斂整理中，防守底線設於 M10。"
-                    else: 
-                        comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
-                        demon = "⚓ 凹單"
-                        
-                if user_demon:
-                    # 🚀 括號斬斷器：遇到半形 ( 或全形 （ 就切斷，只保留前面的主標題
-                    clean_demon = str(user_demon).split("(")[0].split("（")[0].strip()
-                    demon = f"👤 {clean_demon}"
+                    grade = "👑 S級" if roi > 0 else "⚔️ B級"
+                    comment = "⏳ 剛平倉，無足夠的後續交易日可供覆盤"
+            else:
+                grade = "⚪ 戰鬥中"
+                if latest_price > m5 > m10: comment = "🚀 強勢多頭排列，跌破 M5 前死抱不賣！"
+                elif latest_price >= m10: comment = "⏳ 均線收斂整理中，防守底線設於 M10。"
+                else: 
+                    comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
+                    demon = "⚓ 凹單"
+                    
+            if user_demon:
+                # 🚀 括號斬斷器：遇到半形 ( 或全形 （ 就切斷，只保留前面的主標題
+                clean_demon = str(user_demon).split("(")[0].split("（")[0].strip()
+                demon = f"👤 {clean_demon}"
 
-                if demon and "紀律" not in demon and "完美" not in demon:
-                    demons.append(demon)
+            if demon and "紀律" not in demon and "完美" not in demon:
+                demons.append(demon)
 
-                buy_str = buy_date.strftime("%m-%d")
-                sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
+            buy_str = buy_date.strftime("%m-%d")
+            sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
 
-                # 確保持有天數不會出現負數或離譜數字
-                disp_held = int(held_days) if 0 <= held_days <= 10000 else 0
+            # 確保持有天數不會出現負數或離譜數字
+            disp_held = int(held_days) if 0 <= held_days <= 10000 else 0
 
-                results.append({
-                    "代號": sid,
-                    "名稱": TWSE_NAME_MAP.get(sid, sid),
-                    "診斷詳情": comment,
-                    "評級": grade,
-                    "買進日": buy_str,
-                    "賣出日": sell_str,
-                    "持有天數": disp_held,
-                    "報酬率(%)": roi,
-                    "淨利": int(pnl),
-                })
-            except Exception as e:
-                skipped_rows.append({"行數 (Excel)": i+2, "代號": sid_raw, "原因": f"底層運算當機: {e}"})
-                continue
+            results.append({
+                "代號": sid,
+                "名稱": TWSE_NAME_MAP.get(sid, sid),
+                "診斷詳情": comment,
+                "評級": grade,
+                "買進日": buy_str,
+                "賣出日": sell_str,
+                "持有天數": disp_held,
+                "報酬率(%)": roi,
+                "淨利": int(pnl),
+            })
+        except Exception as e:
+            skipped_rows.append({"行數 (Excel)": i+2, "代號": sid_raw, "原因": f"底層運算當機: {e}"})
+            continue
 
     win_rate = (win_trades / total_closed_trades * 100) if total_closed_trades > 0 else 0
     top_demon = pd.Series(demons).mode()[0] if demons else "無"
@@ -417,18 +417,21 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap'})
         )
         
+        # 🚀 V32.4 統帥優化：終極欄位寬度壓制，保證「診斷詳情」一覽無遺
         st.dataframe(
             styled, 
             use_container_width=True, 
             hide_index=True,
             column_config={
-                "代號": st.column_config.TextColumn(width="small"),
-                "名稱": st.column_config.TextColumn(width="small"),
-                "診斷詳情": st.column_config.TextColumn(width="medium"),
-                "評級": st.column_config.TextColumn(width="small"),
-                "買進日": st.column_config.TextColumn(width="small"),
-                "賣出日": st.column_config.TextColumn(width="small"),
-                "持有天數": st.column_config.NumberColumn(width="small"),
+                "代號": st.column_config.TextColumn("代號", width="small"),
+                "名稱": st.column_config.TextColumn("名稱", width="small"),
+                "診斷詳情": st.column_config.TextColumn("診斷詳情", width="large"),
+                "評級": st.column_config.TextColumn("評級", width="small"),
+                "買進日": st.column_config.TextColumn("買進日", width="small"),
+                "賣出日": st.column_config.TextColumn("賣出日", width="small"),
+                "持有天數": st.column_config.NumberColumn("持有天數", width="small"),
+                "報酬率(%)": st.column_config.TextColumn("報酬率(%)", width="small"),
+                "淨利": st.column_config.NumberColumn("淨利", width="small")
             }
         )
     else:
