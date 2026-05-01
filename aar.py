@@ -343,12 +343,26 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     order = ["1-2天 (隔日沖)", "3-5天 (短線甜蜜點)", "6-10天 (短波段)", "11天以上"]
                     day_grp["排序"] = day_grp["天數區間"].apply(lambda x: order.index(x) if x in order else 99)
                     day_grp = day_grp.sort_values("排序").drop(columns=["排序"])
+                    
                     for _, row_g in day_grp.iterrows():
                         wr = row_g["勝率(%)"]
                         avg_r = row_g["平均報酬(%)"]
                         cnt = int(row_g["筆數"])
                         bar_color = COLORS["green"] if wr >= 70 else (COLORS["primary"] if wr >= 50 else COLORS["red"])
-                        st.markdown(f"<div style='margin-bottom:10px;'><div style='display:flex; justify-content:space-between; font-size:13px;'><span style='color:{COLORS['text']}'>{row_g['天數區間']}</span><span style='color:{bar_color}; font-weight:bold;'>{wr:.0f}% ({cnt}筆)</span></div><div style='background:{COLORS['border']}; border-radius:4px; height:8px; margin-top:4px;'><div style='background:{bar_color}; width:{min(wr,100):.0f}%; height:8px; border-radius:4px;'></div></div><div style='font-size:11px; color:{COLORS['subtext']}; margin-top:2px;'>平均報酬 {avg_r:+.2f}%</div></div>", unsafe_allow_html=True)
+                        
+                        html_str = f"""
+                        <div style='margin-bottom:10px;'>
+                            <div style='display:flex; justify-content:space-between; font-size:13px;'>
+                                <span style='color:{COLORS['text']}'>{row_g['天數區間']}</span>
+                                <span style='color:{bar_color}; font-weight:bold;'>{wr:.0f}% ({cnt}筆)</span>
+                            </div>
+                            <div style='background:{COLORS['border']}; border-radius:4px; height:8px; margin-top:4px;'>
+                                <div style='background:{bar_color}; width:{min(wr,100):.0f}%; height:8px; border-radius:4px;'></div>
+                            </div>
+                            <div style='font-size:11px; color:{COLORS['subtext']}; margin-top:2px;'>平均報酬 {avg_r:+.2f}%</div>
+                        </div>
+                        """
+                        st.markdown(html_str, unsafe_allow_html=True)
 
             with pcol2:
                 st.markdown(f"<b style='color:{COLORS['text']}'>⚖️ Kelly Criterion 個人化建議倉位</b>", unsafe_allow_html=True)
@@ -362,7 +376,30 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     kelly_full = (p_win * b_ratio - (1 - p_win)) / b_ratio if b_ratio > 0 else 0
                     kelly_half = max(kelly_full * 0.5, 0)
                     kelly_color = COLORS["green"] if kelly_half > 0.1 else (COLORS["primary"] if kelly_half > 0 else COLORS["red"])
-                    st.markdown(f"<div style='background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:8px; padding:14px;'><div style='font-size:12px; color:{COLORS['subtext']}; margin-bottom:8px;'>基於你的 {len(closed_stat)} 筆真實交易</div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>真實勝率</span><span style='color:{COLORS['text']}; font-weight:bold;'>{p_win*100:.1f}%</span></div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>平均盈虧比</span><span style='color:{COLORS['text']}; font-weight:bold;'>1 : {b_ratio:.2f}</span></div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>Full Kelly</span><span style='color:{COLORS['primary']};'>{kelly_full*100:.1f}%</span></div><div style='display:flex; justify-content:space-between; padding-top:8px; border-top:1px solid {COLORS['border']};'><span style='color:{COLORS['text']}; font-weight:bold; font-size:14px;'>建議單筆倉位 (半Kelly)</span><span style='color:{kelly_color}; font-weight:bold; font-size:18px;'>{kelly_half*100:.1f}%</span></div><div style='font-size:11px; color:{COLORS['subtext']}; margin-top:6px;'>半Kelly為保守安全值，Full Kelly風險過高不建議直接使用</div></div>", unsafe_allow_html=True)
+                    
+                    kelly_html = f"""
+                    <div style='background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:8px; padding:14px;'>
+                        <div style='font-size:12px; color:{COLORS['subtext']}; margin-bottom:8px;'>基於你的 {len(closed_stat)} 筆真實交易</div>
+                        <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
+                            <span style='color:{COLORS['subtext']}; font-size:13px;'>真實勝率</span>
+                            <span style='color:{COLORS['text']}; font-weight:bold;'>{p_win*100:.1f}%</span>
+                        </div>
+                        <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
+                            <span style='color:{COLORS['subtext']}; font-size:13px;'>平均盈虧比</span>
+                            <span style='color:{COLORS['text']}; font-weight:bold;'>1 : {b_ratio:.2f}</span>
+                        </div>
+                        <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
+                            <span style='color:{COLORS['subtext']}; font-size:13px;'>Full Kelly</span>
+                            <span style='color:{COLORS['primary']};'>{kelly_full*100:.1f}%</span>
+                        </div>
+                        <div style='display:flex; justify-content:space-between; padding-top:8px; border-top:1px solid {COLORS['border']};'>
+                            <span style='color:{COLORS['text']}; font-weight:bold; font-size:14px;'>建議單筆倉位 (半Kelly)</span>
+                            <span style='color:{kelly_color}; font-weight:bold; font-size:18px;'>{kelly_half*100:.1f}%</span>
+                        </div>
+                        <div style='font-size:11px; color:{COLORS['subtext']}; margin-top:6px;'>半Kelly為保守安全值，Full Kelly風險過高不建議直接使用</div>
+                    </div>
+                    """
+                    st.markdown(kelly_html, unsafe_allow_html=True)
                 else:
                     st.info("至少需要 5 筆平倉紀錄才能計算 Kelly 建議倉位。")
 
@@ -374,7 +411,19 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 for dm, cnt in demon_counts.items():
                     pct = cnt / total_d * 100
                     dm_color = COLORS["red"] if "凹單" in dm else (COLORS["accent"] if "恐高" in dm else COLORS["primary"])
-                    st.markdown(f"<div style='margin-bottom:8px;'><div style='display:flex; justify-content:space-between; font-size:13px;'><span style='color:{COLORS['text']}'>{dm}</span><span style='color:{dm_color}; font-weight:bold;'>{cnt}次 ({pct:.0f}%)</span></div><div style='background:{COLORS['border']}; border-radius:4px; height:6px; margin-top:3px;'><div style='background:{dm_color}; width:{pct:.0f}%; height:6px; border-radius:4px;'></div></div></div>", unsafe_allow_html=True)
+                    
+                    dm_html = f"""
+                    <div style='margin-bottom:8px;'>
+                        <div style='display:flex; justify-content:space-between; font-size:13px;'>
+                            <span style='color:{COLORS['text']}'>{dm}</span>
+                            <span style='color:{dm_color}; font-weight:bold;'>{cnt}次 ({pct:.0f}%)</span>
+                        </div>
+                        <div style='background:{COLORS['border']}; border-radius:4px; height:6px; margin-top:3px;'>
+                            <div style='background:{dm_color}; width:{pct:.0f}%; height:6px; border-radius:4px;'></div>
+                        </div>
+                    </div>
+                    """
+                    st.markdown(dm_html, unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -404,19 +453,16 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
         table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
         
-        # 🚀 終極霸王比例術：捨棄 st.dataframe 限制，強迫其他欄位縮小，解放「診斷詳情」！
+        # 🚀 終極霸王比例術：改用 st.table，強制其他欄位縮小，解放「診斷詳情」自動換行！
         styled = (
             res_df.style.set_properties(**table_style)
             .format({"報酬率(%)": "{:.2f}%", "淨利": "{:,.0f}"})
             .map(lambda x: f"color:{COLORS['red']}; font-weight:bold;" if x > 0 else (f"color:{COLORS['green']}; font-weight:bold;" if x < 0 else ""), subset=["淨利", "報酬率(%)"])
             .map(grade_color, subset=["評級"])
-            # 🛡️ 壓制其他欄位：強制不換行 (nowrap) 並且寬度設為 1%，把它們逼到最小極限
             .set_properties(subset=["代號", "名稱", "評級", "買進日", "賣出日", "持有天數", "報酬率(%)", "淨利"], **{'white-space': 'nowrap', 'width': '1%'})
-            # 🛡️ 徹底解放診斷詳情：強制左對齊，寬度設為 99%，吃掉畫面上所有剩下的空間並允許自動向下換行！
             .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap', 'width': '99%'})
         )
         
-        # 🚀 殺手鐧：改用 st.table 徹底粉碎 dataframe「不准換行」的死穴！
         st.table(styled)
     else:
         st.info("AAR 解析完畢後，沒有可分析的有效資料。請查看上方的警告面板了解原因。")
