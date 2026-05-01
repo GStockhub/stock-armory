@@ -417,21 +417,21 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap'})
         )
         
-        # 🚀 V32.4 統帥優化：終極欄位寬度壓制，保證「診斷詳情」一覽無遺
+       # 🚀 V32.4 統帥優化：挑戰極限！強制把不重要的欄位壓到最小
         st.dataframe(
             styled, 
             use_container_width=True, 
             hide_index=True,
             column_config={
-                "代號": st.column_config.TextColumn("代號", width="small"),
-                "名稱": st.column_config.TextColumn("名稱", width="small"),
-                "診斷詳情": st.column_config.TextColumn("診斷詳情", width="large"),
-                "評級": st.column_config.TextColumn("評級", width="small"),
-                "買進日": st.column_config.TextColumn("買進日", width="small"),
-                "賣出日": st.column_config.TextColumn("賣出日", width="small"),
-                "持有天數": st.column_config.NumberColumn("持有天數", width="small"),
-                "報酬率(%)": st.column_config.TextColumn("報酬率(%)", width="small"),
-                "淨利": st.column_config.NumberColumn("淨利", width="small")
+                "代號": st.column_config.TextColumn("代號", width=60),     # 強制縮小到 60px
+                "名稱": st.column_config.TextColumn("名稱", width=80),     # 強制縮小到 80px
+                "診斷詳情": st.column_config.TextColumn("診斷詳情", width="large"), # 依舊給予最大權重
+                "評級": st.column_config.TextColumn("評級", width=60),     # 強制縮小
+                "買進日": st.column_config.TextColumn("買進日", width=70),   # 強制縮小
+                "賣出日": st.column_config.TextColumn("賣出日", width=70),   # 強制縮小
+                "持有天數": st.column_config.NumberColumn("持有天數", width=70), # 強制縮小
+                "報酬率(%)": st.column_config.TextColumn("報酬率(%)", width=80),# 強制縮小
+                "淨利": st.column_config.NumberColumn("淨利", width=80)    # 強制縮小
             }
         )
     else:
