@@ -392,8 +392,10 @@ with t_rank:
                     if not ui_s.empty: render_tier_cards(ui_s, "badge-s", "🥇 S級", COLORS["primary"])
                     if not ui_a.empty: render_tier_cards(ui_a, "badge-a", "🥈 A級", COLORS["accent"])
 
-              st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
-                if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
+              # 確保這行與上面的 if not ui_a.empty: 對齊 (通常是 16 個半形空格)
+                st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
+                if ui_b.empty: 
+                    st.info("💡 今日無 B 級符合標的。")
                 else:
                     # 🚀 V32.4 統帥優化：為 B 級添加極簡版輔助徽章
                     def generate_b_badges(row):
