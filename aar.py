@@ -397,7 +397,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         with st.expander(f"⚠️ 系統跳過了 {len(skipped_rows)} 筆格式異常的資料，點擊查看詳細原因", expanded=False):
             st.dataframe(pd.DataFrame(skipped_rows), use_container_width=True)
 
-   if results:
+    if results:
         res_df = pd.DataFrame(results)
         
         def grade_color(val):
