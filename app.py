@@ -361,16 +361,16 @@ with t_rank:
 
                                 card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {border_color}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]}; height: 100%; display: flex; flex-direction: column;">'
                                 
-                                # 🚀 關鍵修復 1：用獨立的 flex-shrink: 0 將標籤保護起來，名稱再長都不會壓扁標籤
+                                # 🚀 關鍵修復：分離標籤與標題，賦予標籤「絕對不壓縮」屬性
                                 card_html += f'<div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">'
+                                # flex-shrink: 0 是剛性裝甲，保證標籤永遠維持原始大小
                                 card_html += f'<div style="flex-shrink: 0; padding-top: 2px;"><span class="tier-badge {badge_class}">{badge_name}</span></div>'
-                                card_html += f'<div style="flex-grow: 1;"><h3 class="stock-title" style="color: {border_color}; margin: 0;">{r["名稱"]} ({r["代號"]})</h3></div>'
+                                # flex-grow: 1 讓標題自動填滿剩餘空間，配合 CSS 裡的 clamp 自動縮小換行
+                                card_html += f'<div style="flex-grow: 1; min-width: 0;"><h3 class="stock-title" style="color: {border_color}; margin: 0;">{r["名稱"]} ({r["代號"]})</h3></div>'
                                 card_html += f'</div>'
                                 
-                                # 🚀 關鍵修復 2：賦予徽章列 min-height: 22px，就算沒徽章也會撐住空間，保證卡片不塌陷
                                 card_html += f'<div style="min-height: 22px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">{badges}</div>'
                                 
-                                # 🚀 關鍵修復 3：利用 margin-top: auto 把下方資料全部往下推，實現完美的底部對齊
                                 card_html += f'<div style="margin-top: auto;">'
                                 card_html += f'<p style="color: #A0A0A0; margin: 0 0 8px 0; font-size: 12px;">{r["產業"]} | 投信連買 {r["連買"]} 天</p>'
                                 card_html += f'<div style="background-color: {COLORS["bg"]}; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid {COLORS["green"]};">'
