@@ -120,7 +120,6 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
 
             vol_now = float(vol_s.iloc[-1])
             vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1])
-            # 🚀 新增：20日均量，用來過濾殭屍股
             vol_ma20 = float(vol_s.rolling(20).mean().iloc[-1])
 
             vol_ratio = vol_now / vol_ma5 if vol_ma5 > 0 else 1
@@ -138,8 +137,31 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
                 if pd.isna(atr_now) or atr_now <= 0: atr_now = p_now * 0.03
             except Exception: atr_now = p_now * 0.03
             
-            # 🚀 新增：ATR波動率，用來過濾牛皮股
             atr_percent = (atr_now / p_now) * 100
+
+            # 🚀 V32.3 新增武器：布林通道 (BBAND)
+            std20 = float(close_s.rolling(20).std().iloc[-1])
+            bb_upper = m20 + 2 * std20
+
+            # 🚀 V32.3 新增武器：RSI(14)
+            delta = close_s.diff()
+            up = delta.clip(lower=0)
+            down = -1 * delta.clip(upper=0)
+            ema_up = up.ewm(com=13, adjust=False).mean()
+            ema_down = down.ewm(com=13, adjust=False).mean()
+            rs = ema_up / ema_down
+            rsi = 100 - (100 / (1 + rs))
+            rsi_now = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50
+
+            # 🚀 V32.3 新增武器：MACD(12,26,9) 翻正判定
+            exp1 = close_s.ewm(span=12, adjust=False).mean()
+            exp2 = close_s.ewm(span=26, adjust=False).mean()
+            macd = exp1 - exp2
+            signal = macd.ewm(span=9, adjust=False).mean()
+            hist = macd - signal
+            hist_now = float(hist.iloc[-1])
+            hist_prev = float(hist.iloc[-2]) if len(hist) > 1 else hist_now
+            macd_cross = (hist_now > 0 and hist_prev <= 0) # 剛翻正
 
             ind = TWSE_IND_MAP.get(sid, "未知")
 
@@ -183,13 +205,13 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             stop_price = max(m10, p_now - 1.5 * atr_now)
             raw_risk = max(p_now - stop_price, 0.01)
 
-            # 🚀 新增：回傳 vol_ma20 與 atr_percent 給 app.py 當作過濾武器
             intel_results.append({
                 "代號": sid, "名稱": TWSE_NAME_MAP.get(sid, sid), "產業": ind, "現價": p_now, "成交量": vol_now, "今日放量": (vol_now > vol_ma5 * 1.4),
                 "乖離(%)": bias, "M5": m5, "M10": m10, "勝率(%)": win_rate, "均報(%)": avg_ret, "戰術型態": tactic,
                 "停損價": stop_price, "原始風險差額": raw_risk, "基本達標": (s_score >= 6 and bias <= 8), "安全指數": s_score,
                 "vol_ratio": vol_ratio, "close_position": close_position,
-                "vol_ma20": vol_ma20, "atr_percent": atr_percent
+                "vol_ma20": vol_ma20, "atr_percent": atr_percent,
+                "ATR": atr_now, "BB_Upper": bb_upper, "RSI": rsi_now, "MACD_Cross": macd_cross # 🚀 新增指標輸出
             })
         except Exception as e:
             continue
