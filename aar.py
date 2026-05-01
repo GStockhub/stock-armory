@@ -5,14 +5,18 @@ from datetime import datetime, timedelta
 import re
 from data_center import read_remote_csv, safe_download, load_industry_map
 
+# 🚀 終極日期解析器：暴力斬斷尾巴，並封殺 1970 年的幽靈數字
 def parse_tw_date(d_str):
     try:
         raw = str(d_str).strip()
+
         if not raw or raw.lower() in ["nan", "nat", "none", "0", "-"]:
             return pd.NaT
+
         raw = raw.split(" ")[0].split("T")[0]
         raw = raw.replace("/", "-").replace(".", "-")
 
+        # 先處理 Excel 日期序號，例如 45400、45580
         if re.fullmatch(r"\d{5}", raw):
             serial = int(raw)
             if 30000 <= serial <= 60000:
@@ -21,6 +25,7 @@ def parse_tw_date(d_str):
                     return dt
             return pd.NaT
 
+        # 處理 8 碼西元日期，例如 20260423
         if re.fullmatch(r"\d{8}", raw):
             y = int(raw[:4])
             m = int(raw[4:6])
@@ -30,6 +35,7 @@ def parse_tw_date(d_str):
                 return dt
             return pd.NaT
 
+        # 處理 7 碼民國日期，例如 1140423
         if re.fullmatch(r"\d{7}", raw):
             y = int(raw[:3]) + 1911
             m = int(raw[3:5])
@@ -40,26 +46,35 @@ def parse_tw_date(d_str):
             return pd.NaT
 
         parts = raw.split("-")
+
         if len(parts) == 3:
             y = int(parts[0])
             m = int(parts[1])
             d = int(parts[2])
+
+            # 民國年，例如 114-04-23
             if y < 1911:
                 y += 1911
+
             dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
+
         elif len(parts) == 2:
             y = datetime.now().year
             m = int(parts[0])
             d = int(parts[1])
             dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
+
         else:
             dt = pd.to_datetime(raw, errors="coerce")
 
         if pd.isna(dt):
             return pd.NaT
+
         if dt.year < 2000 or dt.year > datetime.now().year + 1:
             return pd.NaT
+
         return dt
+
     except Exception:
         return pd.NaT
 
@@ -73,14 +88,19 @@ def extract_number(val_str):
     except Exception:
         return 0.0
 
+# 絕對精準欄位鎖定
 def get_val(row, possible_keys, exclude_keys=None, default=""):
     if exclude_keys is None: exclude_keys = []
+    
+    # 1. 絕對精準比對 (優先)
     for col in row.index:
         col_str = str(col).strip()
         if col_str in possible_keys:
             val = row[col]
             if pd.notna(val) and str(val).strip() != "":
                 return str(val).strip()
+                
+    # 2. 模糊比對 (備用)
     for col in row.index:
         col_str = str(col).strip()
         if any(x in col_str for x in exclude_keys):
@@ -198,6 +218,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                     post_sell_hist = hist.loc[sell_date:]
                     if not post_sell_hist.empty and len(post_sell_hist) > 1:
+                        # 🚀 統帥規矩：只抓賣出後的 20 個交易日！不再當無止盡追蹤的恐怖情人！
                         post_hist = post_sell_hist.iloc[1:21] 
                         if not post_hist.empty:
                             max_idx = post_hist['High'].idxmax()
@@ -213,9 +234,11 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             max_date = pd.to_datetime(max_idx)
                             min_date = pd.to_datetime(min_idx)
                             
+                            # 計算日曆天數
                             days_to_max = (max_date - s_date).days
                             days_to_min = (min_date - s_date).days
                             
+                            # 避免極端異常值 (如果還是算錯，強制轉成文字)
                             disp_days_max = str(days_to_max) if 0 <= days_to_max <= 50 else "?"
                             disp_days_min = str(days_to_min) if 0 <= days_to_min <= 50 else "?"
                             
@@ -258,6 +281,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     demon = "⚓ 凹單"
                     
             if user_demon:
+                # 🚀 括號斬斷器：遇到半形 ( 或全形 （ 就切斷，只保留前面的主標題
                 clean_demon = str(user_demon).split("(")[0].split("（")[0].strip()
                 demon = f"👤 {clean_demon}"
 
@@ -266,6 +290,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
             buy_str = buy_date.strftime("%m-%d")
             sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
+
+            # 確保持有天數不會出現負數或離譜數字
             disp_held = int(held_days) if 0 <= held_days <= 10000 else 0
 
             results.append({
@@ -287,6 +313,9 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     top_demon = pd.Series(demons).mode()[0] if demons else "無"
     p_color = COLORS["red"] if total_pnl > 0 else COLORS["green"]
 
+    # ===================================================
+    # 🧠 個人化統計：從你的真實日誌反推最佳模式
+    # ===================================================
     if results:
         res_df_stat = pd.DataFrame(results)
         closed_stat = res_df_stat[res_df_stat["賣出日"] != "-"].copy()
@@ -296,6 +325,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
         with st.expander("🧠 個人化勝率分析 (從你的歷史反推最佳模式)", expanded=True):
             st.markdown(f"<div style='color:{COLORS['subtext']}; font-size:13px; margin-bottom:16px;'>以下分析基於你的 <b style='color:{COLORS['text']}'>{len(closed_stat)}</b> 筆平倉紀錄，協助系統認識你。</div>", unsafe_allow_html=True)
+
             pcol1, pcol2 = st.columns(2)
 
             with pcol1:
@@ -308,7 +338,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 if not closed_stat.empty:
                     closed_stat["天數區間"] = closed_stat["持有天數_num"].apply(day_bucket)
-                    day_grp = closed_stat.groupby("天數區間").apply(lambda x: pd.Series({"筆數": len(x), "勝率(%)": (x["報酬率_num"] > 0).mean() * 100, "平均報酬(%)": x["報酬率_num"].mean()})).reset_index()
+                    day_grp = closed_stat.groupby("天數區間").apply(
+                        lambda x: pd.Series({
+                            "筆數": len(x),
+                            "勝率(%)": (x["報酬率_num"] > 0).mean() * 100,
+                            "平均報酬(%)": x["報酬率_num"].mean()
+                        })
+                    ).reset_index()
                     order = ["1-2天 (隔日沖)", "3-5天 (短線甜蜜點)", "6-10天 (短波段)", "11天以上"]
                     day_grp["排序"] = day_grp["天數區間"].apply(lambda x: order.index(x) if x in order else 99)
                     day_grp = day_grp.sort_values("排序").drop(columns=["排序"])
@@ -373,16 +409,30 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
         table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
         
-        # 🚀 終極霸王比例術：改用 st.table，強制其他欄位縮小，解放「診斷詳情」自動換行！
         styled = (
             res_df.style.set_properties(**table_style)
             .format({"報酬率(%)": "{:.2f}%", "淨利": "{:,.0f}"})
             .map(lambda x: f"color:{COLORS['red']}; font-weight:bold;" if x > 0 else (f"color:{COLORS['green']}; font-weight:bold;" if x < 0 else ""), subset=["淨利", "報酬率(%)"])
             .map(grade_color, subset=["評級"])
-            .set_properties(subset=["代號", "名稱", "評級", "買進日", "賣出日", "持有天數", "報酬率(%)", "淨利"], **{'white-space': 'nowrap', 'width': '1%'})
-            .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap', 'width': '99%'})
+            .set_properties(subset=["診斷詳情"], **{'text-align': 'left', 'white-space': 'pre-wrap'})
         )
         
-        st.table(styled)
+        # 🚀 V32.4 統帥優化：終極欄位寬度壓制，保證「診斷詳情」一覽無遺
+        st.dataframe(
+            styled, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "代號": st.column_config.TextColumn("代號", width="small"),
+                "名稱": st.column_config.TextColumn("名稱", width="small"),
+                "診斷詳情": st.column_config.TextColumn("診斷詳情", width="large"),
+                "評級": st.column_config.TextColumn("評級", width="small"),
+                "買進日": st.column_config.TextColumn("買進日", width="small"),
+                "賣出日": st.column_config.TextColumn("賣出日", width="small"),
+                "持有天數": st.column_config.NumberColumn("持有天數", width="small"),
+                "報酬率(%)": st.column_config.TextColumn("報酬率(%)", width="small"),
+                "淨利": st.column_config.NumberColumn("淨利", width="small")
+            }
+        )
     else:
         st.info("AAR 解析完畢後，沒有可分析的有效資料。請查看上方的警告面板了解原因。")
