@@ -5,18 +5,14 @@ from datetime import datetime, timedelta
 import re
 from data_center import read_remote_csv, safe_download, load_industry_map
 
-# 🚀 終極日期解析器：暴力斬斷尾巴，並封殺 1970 年的幽靈數字
 def parse_tw_date(d_str):
     try:
         raw = str(d_str).strip()
-
         if not raw or raw.lower() in ["nan", "nat", "none", "0", "-"]:
             return pd.NaT
-
         raw = raw.split(" ")[0].split("T")[0]
         raw = raw.replace("/", "-").replace(".", "-")
 
-        # 先處理 Excel 日期序號
         if re.fullmatch(r"\d{5}", raw):
             serial = int(raw)
             if 30000 <= serial <= 60000:
@@ -25,7 +21,6 @@ def parse_tw_date(d_str):
                     return dt
             return pd.NaT
 
-        # 處理 8 碼西元日期
         if re.fullmatch(r"\d{8}", raw):
             y = int(raw[:4])
             m = int(raw[4:6])
@@ -35,7 +30,6 @@ def parse_tw_date(d_str):
                 return dt
             return pd.NaT
 
-        # 處理 7 碼民國日期
         if re.fullmatch(r"\d{7}", raw):
             y = int(raw[:3]) + 1911
             m = int(raw[3:5])
@@ -46,35 +40,26 @@ def parse_tw_date(d_str):
             return pd.NaT
 
         parts = raw.split("-")
-
         if len(parts) == 3:
             y = int(parts[0])
             m = int(parts[1])
             d = int(parts[2])
-
-            # 民國年
             if y < 1911:
                 y += 1911
-
             dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
-
         elif len(parts) == 2:
             y = datetime.now().year
             m = int(parts[0])
             d = int(parts[1])
             dt = pd.to_datetime(f"{y}-{m:02d}-{d:02d}", errors="coerce")
-
         else:
             dt = pd.to_datetime(raw, errors="coerce")
 
         if pd.isna(dt):
             return pd.NaT
-
         if dt.year < 2000 or dt.year > datetime.now().year + 1:
             return pd.NaT
-
         return dt
-
     except Exception:
         return pd.NaT
 
@@ -88,19 +73,14 @@ def extract_number(val_str):
     except Exception:
         return 0.0
 
-# 絕對精準欄位鎖定
 def get_val(row, possible_keys, exclude_keys=None, default=""):
     if exclude_keys is None: exclude_keys = []
-    
-    # 1. 絕對精準比對 (優先)
     for col in row.index:
         col_str = str(col).strip()
         if col_str in possible_keys:
             val = row[col]
             if pd.notna(val) and str(val).strip() != "":
                 return str(val).strip()
-                
-    # 2. 模糊比對 (備用)
     for col in row.index:
         col_str = str(col).strip()
         if any(x in col_str for x in exclude_keys):
@@ -286,7 +266,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
             buy_str = buy_date.strftime("%m-%d")
             sell_str = sell_date.strftime("%m-%d") if is_sold and pd.notna(sell_date) else "-"
-
             disp_held = int(held_days) if 0 <= held_days <= 10000 else 0
 
             results.append({
@@ -308,9 +287,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     top_demon = pd.Series(demons).mode()[0] if demons else "無"
     p_color = COLORS["red"] if total_pnl > 0 else COLORS["green"]
 
-    # ===================================================
-    # 🧠 個人化統計
-    # ===================================================
     if results:
         res_df_stat = pd.DataFrame(results)
         closed_stat = res_df_stat[res_df_stat["賣出日"] != "-"].copy()
@@ -320,7 +296,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
         with st.expander("🧠 個人化勝率分析 (從你的歷史反推最佳模式)", expanded=True):
             st.markdown(f"<div style='color:{COLORS['subtext']}; font-size:13px; margin-bottom:16px;'>以下分析基於你的 <b style='color:{COLORS['text']}'>{len(closed_stat)}</b> 筆平倉紀錄，協助系統認識你。</div>", unsafe_allow_html=True)
-
             pcol1, pcol2 = st.columns(2)
 
             with pcol1:
@@ -333,36 +308,16 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
 
                 if not closed_stat.empty:
                     closed_stat["天數區間"] = closed_stat["持有天數_num"].apply(day_bucket)
-                    day_grp = closed_stat.groupby("天數區間").apply(
-                        lambda x: pd.Series({
-                            "筆數": len(x),
-                            "勝率(%)": (x["報酬率_num"] > 0).mean() * 100,
-                            "平均報酬(%)": x["報酬率_num"].mean()
-                        })
-                    ).reset_index()
+                    day_grp = closed_stat.groupby("天數區間").apply(lambda x: pd.Series({"筆數": len(x), "勝率(%)": (x["報酬率_num"] > 0).mean() * 100, "平均報酬(%)": x["報酬率_num"].mean()})).reset_index()
                     order = ["1-2天 (隔日沖)", "3-5天 (短線甜蜜點)", "6-10天 (短波段)", "11天以上"]
                     day_grp["排序"] = day_grp["天數區間"].apply(lambda x: order.index(x) if x in order else 99)
                     day_grp = day_grp.sort_values("排序").drop(columns=["排序"])
-                    
                     for _, row_g in day_grp.iterrows():
                         wr = row_g["勝率(%)"]
                         avg_r = row_g["平均報酬(%)"]
                         cnt = int(row_g["筆數"])
                         bar_color = COLORS["green"] if wr >= 70 else (COLORS["primary"] if wr >= 50 else COLORS["red"])
-                        
-                        html_str = f"""
-                        <div style='margin-bottom:10px;'>
-                            <div style='display:flex; justify-content:space-between; font-size:13px;'>
-                                <span style='color:{COLORS['text']}'>{row_g['天數區間']}</span>
-                                <span style='color:{bar_color}; font-weight:bold;'>{wr:.0f}% ({cnt}筆)</span>
-                            </div>
-                            <div style='background:{COLORS['border']}; border-radius:4px; height:8px; margin-top:4px;'>
-                                <div style='background:{bar_color}; width:{min(wr,100):.0f}%; height:8px; border-radius:4px;'></div>
-                            </div>
-                            <div style='font-size:11px; color:{COLORS['subtext']}; margin-top:2px;'>平均報酬 {avg_r:+.2f}%</div>
-                        </div>
-                        """
-                        st.markdown(html_str, unsafe_allow_html=True)
+                        st.markdown(f"<div style='margin-bottom:10px;'><div style='display:flex; justify-content:space-between; font-size:13px;'><span style='color:{COLORS['text']}'>{row_g['天數區間']}</span><span style='color:{bar_color}; font-weight:bold;'>{wr:.0f}% ({cnt}筆)</span></div><div style='background:{COLORS['border']}; border-radius:4px; height:8px; margin-top:4px;'><div style='background:{bar_color}; width:{min(wr,100):.0f}%; height:8px; border-radius:4px;'></div></div><div style='font-size:11px; color:{COLORS['subtext']}; margin-top:2px;'>平均報酬 {avg_r:+.2f}%</div></div>", unsafe_allow_html=True)
 
             with pcol2:
                 st.markdown(f"<b style='color:{COLORS['text']}'>⚖️ Kelly Criterion 個人化建議倉位</b>", unsafe_allow_html=True)
@@ -376,30 +331,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     kelly_full = (p_win * b_ratio - (1 - p_win)) / b_ratio if b_ratio > 0 else 0
                     kelly_half = max(kelly_full * 0.5, 0)
                     kelly_color = COLORS["green"] if kelly_half > 0.1 else (COLORS["primary"] if kelly_half > 0 else COLORS["red"])
-                    
-                    kelly_html = f"""
-                    <div style='background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:8px; padding:14px;'>
-                        <div style='font-size:12px; color:{COLORS['subtext']}; margin-bottom:8px;'>基於你的 {len(closed_stat)} 筆真實交易</div>
-                        <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
-                            <span style='color:{COLORS['subtext']}; font-size:13px;'>真實勝率</span>
-                            <span style='color:{COLORS['text']}; font-weight:bold;'>{p_win*100:.1f}%</span>
-                        </div>
-                        <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
-                            <span style='color:{COLORS['subtext']}; font-size:13px;'>平均盈虧比</span>
-                            <span style='color:{COLORS['text']}; font-weight:bold;'>1 : {b_ratio:.2f}</span>
-                        </div>
-                        <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
-                            <span style='color:{COLORS['subtext']}; font-size:13px;'>Full Kelly</span>
-                            <span style='color:{COLORS['primary']};'>{kelly_full*100:.1f}%</span>
-                        </div>
-                        <div style='display:flex; justify-content:space-between; padding-top:8px; border-top:1px solid {COLORS['border']};'>
-                            <span style='color:{COLORS['text']}; font-weight:bold; font-size:14px;'>建議單筆倉位 (半Kelly)</span>
-                            <span style='color:{kelly_color}; font-weight:bold; font-size:18px;'>{kelly_half*100:.1f}%</span>
-                        </div>
-                        <div style='font-size:11px; color:{COLORS['subtext']}; margin-top:6px;'>半Kelly為保守安全值，Full Kelly風險過高不建議直接使用</div>
-                    </div>
-                    """
-                    st.markdown(kelly_html, unsafe_allow_html=True)
+                    st.markdown(f"<div style='background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:8px; padding:14px;'><div style='font-size:12px; color:{COLORS['subtext']}; margin-bottom:8px;'>基於你的 {len(closed_stat)} 筆真實交易</div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>真實勝率</span><span style='color:{COLORS['text']}; font-weight:bold;'>{p_win*100:.1f}%</span></div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>平均盈虧比</span><span style='color:{COLORS['text']}; font-weight:bold;'>1 : {b_ratio:.2f}</span></div><div style='display:flex; justify-content:space-between; margin-bottom:6px;'><span style='color:{COLORS['subtext']}; font-size:13px;'>Full Kelly</span><span style='color:{COLORS['primary']};'>{kelly_full*100:.1f}%</span></div><div style='display:flex; justify-content:space-between; padding-top:8px; border-top:1px solid {COLORS['border']};'><span style='color:{COLORS['text']}; font-weight:bold; font-size:14px;'>建議單筆倉位 (半Kelly)</span><span style='color:{kelly_color}; font-weight:bold; font-size:18px;'>{kelly_half*100:.1f}%</span></div><div style='font-size:11px; color:{COLORS['subtext']}; margin-top:6px;'>半Kelly為保守安全值，Full Kelly風險過高不建議直接使用</div></div>", unsafe_allow_html=True)
                 else:
                     st.info("至少需要 5 筆平倉紀錄才能計算 Kelly 建議倉位。")
 
@@ -411,19 +343,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 for dm, cnt in demon_counts.items():
                     pct = cnt / total_d * 100
                     dm_color = COLORS["red"] if "凹單" in dm else (COLORS["accent"] if "恐高" in dm else COLORS["primary"])
-                    
-                    dm_html = f"""
-                    <div style='margin-bottom:8px;'>
-                        <div style='display:flex; justify-content:space-between; font-size:13px;'>
-                            <span style='color:{COLORS['text']}'>{dm}</span>
-                            <span style='color:{dm_color}; font-weight:bold;'>{cnt}次 ({pct:.0f}%)</span>
-                        </div>
-                        <div style='background:{COLORS['border']}; border-radius:4px; height:6px; margin-top:3px;'>
-                            <div style='background:{dm_color}; width:{pct:.0f}%; height:6px; border-radius:4px;'></div>
-                        </div>
-                    </div>
-                    """
-                    st.markdown(dm_html, unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-bottom:8px;'><div style='display:flex; justify-content:space-between; font-size:13px;'><span style='color:{COLORS['text']}'>{dm}</span><span style='color:{dm_color}; font-weight:bold;'>{cnt}次 ({pct:.0f}%)</span></div><div style='background:{COLORS['border']}; border-radius:4px; height:6px; margin-top:3px;'><div style='background:{dm_color}; width:{pct:.0f}%; height:6px; border-radius:4px;'></div></div></div>", unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
