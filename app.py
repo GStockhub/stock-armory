@@ -392,15 +392,28 @@ with t_rank:
                     if not ui_s.empty: render_tier_cards(ui_s, "badge-s", "🥇 S級", COLORS["primary"])
                     if not ui_a.empty: render_tier_cards(ui_a, "badge-a", "🥈 A級", COLORS["accent"])
 
-                st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
+               st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
                 if ui_b.empty: st.info("💡 今日無 B 級符合標的。")
                 else:
-                    # 🚀 統帥優化：切除多餘的「評級」欄位
-                    disp_b = ui_b[["名次", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
-                    disp_b = disp_b.rename(columns={"Quant_Score": "量化評分", "停損價": "ATR停損"})
+                    # 🚀 V32.4 統帥優化：為 B 級添加極簡版輔助徽章
+                    def generate_b_badges(row):
+                        b_tags = []
+                        if row.get("MACD_Cross"): b_tags.append("✅M")
+                        if row.get("RSI", 50) > 75: b_tags.append("⚠️R")
+                        elif 50 <= row.get("RSI", 50) <= 70: b_tags.append("🟢R")
+                        if row["現價"] > row.get("BB_Upper", 9999) * 1.02: b_tags.append("🌋B")
+                        
+                        tag_str = " ".join(b_tags)
+                        return f"{row['戰術型態']} {tag_str}" if tag_str else row['戰術型態']
+
+                    disp_b = ui_b.copy()
+                    disp_b["戰術型態"] = disp_b.apply(generate_b_badges, axis=1)
+
+                    disp_b = disp_b[["名次", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議量(張)", "連買"]].copy()
+                    disp_b = disp_b.rename(columns={"Quant_Score": "評分", "停損價": "停損"})
                     disp_b["現價"] = disp_b["現價"].apply(lambda x: f"{x:.2f}")
-                    disp_b["ATR停損"] = disp_b["ATR停損"].apply(lambda x: f"{x:.2f}")
-                    disp_b["量化評分"] = disp_b["量化評分"].apply(lambda x: f"{x:.1f}")
+                    disp_b["停損"] = disp_b["停損"].apply(lambda x: f"{x:.2f}")
+                    disp_b["評分"] = disp_b["評分"].apply(lambda x: f"{x:.1f}")
                     raw_win_rate = disp_b["勝率(%)"].copy()
                     disp_b["勝率(%)"] = disp_b["勝率(%)"].apply(lambda x: f"{x:.1f}%")
 
