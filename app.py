@@ -68,11 +68,26 @@ st.markdown("""
 .tier-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap !important; flex-shrink: 0; }
 .badge-s { background-color: rgba(255, 75, 75, 0.1); color: #FF4B4B; border: 1px solid #FF4B4B; }
 .badge-a { background-color: rgba(255, 165, 0, 0.1); color: #FFA500; border: 1px solid #FFA500; }
+
 .tier-card { border-radius: 6px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; margin-bottom: 12px; }
 .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; width: 100%; }
 .info-label { font-size: 13px; opacity: 0.8; white-space: nowrap; }
 .info-value { font-size: 13px; font-weight: 500; text-align: right; white-space: nowrap; }
-.stock-title { margin: 0; font-size: clamp(14px, 1.1rem, 18px); line-height: 1.25; white-space: normal; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* 🚀 長檔名終極自適應裝甲 */
+.stock-title { 
+    margin: 0; 
+    /* 字體會根據螢幕寬度自動伸縮，電腦版最大 18px，手機版極限縮小至 14px */
+    font-size: clamp(14px, 3.5vw, 18px); 
+    line-height: 1.35; 
+    white-space: normal; 
+    word-break: break-word; /* 允許長字串物理切斷換行 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* 嚴格限制最多兩行，絕不撐爆版面 */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 @media (max-width: 768px) {
     .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
     .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
@@ -337,16 +352,21 @@ with t_rank:
                         for idx, (_, r) in enumerate(tier_df.iterrows()):
                             if idx >= 3: break
                             with cols[idx]:
-                                # 🚀 統帥優化：生成戰術輔助標籤 (RSI, MACD, BBAND)
+                                # 🚀 拔除原本的 margin-right，改交由外層 gap 統一控制間距
                                 badges = ""
-                                if r.get("MACD_Cross"): badges += f"<span style='background-color: rgba(241, 196, 15, 0.15); color: #F1C40F; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; border: 1px solid #F1C40F;'>✅ MACD 共振</span>"
-                                if r.get("RSI", 50) > 75: badges += f"<span style='background-color: rgba(255, 75, 75, 0.15); color: #FF4B4B; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; border: 1px solid #FF4B4B;'>⚠️ RSI {r.get('RSI',0):.0f} 禁追高</span>"
-                                elif 50 <= r.get("RSI", 50) <= 70: badges += f"<span style='background-color: rgba(63, 185, 80, 0.15); color: #3FB950; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; border: 1px solid #3FB950;'>🟢 RSI 健康</span>"
+                                if r.get("MACD_Cross"): badges += f"<span style='background-color: rgba(241, 196, 15, 0.15); color: #F1C40F; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #F1C40F;'>✅ MACD 共振</span>"
+                                if r.get("RSI", 50) > 75: badges += f"<span style='background-color: rgba(255, 75, 75, 0.15); color: #FF4B4B; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #FF4B4B;'>⚠️ RSI {r.get('RSI',0):.0f} 禁追高</span>"
+                                elif 50 <= r.get("RSI", 50) <= 70: badges += f"<span style='background-color: rgba(63, 185, 80, 0.15); color: #3FB950; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #3FB950;'>🟢 RSI 健康</span>"
                                 if r["現價"] > r.get("BB_Upper", 9999) * 1.02: badges += f"<span style='background-color: rgba(230, 126, 34, 0.15); color: #E67E22; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #E67E22;'>🌋 乖離上軌</span>"
 
                                 card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {border_color}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]};">'
-                                card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: center; gap: 6px; overflow: hidden;"><span class="tier-badge {badge_class}">{badge_name}</span><h3 class="stock-title" style="color: {border_color};">{r["名稱"]} ({r["代號"]})</h3></div>'
-                                card_html += f'<div style="margin-bottom: 8px;">{badges}</div>'
+                                
+                                # 🚀 關鍵修復 1：改為 align-items: flex-start (頂部對齊)，並給標籤 margin-top: 3px 完美對齊第一行文字
+                                card_html += f'<div style="margin-bottom: 8px; display: flex; align-items: flex-start; gap: 6px; overflow: hidden;"><span class="tier-badge {badge_class}" style="margin-top: 3px;">{badge_name}</span><h3 class="stock-title" style="color: {border_color};">{r["名稱"]} ({r["代號"]})</h3></div>'
+                                
+                                # 🚀 關鍵修復 2：加上 flex-wrap: wrap，當手機版螢幕太窄，輔助徽章會自動折到下一行，絕不破版
+                                card_html += f'<div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px;">{badges}</div>'
+                                
                                 card_html += f'<p style="color: #A0A0A0; margin: 0 0 8px 0; font-size: 12px;">{r["產業"]} | 投信連買 {r["連買"]} 天</p>'
                                 card_html += f'<div style="background-color: {COLORS["bg"]}; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid {COLORS["green"]};">'
                                 card_html += f'<div class="info-row"><span class="info-label" style="font-weight:bold; color: {COLORS["text"]};">🎯 量化評分</span><span class="info-value" style="font-size: 16px; color: {COLORS["text"]}; font-weight:bold;">{r["Quant_Score"]} 分</span></div>'
