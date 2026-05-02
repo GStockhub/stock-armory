@@ -66,6 +66,21 @@ def render_sidebar(auth_status="guest_auth"):
         st.info(f"🛡️ **單筆保命底線：{risk_amount:,.0f} 元**")
         
         st.markdown("---")
+        st.markdown("#### 🎚️ 作戰模式")
+        operation_mode = st.selectbox(
+            "今日操作節奏",
+            ["保守模式", "標準模式", "進攻模式"],
+            index=1,
+            help="保守：提高門檻、減少買量；標準：維持原本節奏；進攻：放寬B級觀察與買量，但仍遵守風控。"
+        )
+        if operation_mode == "保守模式":
+            st.warning("🛡️ 保守模式：只重視高分標的，建議買量自動打 7 折。")
+        elif operation_mode == "進攻模式":
+            st.info("⚔️ 進攻模式：B級觀察會比較積極，建議買量最多提高 15%。")
+        else:
+            st.success("⚖️ 標準模式：依照V32短波段模型正常執行。")
+
+        st.markdown("---")
         st.markdown("#### ⚖️ 真實稅費參數")
         fee_discount = st.slider("券商手續費折數 (無折扣=1.0, 五折=0.5)", min_value=0.1, max_value=1.0, value=1.0, step=0.05)
         
@@ -98,5 +113,6 @@ def render_sidebar(auth_status="guest_auth"):
             "aar_sheet_url": aar_sheet_url,
             "total_capital": total_capital,
             "risk_amount": risk_amount,
-            "fee_discount": fee_discount
+            "fee_discount": fee_discount,
+            "operation_mode": operation_mode
         }

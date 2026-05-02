@@ -4,6 +4,69 @@ import streamlit as st
 import concurrent.futures
 from data_center import fetch_single_stock_batch, safe_download
 
+def _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s, max_hold_bars=10):
+    """用接近你真實SOP的方式估算：隔日開盤進、跳空>4.5%不追、+5.5%先出半、M5/M10控風險。"""
+    df_bt = pd.DataFrame({"Close": close_s, "Open": open_s, "High": high_s, "Low": low_s, "Volume": vol_s}).dropna()
+    if len(df_bt) < 35:
+        return []
+    df_bt["MA5"] = df_bt["Close"].rolling(5).mean()
+    df_bt["MA10"] = df_bt["Close"].rolling(10).mean()
+    df_bt["MA20"] = df_bt["Close"].rolling(20).mean()
+    df_bt["VolMA5"] = df_bt["Volume"].rolling(5).mean()
+    df_bt["PrevClose"] = df_bt["Close"].shift(1)
+    tr1 = df_bt["High"] - df_bt["Low"]
+    tr2 = (df_bt["High"] - df_bt["PrevClose"]).abs()
+    tr3 = (df_bt["Low"] - df_bt["PrevClose"]).abs()
+    df_bt["ATR"] = np.maximum(tr1, np.maximum(tr2, tr3)).rolling(14).mean()
+
+    returns = []
+    for i in range(20, len(df_bt) - 2):
+        row = df_bt.iloc[i]
+        if pd.isna(row["MA5"]) or pd.isna(row["MA10"]) or pd.isna(row["MA20"]):
+            continue
+        close_pos = (row["Close"] - row["Low"]) / (row["High"] - row["Low"]) if row["High"] > row["Low"] else 0.5
+        trend_signal = row["Close"] > row["MA5"] > row["MA10"]
+        pullback_signal = row["Close"] >= row["MA10"] and row["Close"] <= row["MA5"] * 1.015 and row["Close"] > row["Open"]
+        volume_ok = row["Volume"] >= row["VolMA5"] * 0.8 if row["VolMA5"] > 0 else True
+        if not ((trend_signal and close_pos >= 0.55 and volume_ok) or pullback_signal):
+            continue
+
+        entry_idx = i + 1
+        entry = float(df_bt.iloc[entry_idx]["Open"])
+        prev_close = float(row["Close"])
+        if prev_close > 0 and entry > prev_close * 1.045:
+            continue
+
+        atr = float(row["ATR"]) if pd.notna(row["ATR"]) and row["ATR"] > 0 else entry * 0.03
+        stop = max(float(row["MA10"]), entry - 1.5 * atr, entry * 0.97)
+        take_half = entry * 1.055
+        sold_half = False
+        ret = 0.0
+        end_idx = min(entry_idx + max_hold_bars, len(df_bt) - 1)
+
+        for j in range(entry_idx, end_idx + 1):
+            rj = df_bt.iloc[j]
+            curr = float(rj["Close"])
+            ma5 = float(rj["MA5"]) if pd.notna(rj["MA5"]) else curr
+            ma10 = float(rj["MA10"]) if pd.notna(rj["MA10"]) else stop
+            if curr >= entry * 1.035:
+                stop = max(stop, entry)
+            if not sold_half and curr >= take_half:
+                sold_half = True
+            if curr < ma10 or curr < stop:
+                exit_p = max(min(curr, ma10), stop)
+                ret = (0.5 * ((take_half - entry) / entry) + 0.5 * ((exit_p - entry) / entry)) if sold_half else ((exit_p - entry) / entry)
+                break
+            if sold_half and curr < ma5:
+                ret = 0.5 * ((take_half - entry) / entry) + 0.5 * ((ma5 - entry) / entry)
+                break
+        else:
+            final_p = float(df_bt.iloc[end_idx]["Close"])
+            ret = 0.5 * ((take_half - entry) / entry) + 0.5 * ((final_p - entry) / entry) if sold_half else ((final_p - entry) / entry)
+        returns.append(ret)
+    return returns
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     sid = str(sid).strip()
@@ -50,17 +113,7 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
         if pd.isna(atr_now) or atr_now <= 0: atr_now = p_now * 0.03
     except Exception: atr_now = p_now * 0.03
 
-    sim_returns = []
-    buy_prices = []
-    
-    if len(close_s) >= 40:
-        for i in range(20, len(close_s) - 5):
-            c_p = close_s.iloc[i]
-            c_m5 = close_s.rolling(5).mean().iloc[i]
-            c_m10 = close_s.rolling(10).mean().iloc[i]
-            if c_p > c_m5 > c_m10:
-                buy_prices.append(c_p)
-                sim_returns.append((close_s.iloc[i+5] - c_p) / c_p)
+    sim_returns = _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s)
                 
     if len(sim_returns) < 5: win_rate, avg_ret = 50.0, 0.0
     else: win_rate, avg_ret = (np.array(sim_returns) > 0).mean() * 100, np.array(sim_returns).mean() * 100
@@ -175,14 +228,7 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             elif p_now > m10 and p_now < m5: tactic = "🛡️ 回踩 M10"
             elif p_now < m10: tactic = "⚠️ 跌破短均"
 
-            sim_returns = []
-            if len(close_s) >= 40:
-                for i in range(20, len(close_s) - 5):
-                    c_p = close_s.iloc[i]
-                    c_m5 = close_s.rolling(5).mean().iloc[i]
-                    c_m10 = close_s.rolling(10).mean().iloc[i]
-                    if c_p > c_m5 > c_m10:
-                        sim_returns.append((close_s.iloc[i+5] - c_p) / c_p)
+            sim_returns = _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s)
                         
             if len(sim_returns) < 5: win_rate, avg_ret = 50.0, 0.0
             else: win_rate, avg_ret = (np.array(sim_returns) > 0).mean() * 100, np.array(sim_returns).mean() * 100

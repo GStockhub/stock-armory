@@ -38,7 +38,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V32.3 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V32.4 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -110,11 +110,17 @@ try: risk_amount = float(configs.get("risk_amount", 1000))
 except: risk_amount = 1000.0
 try: fee_discount = float(configs.get("fee_discount", 1.0))
 except: fee_discount = 1.0
+operation_mode = configs.get("operation_mode", "標準模式")
+MODE_PROFILE = {
+    "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折，只打最有把握的球。"},
+    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V32短波段原始節奏。"},
+    "進攻模式": {"s": 84, "a": 60, "b": 40, "size": 1.15, "label": "⚔️ 進攻模式", "note": "略放寬B級觀察與買量，但仍受總曝險與停損控制。"},
+}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V32短波段原始節奏。"})
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v32.3</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 短打狙擊 ✕ 真人操盤直覺 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 短打狙擊 ✕ 資料健康燈號 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -133,6 +139,54 @@ def format_lots(shares):
     if lots <= 0: return "0"
     return f"{lots:.1f}".rstrip("0").rstrip(".")
 
+def render_data_health_panel():
+    health = []
+    health.append(("產業地圖", len(TWSE_NAME_MAP) > 0, f"{len(TWSE_NAME_MAP):,} 筆" if TWSE_NAME_MAP else "未讀取"))
+    health.append(("大盤儀表", not MACRO_DF.empty, f"{len(MACRO_DF)} 項" if not MACRO_DF.empty else "無資料"))
+    health.append(("法人籌碼", len(chip_db) > 0, f"近 {len(chip_db)} 日" if len(chip_db) > 0 else "連線失敗"))
+    health.append(("持股CSV", holding_read_ok, f"{holding_rows} 筆" if holding_read_ok else ("未設定" if not sheet_url else "讀取失敗/空表")))
+    health.append(("AAR日誌", aar_read_ok, f"{aar_rows} 筆" if aar_read_ok else ("未設定" if not aar_sheet_url else "讀取失敗/空表")))
+    health.append(("FinMind Token", bool(str(FM_TOKEN).strip()), "已設定" if str(FM_TOKEN).strip() else "未設定"))
+    with st.expander("🧭 資料健康燈號（抓不到資料先看這裡）", expanded=False):
+        cols = st.columns(3)
+        for idx, (name, ok, msg) in enumerate(health):
+            color = COLORS["green"] if ok else COLORS["red"]
+            icon = "✅" if ok else "⚠️"
+            with cols[idx % 3]:
+                st.markdown(f"""
+                <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:4px solid {color}; padding:10px 12px; border-radius:8px; margin-bottom:8px;">
+                    <div style="font-size:13px; color:{COLORS['subtext']};">{icon} {name}</div>
+                    <div style="font-size:16px; font-weight:700; color:{COLORS['text']};">{msg}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+
+def render_battle_summary(master_list, rank_sorted):
+    attack_df = master_list[master_list["評級"].isin(["S", "A"])] if not master_list.empty else pd.DataFrame()
+    b_df = master_list[master_list["評級"].eq("B")] if not master_list.empty else pd.DataFrame()
+    top_names = "、".join((attack_df["名稱"].astype(str) + "(" + attack_df["代號"].astype(str) + ")").head(3).tolist()) if not attack_df.empty else "今日無主攻標的"
+    caution_cnt = 0
+    if rank_sorted is not None and not rank_sorted.empty:
+        caution_cnt = int(((rank_sorted.get("RSI", 50) > 75) | (rank_sorted.get("乖離(%)", 0) > 8) | (rank_sorted.get("生命週期", "").astype(str).str.contains("第三段", na=False))).sum())
+    market_msg = "可小量作戰" if MACRO_SCORE > 5 and not OVERHEAT_FLAG else "防守優先、降低倉位"
+    st.markdown("#### 🧭 今日作戰摘要")
+    c1, c2, c3, c4 = st.columns(4)
+    cards = [
+        (MODE_PROFILE["label"], MODE_PROFILE["note"], COLORS["primary"]),
+        (f"可出手 {len(attack_df)} 檔", top_names, COLORS["green"] if len(attack_df) else COLORS["accent"]),
+        (f"B級備選 {len(b_df)} 檔", "只回踩低接，不追高", COLORS["accent"]),
+        (f"禁追/警戒 {caution_cnt} 檔", market_msg, COLORS["red"] if caution_cnt else COLORS["green"]),
+    ]
+    for col, (title, sub, color) in zip([c1, c2, c3, c4], cards):
+        with col:
+            st.markdown(f"""
+            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:10px; padding:12px 14px; min-height:86px;">
+                <div style="font-size:16px; font-weight:800; color:{COLORS['text']}; margin-bottom:6px;">{title}</div>
+                <div style="font-size:12.5px; line-height:1.35; color:{COLORS['subtext']};">{sub}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
 if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量！", icon="🌋")
@@ -143,6 +197,10 @@ with st.spinner("情報兵正在部署防線..."):
 m_df = pd.DataFrame()
 today_df = pd.DataFrame()
 top_80_chips = []
+holding_rows = 0
+holding_read_ok = False
+aar_rows = 0
+aar_read_ok = False
 
 if len(chip_db) >= 1:
     dates = sorted(list(chip_db.keys()), reverse=True)
@@ -166,6 +224,8 @@ else:
 if sheet_url:
     try:
         sheet_df = read_remote_csv(sheet_url, dtype=str)
+        holding_rows = len(sheet_df)
+        holding_read_ok = not sheet_df.empty
         code_col = next((c for c in sheet_df.columns if any(k in c for k in ["代號", "代碼"])), None)
         if code_col: sheet_df = sheet_df.rename(columns={code_col: "代號"})
             
@@ -311,9 +371,9 @@ with t_rank:
             rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
             is_phase_3 = rank_sorted["生命週期"].str.contains("第三段", na=False)
             
-            s_mask = (rank_sorted["Quant_Score"] >= 88) & (rank_sorted["基本達標"] == True) & (~is_phase_3)
-            a_mask = (~s_mask) & (rank_sorted["Quant_Score"] >= 65) & (rank_sorted["基本達標"] == True)
-            b_mask = (~s_mask) & (~a_mask) & (rank_sorted["Quant_Score"] >= 45)
+            s_mask = (rank_sorted["Quant_Score"] >= MODE_PROFILE["s"]) & (rank_sorted["基本達標"] == True) & (~is_phase_3)
+            a_mask = (~s_mask) & (rank_sorted["Quant_Score"] >= MODE_PROFILE["a"]) & (rank_sorted["基本達標"] == True)
+            b_mask = (~s_mask) & (~a_mask) & (rank_sorted["Quant_Score"] >= MODE_PROFILE["b"])
             c_mask = (~s_mask) & (~a_mask) & (~b_mask)
 
             s_tier = rank_sorted[s_mask].head(3).copy()
@@ -334,6 +394,7 @@ with t_rank:
                         suggested_shares = min(risk_amount / row["原始風險差額"], (total_capital * 0.15) / row["現價"])
                     else: suggested_shares = 0
                     if MACRO_SCORE <= 5 or OVERHEAT_FLAG: suggested_shares *= 0.5
+                    suggested_shares *= MODE_PROFILE["size"]
                     if row["現價"] > 3000: suggested_shares *= 0.5
                     return format_lots(suggested_shares)
 
@@ -343,6 +404,7 @@ with t_rank:
                 ui_a = master_list[master_list["評級"] == "A"]
                 ui_b = master_list[master_list["評級"] == "B"]
                 ui_c = master_list[master_list["評級"] == "C"]
+                render_battle_summary(master_list, rank_sorted)
                 st.markdown("#### 🥇 <span class='highlight-primary'>【S / A 級】主力狙擊區</span>", unsafe_allow_html=True)
                 
                 if ui_s.empty and ui_a.empty: 
@@ -597,4 +659,4 @@ with t_hist:
     st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V32.3</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V32.4</p>", unsafe_allow_html=True)

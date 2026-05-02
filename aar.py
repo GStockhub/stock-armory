@@ -199,6 +199,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     god_best_pnl = 0.0
     god_best_stock = ""
     god_trade_count = 0
+    missed_k_records = []
+    missed_money_records = []
 
     _, TWSE_NAME_MAP = load_industry_map()
 
@@ -307,10 +309,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             min_date = pd.to_datetime(min_idx)
                             cal_days_max = (max_date - s_date).days
                             cal_days_min = (min_date - s_date).days
-                            disp_days_max = f"{k_days_max}根K" if 0 <= k_days_max <= 50 else "?"
-                            disp_days_min = f"{k_days_min}根K" if 0 <= k_days_min <= 50 else "?"
+                            disp_days_max = f"{k_days_max}根K（約{cal_days_max}天）" if 0 <= k_days_max <= 50 else "?"
+                            disp_days_min = f"{k_days_min}根K（約{cal_days_min}天）" if 0 <= k_days_min <= 50 else "?"
                             missed_pnl = (max_after_sell - sell_price) * shares * 1000
                             avoided_loss = (sell_price - min_after_sell) * shares * 1000
+                            if missed_pnl > buy_cost * 0.03:
+                                missed_k_records.append(k_days_max)
+                                missed_money_records.append(missed_pnl)
 
                             if missed_pnl > max_missed_profit:
                                 max_missed_profit = missed_pnl
@@ -479,6 +484,33 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         _metric_card_html("👑 最強買點", god_best_stock if god_best_stock else "無", accent, COLORS),
     ]
     _render_metric_grid(cards, COLORS)
+
+    # ===================================================
+    # 🧭 AAR 行為建議：把統計變成下一步動作
+    # ===================================================
+    avg_missed_k = float(np.mean(missed_k_records)) if missed_k_records else 0
+    avg_missed_money = float(np.mean(missed_money_records)) if missed_money_records else 0
+    if god_total_pnl > 0 and capture_rate < 30:
+        behavior_title = "主要問題：出場太早，獲利捕捉率偏低"
+        behavior_detail = "建議獲利單不要一口氣清空；達 +5～6% 先出一半，剩餘部位用 M5 守，跌破 M5 且站不回才出。"
+    elif "賣飛" in str(top_demon) or missed_k_records:
+        behavior_title = "主要問題：賣飛仍是最大改善空間"
+        behavior_detail = "你的選股有肉，但需要把一部分倉位留給趨勢。把『全部停利』改成『半倉停利＋半倉追蹤』。"
+    elif "恐慌" in str(top_demon):
+        behavior_title = "主要問題：回檔時容易恐慌出場"
+        behavior_detail = "虧損單請守紀律，但獲利單回測 M5 不等於轉弱；真正破 M10 或 ATR 底線再執行撤退。"
+    else:
+        behavior_title = "目前行為穩定：維持紀律，避免新增太多規則"
+        behavior_detail = "這版 AAR 顯示你的交易沒有明顯單一心魔，下一步重點是穩定照 SOP 執行。"
+
+    k_hint = f"賣飛高點平均出現在賣後第 {avg_missed_k:.1f} 根K，平均少賺約 {avg_missed_money:,.0f} 元。" if missed_k_records else "目前賣飛樣本不足，先累積更多平倉紀錄。"
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; border-radius:10px; padding:14px 16px; margin: 8px 0 16px 0;">
+        <div style="font-size:15px; font-weight:800; color:{COLORS['text']}; margin-bottom:6px;">🧭 AAR 行為建議｜{behavior_title}</div>
+        <div style="font-size:13.5px; line-height:1.55; color:{COLORS['text']};">{behavior_detail}</div>
+        <div style="font-size:12.5px; margin-top:6px; color:{COLORS['subtext']};">{k_hint}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     if skipped_rows:
         with st.expander(f"⚠️ 系統跳過了 {len(skipped_rows)} 筆格式異常的資料，點擊查看詳細原因", expanded=False):
