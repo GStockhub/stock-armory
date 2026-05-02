@@ -187,6 +187,123 @@ def render_battle_summary(master_list, rank_sorted):
             """, unsafe_allow_html=True)
 
 
+def _macro_to_float(val):
+    try:
+        return float(str(val).replace("%", "").replace(",", "").strip())
+    except Exception:
+        return np.nan
+
+
+def build_macro_brief(macro_df, macro_score, overheat_flag):
+    """把國際大盤表格翻成一句可執行的明日策略。"""
+    if macro_df is None or macro_df.empty:
+        return {
+            "title": "資料不足：大盤狀態暫時無法判讀",
+            "body": "目前大盤資料未成功讀取。明日先以保守模式處理，只看既有持股與高把握 S/A，避免因資料斷線誤判行情。",
+            "strategy": "建議：降低倉位，不追高；等資料恢復後再恢復正常掃描。",
+            "risk": "風險提醒：請先檢查 Yahoo / 大盤儀表資料健康燈號。",
+            "color": COLORS["accent"],
+            "icon": "⚪"
+        }
+
+    dfm = macro_df.copy()
+    if "名稱" not in dfm.columns:
+        return {
+            "title": "資料格式異常：大盤欄位無法判讀",
+            "body": "目前大盤表格缺少【名稱】欄位，無法產生完整綜合結論。",
+            "strategy": "建議：先以系統分級與個股技術面為主，降低操作金額。",
+            "risk": "風險提醒：請檢查 data_center.py 的 get_macro_dashboard 回傳欄位。",
+            "color": COLORS["accent"],
+            "icon": "⚪"
+        }
+
+    def find_row(keyword):
+        hit = dfm[dfm["名稱"].astype(str).str.contains(keyword, na=False)]
+        return hit.iloc[0] if not hit.empty else None
+
+    tw = find_row("台股")
+    nas = find_row("那斯")
+    spx = find_row("標普")
+    vix = find_row("恐慌")
+    fx = find_row("美元")
+
+    def bias_of(row):
+        if row is None or "乖離(%)" not in row.index:
+            return np.nan
+        return _macro_to_float(row["乖離(%)"])
+
+    def status_of(row):
+        if row is None or "狀態" not in row.index:
+            return ""
+        return str(row["狀態"])
+
+    tw_bias = bias_of(tw)
+    tw_status = status_of(tw)
+    nas_status = status_of(nas)
+    spx_status = status_of(spx)
+    vix_status = status_of(vix)
+    fx_status = status_of(fx)
+
+    equity_bulls = sum("多頭" in x for x in [tw_status, nas_status, spx_status])
+    vix_ok = ("安定" in vix_status) or ("月線下" in vix_status)
+    fx_bad = ("貶值" in fx_status) or ("資金外逃" in fx_status)
+    hot = bool(overheat_flag) or (pd.notna(tw_bias) and tw_bias >= 5)
+
+    risk_items = []
+    if hot:
+        risk_items.append(f"台股乖離偏高{f'（{tw_bias:.2f}%）' if pd.notna(tw_bias) else ''}，短線拉回風險增加")
+    if fx_bad:
+        risk_items.append("美元/台幣偏強，資金面需留意")
+    if not vix_ok:
+        risk_items.append("VIX 未明顯安定，盤中波動可能放大")
+    if equity_bulls <= 1:
+        risk_items.append("主要股市站上月線數量不足，趨勢保護偏弱")
+
+    if macro_score <= 3:
+        title = "偏空防守：明日不主動開新倉"
+        body = "大盤分數落在高風險區，代表趨勢或資金面不利。此時重點不是找飆股，而是保住本金與處理既有部位。"
+        strategy = "建議明日：新倉暫停；只處理持股停損/減碼；除非 S 級且低開回穩，否則不出手。"
+        color, icon = COLORS["red"], "🔴"
+    elif hot:
+        title = "偏多但過熱：可做，但不追高"
+        body = "台股與美股趨勢仍有支撐，但台股乖離已偏高。這種盤最怕早盤一追就被倒貨，適合小量打 S/A，B 級等回踩。"
+        strategy = "建議明日：S/A 級小量出手；B 級等 13:00 後確認；跳空 >4.5% 一律不追。"
+        color, icon = COLORS["accent"], "🔥"
+    elif macro_score >= 7 and equity_bulls >= 2 and vix_ok:
+        title = "偏多可作戰：優先打 S/A 主攻"
+        body = "主要股市多數站上月線，VIX 也相對安定，盤勢允許正常短波段操作。仍需避開過熱與第三段末升股。"
+        strategy = "建議明日：S/A 可依計畫進場；B 級只做回踩；禁追價與停損價照表執行。"
+        color, icon = COLORS["green"], "🟢"
+    elif macro_score >= 5:
+        title = "中性偏多：可以做，但倉位要克制"
+        body = "大盤不是壞盤，但優勢不夠明顯。適合精選少數高分標的，不適合全面開火。"
+        strategy = "建議明日：只選前 2～4 檔；S/A 優先；B 級需等回踩；單筆買量保守一點。"
+        color, icon = COLORS["primary"], "🟡"
+    else:
+        title = "中性偏弱：防守優先，少做多看"
+        body = "大盤分數偏低，代表行情沒有給足安全墊。此時容易選到反彈而不是主升，操作要縮小。"
+        strategy = "建議明日：只看 S 級或既有持股；A/B 暫列觀察；跌破 M10 不凹單。"
+        color, icon = COLORS["red"], "🟠"
+
+    risk = "；".join(risk_items) if risk_items else "目前未見明顯系統性風險，但仍需遵守禁追價與停損線。"
+    return {"title": title, "body": body, "strategy": strategy, "risk": risk, "color": color, "icon": icon}
+
+
+def render_macro_brief(macro_df, macro_score, overheat_flag):
+    brief = build_macro_brief(macro_df, macro_score, overheat_flag)
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {brief['color']}; border-radius:10px; padding:14px 16px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="font-size:22px;">{brief['icon']}</span>
+            <span style="font-size:18px; font-weight:800; color:{COLORS['text']};">綜合判斷：{brief['title']}</span>
+        </div>
+        <div style="font-size:14px; line-height:1.65; color:{COLORS['text']}; margin-bottom:6px;">{brief['body']}</div>
+        <div style="font-size:14px; line-height:1.65; color:{COLORS['text']};"><b>明日策略：</b>{brief['strategy']}</div>
+        <div style="font-size:13px; line-height:1.55; color:{COLORS['subtext']}; margin-top:6px;"><b>風險提醒：</b>{brief['risk']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
 if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量！", icon="🌋")
@@ -279,6 +396,7 @@ with t_rank:
     st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
 
     with st.expander("🌍 國際大盤數值"):
+        render_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
         if not MACRO_DF.empty:
             disp_macro = MACRO_DF.copy()
             if "現價" in disp_macro.columns: disp_macro["現價"] = pd.to_numeric(disp_macro["現價"], errors='coerce').apply(lambda x: f"{x:.2f}")
@@ -584,7 +702,7 @@ with t_chip:
             st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
             st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.set_properties(**table_style).format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
             st.markdown("---")
-        st.markdown("#### <span class='highlight-accent'>🛳️ 穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
+        st.markdown("#### <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
         main_chips = today_df.sort_values("三大法人合計", ascending=False).head(200)
         if "intel_df" in locals() and intel_df is not None and not intel_df.empty:
             main_chips = pd.merge(main_chips, intel_df[["代號", "安全指數"]], on="代號", how="left")
