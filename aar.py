@@ -300,8 +300,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             max_after_sell = float(post_hist.loc[max_idx, "High"])
                             min_after_sell = float(post_hist.loc[min_idx, "Low"])
                             s_date = pd.to_datetime(sell_date)
-                            days_to_max = (pd.to_datetime(max_idx) - s_date).days
-                            days_to_min = (pd.to_datetime(min_idx) - s_date).days
+                            days_to_max = post_hist.index.get_loc(max_idx) + 1
+                            days_to_min = post_hist.index.get_loc(min_idx) + 1
                             disp_days_max = str(days_to_max) if 0 <= days_to_max <= 50 else "?"
                             disp_days_min = str(days_to_min) if 0 <= days_to_min <= 50 else "?"
                             missed_pnl = (max_after_sell - sell_price) * shares * 1000
@@ -314,15 +314,15 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             if roi > 0:
                                 if missed_pnl > buy_cost * 0.03:
                                     grade = "🥈 A級"
-                                    comment = f"🕊️獲利了結！後於第{disp_days_max}天漲至{max_after_sell:.1f}元，潛在+{missed_pnl:,.0f}元。"
+                                    comment = f"🕊️獲利了結，後於第{disp_days_max}天漲至{max_after_sell:.1f}元，潛在+{missed_pnl:,.0f}元"
                                     demon = "🕊️ 賣飛"
                                 else:
                                     grade = "👑 S級"
-                                    comment = "👑完美停利！賣出後未見大幅創高，波段高點精準入袋！"
+                                    comment = "👑完美停利，賣出後未見大幅創高，波段高點精準入袋"
                             else:
                                 if avoided_loss > buy_cost * 0.03:
                                     grade = "⚔️ B級"
-                                    comment = f"🛡️果斷停損！後於第{disp_days_min}天跌至{min_after_sell:.1f}元，防止-{avoided_loss:,.0f}元虧損"
+                                    comment = f"🛡️果斷停損，後於第{disp_days_min}天跌至{min_after_sell:.1f}元，防止-{avoided_loss:,.0f}元虧損"
                                     demon = "🛡️ 紀律"
                                 else:
                                     grade = "⚠️ C級"
