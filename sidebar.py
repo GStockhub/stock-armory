@@ -41,9 +41,9 @@ def render_sidebar(auth_status="guest_auth"):
             default_sheet_url = st.secrets.get("sheet_url", "")
             default_aar_url   = st.secrets.get("aar_sheet_url", "")
             if default_sheet_url:
-                st.success("✅ 統帥專屬：持股部位已自動連線", icon="🔗")
+                st.success("✅ 持股部位已自動連線", icon="🔗")
             if default_aar_url:
-                st.success("✅ 統帥專屬：交易日誌已自動連線", icon="🔗")
+                st.success("✅ 交易日誌已自動連線", icon="🔗")
         else:
             # 🤝 友軍登入，預設給空白
             default_sheet_url = ""
