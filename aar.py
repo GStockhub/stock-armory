@@ -646,22 +646,100 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-
         st.markdown(f"<div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['primary']};'><div style='color:{COLORS['subtext']}; font-size:14px;'>已平倉總淨利</div><div style='font-size:24px; font-weight:bold; color:{p_color};'>{total_pnl:,.0f}</div></div>", unsafe_allow_html=True)
 
     with col2:
-
         st.markdown(f"<div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['accent']};'><div style='color:{COLORS['subtext']}; font-size:14px;'>實戰勝率</div><div style='font-size:24px; font-weight:bold; color:{COLORS['text']};'>{win_rate:.1f}%</div></div>", unsafe_allow_html=True)
 
     with col3:
-
         st.markdown(f"<div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['red']};'><div style='color:{COLORS['subtext']}; font-size:14px;'>最痛的賣飛</div><div style='font-size:18px; font-weight:bold; color:{COLORS['text']};'>{max_missed_stock if max_missed_stock else '無'}</div></div>", unsafe_allow_html=True)
 
     with col4:
-
         st.markdown(f"<div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['green']};'><div style='color:{COLORS['subtext']}; font-size:14px;'>最大心魔</div><div style='font-size:20px; font-weight:bold; color:{COLORS['text']};'>{top_demon}</div></div>", unsafe_allow_html=True)
 
-    
+    # ===================================================
+    # 🧙 神仙模式（理論最大獲利）
+    # ===================================================
+    god_total_pnl = 0
+
+    for i, row in df.iterrows():
+        try:
+            sid = get_val(row, ["代號", "股票代號", "證券代號", "股票代碼"])
+            if not sid:
+                continue
+
+            buy_date_raw = get_val(row, ["買進日期", "買進日", "日期"], exclude_keys=["賣"])
+            buy_price_raw = get_val(row, ["買進價", "成本價", "成本"])
+            shares_raw = get_val(row, ["張數", "庫存張數", "股數"])
+
+            if not buy_date_raw or not buy_price_raw or not shares_raw:
+                continue
+
+            buy_date = parse_tw_date(buy_date_raw)
+            buy_price = extract_number(buy_price_raw)
+            shares = extract_number(shares_raw)
+
+            if pd.isna(buy_date) or buy_price <= 0 or shares <= 0:
+                continue
+
+            hist = safe_download(sid, fm_token, period="6mo")
+            if hist is None or hist.empty:
+                continue
+
+            hist.index = pd.to_datetime(hist.index).tz_localize(None)
+
+            future_hist = hist.loc[buy_date:]
+            if future_hist.empty:
+                continue
+
+            max_price = future_hist["High"].max()
+
+            fee_rate = 0.001425 * fee_discount
+            tax_rate = 0.001 if sid.startswith("00") else 0.003
+
+            buy_cost = buy_price * shares * 1000
+            buy_cost += buy_cost * fee_rate
+
+            sell_rev = max_price * shares * 1000
+            sell_rev -= sell_rev * fee_rate
+            sell_rev -= sell_rev * tax_rate
+
+            god_pnl = sell_rev - buy_cost
+            god_total_pnl += god_pnl
+
+        except:
+            continue
+
+    missed_total = god_total_pnl - total_pnl
+    capture_rate = (total_pnl / god_total_pnl * 100) if god_total_pnl > 0 else 0
+
+    # 🎯 顯示 UI（新一排）
+    g1, g2, g3 = st.columns(3)
+
+    with g1:
+        st.markdown(f"""
+        <div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['primary']};'>
+            <div style='color:{COLORS['subtext']}; font-size:14px;'>🧙 神仙最大淨利</div>
+            <div style='font-size:22px; font-weight:bold; color:{COLORS['text']};'>{god_total_pnl:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with g2:
+        color_miss = COLORS["red"] if missed_total > 0 else COLORS["green"]
+        st.markdown(f"""
+        <div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {color_miss};'>
+            <div style='color:{COLORS['subtext']}; font-size:14px;'>📉 少賺空間</div>
+            <div style='font-size:22px; font-weight:bold; color:{color_miss};'>{missed_total:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with g3:
+        st.markdown(f"""
+        <div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['accent']};'>
+            <div style='color:{COLORS['subtext']}; font-size:14px;'>🎯 獲利捕捉率</div>
+            <div style='font-size:22px; font-weight:bold; color:{COLORS['text']};'>{capture_rate:.1f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
