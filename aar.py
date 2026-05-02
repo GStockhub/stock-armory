@@ -307,8 +307,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             min_date = pd.to_datetime(min_idx)
                             cal_days_max = (max_date - s_date).days
                             cal_days_min = (min_date - s_date).days
-                            disp_days_max = f"{k_days_max}根K（約{cal_days_max}天）" if 0 <= k_days_max <= 50 else "?"
-                            disp_days_min = f"{k_days_min}根K（約{cal_days_min}天）" if 0 <= k_days_min <= 50 else "?"
+                            disp_days_max = f"{k_days_max}根K(約{cal_days_max}天)" if 0 <= k_days_max <= 50 else "?"
+                            disp_days_min = f"{k_days_min}根K(約{cal_days_min}天)" if 0 <= k_days_min <= 50 else "?"
                             missed_pnl = (max_after_sell - sell_price) * shares * 1000
                             avoided_loss = (sell_price - min_after_sell) * shares * 1000
 
@@ -331,7 +331,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                                     demon = "🛡️ 紀律"
                                 else:
                                     grade = "⚠️ C級"
-                                    comment = f"😨砍在阿呆谷！後於第{disp_days_max}天反彈至{max_after_sell:.1f}元，潛在+{missed_pnl:,.0f}元"
+                                    comment = f"😨砍在山谷，後於第{disp_days_max}天反彈至{max_after_sell:.1f}元，潛在+{missed_pnl:,.0f}元"
                                     demon = "😨 恐慌"
                         else:
                             grade = "👑 S級" if roi > 0 else "⚔️ B級"
