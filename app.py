@@ -219,7 +219,7 @@ if len(chip_db) >= 1:
     today_df["連買"] = today_df.apply(get_streak, axis=1)
     top_80_chips = today_df.sort_values("投信(張)", ascending=False).head(80)["代號"].tolist()
 else:
-    st.toast("⚠️ 籌碼連線失敗！但沙盤推演與司令部仍可正常使用！", icon="🚨")
+    st.toast("籌碼連線失敗；沙盤與司令部仍可使用。", icon="⚠️")
 
 if sheet_url:
     try:
@@ -405,10 +405,84 @@ with t_rank:
                 ui_b = master_list[master_list["評級"] == "B"]
                 ui_c = master_list[master_list["評級"] == "C"]
                 render_battle_summary(master_list, rank_sorted)
+
+                # ===================================================
+                # 📱 明日清單下載：手機盤中快速查看
+                # ===================================================
+                def build_mobile_list(df_src):
+                    rows = []
+                    for _, rr in df_src.iterrows():
+                        tactic = str(rr.get("戰術型態", ""))
+                        price = float(rr.get("現價", 0) or 0)
+                        m5 = float(rr.get("M5", price) or price)
+                        m10 = float(rr.get("M10", price) or price)
+                        stop = float(rr.get("停損價", 0) or 0)
+                        if "🛡️" in tactic:
+                            low_p, high_p = sorted([m10, m5])
+                            entry_zone = f"{low_p:.2f}~{high_p:.2f}"
+                            note = "回踩單：靠近M5/M10才買"
+                        else:
+                            entry_zone = f"{price:.2f}~{price * 1.03:.2f}"
+                            note = "突破單：+4.5%內才考慮"
+                        if float(rr.get("RSI", 50) or 50) > 75:
+                            note += "；RSI過熱，不追"
+                        if float(rr.get("乖離(%)", 0) or 0) > 8:
+                            note += "；乖離過大等回檔"
+                        if "第三段" in str(rr.get("生命週期", "")):
+                            note += "；末升警戒"
+                        rows.append({
+                            "評級": rr.get("評級", ""),
+                            "代號": rr.get("代號", ""),
+                            "名稱": rr.get("名稱", ""),
+                            "現價": round(price, 2),
+                            "建議進場": entry_zone,
+                            "禁追價(+4.5%)": round(price * 1.045, 2),
+                            "停損價": round(stop, 2),
+                            "建議買量(張)": rr.get("建議買量(張)", ""),
+                            "戰術型態": rr.get("戰術型態", ""),
+                            "生命週期": rr.get("生命週期", ""),
+                            "量化分數": rr.get("Quant_Score", ""),
+                            "備註": note,
+                        })
+                    return pd.DataFrame(rows)
+
+                def build_full_list(df_src):
+                    cols = [
+                        "名次", "評級", "代號", "名稱", "產業", "生命週期", "戰術型態",
+                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "現價", "M5", "M10", "M20",
+                        "乖離(%)", "RSI", "MACD_Hist", "BB_Upper", "停損價", "停利價",
+                        "建議買量(張)", "連買", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"
+                    ]
+                    keep = [c for c in cols if c in df_src.columns]
+                    out = df_src[keep].copy()
+                    if "Quant_Score" in out.columns:
+                        out = out.rename(columns={"Quant_Score": "量化分數", "停損價": "ATR停損"})
+                    return out
+
+                mobile_csv = build_mobile_list(master_list).to_csv(index=False).encode("utf-8-sig")
+                full_csv = build_full_list(master_list).to_csv(index=False).encode("utf-8-sig")
+                dl1, dl2 = st.columns(2)
+                with dl1:
+                    st.download_button(
+                        "📱 下載手機簡表 CSV",
+                        data=mobile_csv,
+                        file_name=f"Mobile_Tactical_List_{datetime.now().strftime('%Y%m%d')}.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+                with dl2:
+                    st.download_button(
+                        "📊 下載完整戰術 CSV",
+                        data=full_csv,
+                        file_name=f"Full_Tactical_List_{datetime.now().strftime('%Y%m%d')}.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+
                 st.markdown("#### 🥇 <span class='highlight-primary'>【S / A 級】主力狙擊區</span>", unsafe_allow_html=True)
                 
                 if ui_s.empty and ui_a.empty: 
-                    st.info("💡 今日無主戰力標的符合 (Quant 分數未達標)。")
+                    st.info("今日無 S/A 主攻標的；不追高，等下一輪訊號。")
                 else:
                     def render_tier_cards(tier_df, badge_class, badge_name, border_color):
                         cols = st.columns(3)
@@ -457,7 +531,7 @@ with t_rank:
               # 確保這行與上面的 if not ui_a.empty: 對齊 (通常是 16 個半形空格)
                 st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
                 if ui_b.empty: 
-                    st.info("💡 今日無 B 級符合標的。")
+                    st.info("今日無 B 級備選。")
                 else:
                     # 🚀 V32.4 統帥優化：為 B 級添加極簡版輔助徽章
                     def generate_b_badges(row):
@@ -487,7 +561,7 @@ with t_rank:
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
                     
                 st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
-                if ui_c.empty: st.info("💡 今日無 C 級潛伏標的。")
+                if ui_c.empty: st.info("今日無 C 級觀察名單。")
                 else:
                     # 🚀 統帥優化：切除多餘的「評級」欄位
                     disp_c = ui_c[["名次", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]].copy()
@@ -518,7 +592,7 @@ with t_chip:
         else: main_chips["安全指數"] = "-"
         st.dataframe(main_chips[["代號", "名稱", "連買", "安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]].style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["安全指數"]), height=500, use_container_width=True, hide_index=True)
     else:
-        st.info("🚨 籌碼連線中斷，情報局暫時停止運作。")
+        st.info("籌碼連線中斷，情報局暫停；沙盤與司令部仍可使用。")
 
 with t_cmd:
     st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
@@ -659,4 +733,4 @@ with t_hist:
     st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V32.4</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V32.5</p>", unsafe_allow_html=True)
