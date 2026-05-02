@@ -799,7 +799,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 border-bottom: none;
             }}
             .aar-code {{ width: 6%; white-space: nowrap; }}
-            .aar-name {{ width: 8%; white-space: nowrap; }}
+            .aar-name {{width: 8%;white-space: normal !important;word-break: break-all;overflow-wrap: anywhere;line-height: 1.35;}}
             .aar-detail {{
                 width: 48%;                    /* 診斷詳情吃最多空間 */
                 text-align: left;
