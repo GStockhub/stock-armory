@@ -15,14 +15,14 @@ def render_sidebar(auth_status="guest_auth"):
             ["保守模式", "標準模式", "進攻模式"],
             index=1,
             horizontal=False,
-            help="保守：提高門檻、減少買量；標準：維持原本節奏；進攻：略放寬 B 級與買量，但仍遵守停損。"
+            help="保守：提高門檻、減少買量；標準：維持原本節奏；進攻：略放寬B級與買量，但仍遵守停損。"
         )
         if operation_mode == "保守模式":
-            st.warning("🛡️ 保守模式：只打高把握標的，建議買量自動打 7 折。")
+            st.warning("🛡️ 保守：只打高把握標的，建議買量減少30%")
         elif operation_mode == "進攻模式":
-            st.info("⚔️ 進攻模式：B級備選更積極，建議買量最多提高 15%。")
+            st.info("⚔️ 進攻：B級備選更積極，建議買量最多提高15%")
         else:
-            st.success("⚖️ 標準模式：依照 V32 短波段模型正常執行。")
+            st.success("⚖️ 標準：短波段模型正常執行")
 
         st.markdown("---")
 
@@ -56,9 +56,9 @@ def render_sidebar(auth_status="guest_auth"):
             default_sheet_url = st.secrets.get("sheet_url", "")
             default_aar_url = st.secrets.get("aar_sheet_url", "")
             if default_sheet_url:
-                st.success("✅ 持股部位已自動連線", icon="🔗")
+                st.success("✅持股部位已自動連線", icon="🔗")
             if default_aar_url:
-                st.success("✅ 交易日誌已自動連線", icon="🔗")
+                st.success("✅交易日誌已自動連線", icon="🔗")
         else:
             default_sheet_url = ""
             default_aar_url = ""
