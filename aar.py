@@ -657,6 +657,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     with col4:
         st.markdown(f"<div style='background-color:{COLORS['card']}; padding:15px; border-radius:8px; border-left:5px solid {COLORS['green']};'><div style='color:{COLORS['subtext']}; font-size:14px;'>最大心魔</div><div style='font-size:20px; font-weight:bold; color:{COLORS['text']};'>{top_demon}</div></div>", unsafe_allow_html=True)
 
+
+    
     # ===================================================
     # 🧙 神仙模式（理論最大獲利）
     # ===================================================
