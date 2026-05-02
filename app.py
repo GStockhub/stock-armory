@@ -584,7 +584,7 @@ with t_chip:
             st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
             st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.set_properties(**table_style).format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
             st.markdown("---")
-        st.markdown("#### <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
+        st.markdown("#### <span class='highlight-accent'>🛳️ 穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
         main_chips = today_df.sort_values("三大法人合計", ascending=False).head(200)
         if "intel_df" in locals() and intel_df is not None and not intel_df.empty:
             main_chips = pd.merge(main_chips, intel_df[["代號", "安全指數"]], on="代號", how="left")
