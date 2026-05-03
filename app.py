@@ -14,7 +14,7 @@ try:
 except AttributeError: pass
 else: ssl._create_default_https_context = _create_unverified_https_context
 
-from manual import MANUAL_TEXT, HISTORY_TEXT
+from manual import QUICK_MANUAL_TEXT, MANUAL_TEXT, HISTORY_TEXT
 import aar
 import sidebar
 
@@ -38,7 +38,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 V32.4 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v33.0 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -119,8 +119,8 @@ MODE_PROFILE = {
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v32.3</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 短打狙擊 ✕ 資料健康燈號 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v33.0</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD 司令官版 ✕ 快速沙盤 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
 st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -159,6 +159,28 @@ def render_data_health_panel():
                     <div style="font-size:16px; font-weight:700; color:{COLORS['text']};">{msg}</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+
+def render_data_status_bar():
+    status_items = [
+        len(TWSE_NAME_MAP) > 0,
+        not MACRO_DF.empty,
+        len(chip_db) > 0,
+        holding_read_ok or not sheet_url,
+        aar_read_ok or not aar_sheet_url,
+        bool(str(FM_TOKEN).strip()),
+    ]
+    ok_count = sum(bool(x) for x in status_items)
+    total_count = len(status_items)
+    color = COLORS["green"] if ok_count >= 5 else (COLORS["accent"] if ok_count >= 4 else COLORS["red"])
+    msg = "全部正常" if ok_count == total_count else "部分異常，請打開健康燈號查看"
+    html_block = f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; padding:8px 12px; border-radius:8px; margin:8px 0 14px 0; font-size:13px;">
+        <b style="color:{COLORS['text']};">🧭 資料狀態：{ok_count}/{total_count} 正常</b>
+        <span style="color:{COLORS['subtext']}; margin-left:8px;">{msg}</span>
+    </div>
+    """
+    st.markdown(html_block, unsafe_allow_html=True)
 
 
 def render_battle_summary(master_list, rank_sorted):
@@ -260,29 +282,29 @@ def build_macro_brief(macro_df, macro_score, overheat_flag):
         risk_items.append("主要股市站上月線數量不足，趨勢保護偏弱")
 
     if macro_score <= 3:
-        title = "偏空防守：明日不主動開新倉"
-        body = "大盤分數落在高風險區，代表趨勢或資金面不利。此時重點不是找飆股，而是保住本金與處理既有部位。"
-        strategy = "建議明日：新倉暫停；只處理持股停損/減碼；除非 S 級且低開回穩，否則不出手。"
+        title = "偏空防守：不開新倉"
+        body = "趨勢或資金面不利，先保本金。"
+        strategy = "新倉暫停；只處理持股停損/減碼。"
         color, icon = COLORS["red"], "🔴"
     elif hot:
-        title = "偏多但過熱：可做，但不追高"
-        body = "台股與美股趨勢仍有支撐，但台股乖離已偏高。這種盤最怕早盤一追就被倒貨，適合小量打 S/A，B 級等回踩。"
-        strategy = "建議明日：S/A 級小量出手；B 級等 13:00 後確認；跳空 >4.5% 一律不追。"
+        title = "偏多過熱：小量，不追高"
+        body = "趨勢仍有支撐，但台股乖離偏高，早盤追高容易被倒貨。"
+        strategy = "S/A 小量；B 等 13:00 後確認；跳空 >4.5% 不追。"
         color, icon = COLORS["accent"], "🔥"
     elif macro_score >= 7 and equity_bulls >= 2 and vix_ok:
-        title = "偏多可作戰：優先打 S/A 主攻"
-        body = "主要股市多數站上月線，VIX 也相對安定，盤勢允許正常短波段操作。仍需避開過熱與第三段末升股。"
-        strategy = "建議明日：S/A 可依計畫進場；B 級只做回踩；禁追價與停損價照表執行。"
+        title = "偏多可作戰：優先 S/A"
+        body = "主要股市站上月線，VIX 安定，可正常短波段。"
+        strategy = "S/A 依計畫；B 只做回踩；禁追價與停損照表。"
         color, icon = COLORS["green"], "🟢"
     elif macro_score >= 5:
-        title = "中性偏多：可以做，但倉位要克制"
-        body = "大盤不是壞盤，但優勢不夠明顯。適合精選少數高分標的，不適合全面開火。"
-        strategy = "建議明日：只選前 2～4 檔；S/A 優先；B 級需等回踩；單筆買量保守一點。"
+        title = "中性偏多：精選少做"
+        body = "盤勢不差，但優勢不夠大。"
+        strategy = "只選前 2～4 檔；S/A 優先；B 等回踩。"
         color, icon = COLORS["primary"], "🟡"
     else:
-        title = "中性偏弱：防守優先，少做多看"
-        body = "大盤分數偏低，代表行情沒有給足安全墊。此時容易選到反彈而不是主升，操作要縮小。"
-        strategy = "建議明日：只看 S 級或既有持股；A/B 暫列觀察；跌破 M10 不凹單。"
+        title = "中性偏弱：少做多看"
+        body = "安全墊不足，容易買到反彈不是主升。"
+        strategy = "只看 S 級與持股；A/B 觀察；破 M10 不凹。"
         color, icon = COLORS["red"], "🟠"
 
     risk = "；".join(risk_items) if risk_items else "目前未見明顯系統性風險，但仍需遵守禁追價與停損線。"
@@ -298,7 +320,7 @@ def render_macro_brief(macro_df, macro_score, overheat_flag):
             <span style="font-size:18px; font-weight:800; color:{COLORS['text']};">綜合判斷：{brief['title']}</span>
         </div>
         <div style="font-size:14px; line-height:1.65; color:{COLORS['text']}; margin-bottom:6px;">{brief['body']}</div>
-        <div style="font-size:14px; line-height:1.65; color:{COLORS['text']};"><b>明日策略：</b>{brief['strategy']}</div>
+        <div style="font-size:14px; line-height:1.65; color:{COLORS['text']};"><b>策略：</b>{brief['strategy']}</div>
         <div style="font-size:13px; line-height:1.55; color:{COLORS['subtext']}; margin-top:6px;"><b>風險提醒：</b>{brief['risk']}</div>
     </div>
     """, unsafe_allow_html=True)
@@ -357,43 +379,86 @@ if sheet_url:
                 else: m_df["名稱"] = m_df["代號"].map(TWSE_NAME_MAP).fillna("未知")
     except Exception as e: st.error(f"❌ 讀取持股部位失敗：{e}")
 
-t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (機率模型)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
+if aar_sheet_url:
+    try:
+        aar_probe_df = read_remote_csv(aar_sheet_url, dtype=str)
+        aar_rows = len(aar_probe_df)
+        aar_read_ok = not aar_probe_df.empty
+    except Exception:
+        aar_rows = 0
+        aar_read_ok = False
 
-with t_rank:
-    st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演(買前體檢)</span>", unsafe_allow_html=True)
+render_data_status_bar()
+
+
+@st.fragment
+def render_sandbox_panel():
+    st.markdown("### 🔮 <span class='highlight-primary'>快速沙盤推演（盤中獨立查詢）</span>", unsafe_allow_html=True)
     col_s1, col_s2 = st.columns([1, 3])
-
     with col_s1:
-        st.caption("💡 輸入代號，預防手殘接刀")
-        sim_id = st.text_input("股票代號", placeholder="例: 2330 或 0050", label_visibility="collapsed")
-        sim_btn = st.button("⚡執行體檢", use_container_width=True)
+        st.caption("💡 盤中頻繁查股用；不會重跑下方 S/A/B/C 名單")
+        sim_id = st.text_input("股票代號", placeholder="例: 2330 或 0050", label_visibility="collapsed", key="sandbox_stock_id")
+        sim_btn = st.button("⚡執行體檢", use_container_width=True, key="sandbox_btn")
+        if st.button("🧹 清除沙盤結果", use_container_width=True, key="sandbox_clear_btn"):
+            st.session_state.pop("sandbox_last_result", None)
+            st.session_state.pop("sandbox_last_id", None)
 
     with col_s2:
         if sim_btn and sim_id:
             with st.spinner("🧠 正在呼叫量化引擎掃描..."):
                 res = run_sandbox_sim(str(sim_id).strip(), TWSE_NAME_MAP, FM_TOKEN)
-                if res:
-                    p_now, m5, m10, bias, win_rate, sl_price = res["現價"], res["M5"], res["M10"], res["乖離"], res["勝率"], res["停損價"]
-                    if p_now < m10:
-                        grade_color, grade_text, advice = COLORS["red"], "🛑 嚴禁接刀 (D級)", f"股價已跌破 M10 ({m10:.1f})，目前為空頭慣性。絕對禁止進場摸底。"
-                    elif bias > 7:
-                        grade_color, grade_text, advice = COLORS["accent"], "⚠️ 追高警告 (C級)", f"乖離率高達 {bias:.1f}%。除非爆量真突破，否則等回拉 M5。"
-                    elif p_now > m5 and win_rate >= 50:
-                        grade_color, grade_text, advice = COLORS["primary"], "👑 准許出兵 (S/A級)", f"多頭結構且回測勝率達 {win_rate:.0f}%！防守底線設於 {sl_price:.1f}。"
-                    else:
-                        grade_color, grade_text, advice = COLORS["green"], "⚖️ 穩健觀察 (B級)", f"結構普通 (勝率 {win_rate:.0f}%)。若資金充裕可小量試單，防守底線設於 {sl_price:.1f}。"
+                st.session_state["sandbox_last_result"] = res
+                st.session_state["sandbox_last_id"] = str(sim_id).strip()
 
-                    st.markdown(f"""
-                    <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:6px; margin-bottom:10px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:8px;"><h4 style="margin:0; font-size:20px; color:{COLORS['text']};">{res['名稱']} ({res['代號']})</h4><span style="font-weight:bold; color:{grade_color}; font-size:18px;">{grade_text}</span></div>
-                        <div style="font-size:14px; color:{COLORS['subtext']}; margin-bottom:10px;">現價: <span style="color:{COLORS['text']}; font-weight:bold;">{p_now:.2f}</span> | 月線乖離: <span style="color:{COLORS['text']}; font-weight:bold;">{bias:.1f}%</span> | 波段勝率: <span style="color:{COLORS['text']}; font-weight:bold;">{win_rate:.0f}%</span></div>
-                        <div style="background-color:{COLORS['bg']}; padding:10px; border-radius:4px; font-size:14px; color:{COLORS['text']};">💡 <b>教練指示：</b>{advice}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else: st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
+        res = st.session_state.get("sandbox_last_result")
+        if res:
+            p_now, m5, m10, bias, win_rate, sl_price = res["現價"], res["M5"], res["M10"], res["乖離"], res["勝率"], res["停損價"]
+            if p_now < m10:
+                grade_color, grade_text = COLORS["red"], "🛑 嚴禁接刀 (D級)"
+                advice = f"現價跌破 M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"
+            elif p_now < m5:
+                grade_color, grade_text = COLORS["accent"], "⚠️ 等站回 M5"
+                advice = f"現價低於 M5 ({m5:.1f})。若 13:00 後站回 M5 且量能正常才觀察；站不回就等 M10。"
+            elif bias > 7:
+                grade_color, grade_text = COLORS["accent"], "⚠️ 追高警告 (C級)"
+                advice = f"乖離 {bias:.1f}% 偏高。除非小幅突破且量能強，否則等回踩 M5。"
+            elif p_now > m5 and win_rate >= 50:
+                grade_color, grade_text = COLORS["primary"], "👑 准許出兵 (S/A級)"
+                advice = f"多頭結構且回測勝率 {win_rate:.0f}%。防守底線 {sl_price:.1f}；跳空 >4.5% 不追。"
+            else:
+                grade_color, grade_text = COLORS["green"], "⚖️ 穩健觀察 (B級)"
+                advice = f"結構普通，勝率 {win_rate:.0f}%。可小量試單，防守底線 {sl_price:.1f}。"
 
+            html_block = f"""
+            <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:8px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:8px;">
+                    <h4 style="margin:0; font-size:20px; color:{COLORS['text']};">{res['名稱']} ({res['代號']})</h4>
+                    <span style="font-weight:bold; color:{grade_color}; font-size:18px; white-space:nowrap;">{grade_text}</span>
+                </div>
+                <div style="font-size:14px; color:{COLORS['subtext']}; margin-bottom:10px;">
+                    現價 <b style="color:{COLORS['text']};">{p_now:.2f}</b>｜M5 <b>{m5:.2f}</b>｜M10 <b>{m10:.2f}</b>｜乖離 <b>{bias:.1f}%</b>｜勝率 <b>{win_rate:.0f}%</b>
+                </div>
+                <div style="background-color:{COLORS['bg']}; padding:10px; border-radius:6px; font-size:14px; color:{COLORS['text']};">💡 <b>下一步：</b>{advice}</div>
+            </div>
+            """
+            st.markdown(html_block, unsafe_allow_html=True)
+        elif sim_btn:
+            st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
+        else:
+            st.info("輸入代號後執行體檢；結果會暫存在本頁，不會因切換分頁立刻消失。")
+
+t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (機率模型)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
+
+with t_rank:
+    render_sandbox_panel()
     st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
+    scan_col1, scan_col2 = st.columns([1, 3])
+    with scan_col1:
+        force_eod_scan = st.button("🔄 重新掃描明日清單", use_container_width=True, key="force_eod_scan")
+    with scan_col2:
+        last_scan = st.session_state.get("eod_last_scan_time", "尚未掃描")
+        st.caption(f"EOD 排名主引擎只在首次載入或按下重新掃描時更新；沙盤查詢不會拖動此區。最後掃描：{last_scan}")
 
     with st.expander("🌍 國際大盤數值"):
         render_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
@@ -412,7 +477,15 @@ with t_rank:
 
     if not today_df.empty and MACRO_SCORE > 3:
         calc_list = tuple(set(today_df[today_df["連買"] >= 1]["代號"].tolist() + top_80_chips))
-        intel_df = level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
+        scan_key = f"{dates[0] if 'dates' in locals() and dates else 'nodate'}_{MACRO_SCORE}_{operation_mode}_{len(calc_list)}"
+        needs_eod_scan = force_eod_scan or st.session_state.get("eod_scan_key") != scan_key or "eod_intel_df" not in st.session_state
+        if needs_eod_scan:
+            intel_df = level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
+            st.session_state["eod_intel_df"] = intel_df
+            st.session_state["eod_scan_key"] = scan_key
+            st.session_state["eod_last_scan_time"] = datetime.now().strftime("%H:%M:%S")
+        else:
+            intel_df = st.session_state.get("eod_intel_df")
 
         if intel_df is None:
             st.error("🚨 **資料斷線警告**：Yahoo 與 FinMind 皆無回應。請稍後重整或確認 API 額度！", icon="💀")
@@ -825,11 +898,24 @@ with t_cmd:
                         struct = f"📈 趨勢：現價 > M5" if p_now > m5 else (f"📉 跌破M5" if p_now >= dynamic_sl else f"💀 貫穿防線")
                         coach = f"<strong style='color:{conf_color}; font-size:14px;'>🛡️ 續抱信心【{conf_level}】</strong><br>{conf_text}"
 
+                    if p_now == 0.0 or m10 == 0.0:
+                        next_action = "手動確認資料"
+                    elif p_now < dynamic_sl or p_now < m10:
+                        next_action = "破防：減碼/停損"
+                    elif p_now < m5:
+                        next_action = "等站回M5，站不回看M10"
+                    elif ret >= 5.5 and conf_level == "高":
+                        next_action = "可先出半，剩下守M5"
+                    elif conf_level == "高":
+                        next_action = "續抱，跌破M5再處理"
+                    else:
+                        next_action = "守M5/ATR，不追不攤"
+
                     name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                     display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
                     timer_html = f"<span style='color:{timer_color}; font-size:12px;'>{timer_warning}</span>" if timer_warning else ""
                     
-                    html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 10px 15px; background-color: {COLORS['card']}; border-radius: 4px; margin-bottom: 8px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} {timer_html}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div></div></div>"
+                    html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 10px 15px; background-color: {COLORS['card']}; border-radius: 4px; margin-bottom: 8px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} {timer_html}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>🎯 下一步：</span><span style='color:{conf_color}; font-weight:700;'>{next_action}</span></div></div></div>"
                 except Exception as e: continue
             html_cards += '</div>'
             
@@ -844,11 +930,15 @@ with t_cmd:
 
 with t_book:
     st.markdown("### 📖 <span class='highlight-primary'>游擊兵工廠：實戰教戰手冊</span>", unsafe_allow_html=True)
-    st.markdown(MANUAL_TEXT, unsafe_allow_html=True)
+    quick_tab, full_tab = st.tabs(["⚡ 快速版", "📚 完整版"])
+    with quick_tab:
+        st.markdown(QUICK_MANUAL_TEXT, unsafe_allow_html=True)
+    with full_tab:
+        st.markdown(MANUAL_TEXT, unsafe_allow_html=True)
 
 with t_hist:
     st.markdown("### 🏛️ <span class='highlight-primary'>皇家軍史館：兵器開發檔案</span>", unsafe_allow_html=True)
     st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - V32.5</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v33.0</p>", unsafe_allow_html=True)
