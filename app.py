@@ -325,9 +325,68 @@ def render_macro_brief(macro_df, macro_score, overheat_flag):
     """, unsafe_allow_html=True)
 
 
-if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃，保留現金。", icon="🚨")
-elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
-if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：大盤偏離月線突破5%，可能劇烈拉回，限縮AI建議買量。", icon="🌋")
+def render_top_status_panel():
+    """把大盤警戒、過熱警戒、資料狀態濃縮成一張戰情總覽卡，避免首頁堆太多 alert。"""
+    status_items = [
+        len(TWSE_NAME_MAP) > 0,
+        not MACRO_DF.empty,
+        len(chip_db) > 0,
+        holding_read_ok or not sheet_url,
+        aar_read_ok or not aar_sheet_url,
+        bool(str(FM_TOKEN).strip()),
+    ]
+    ok_count = sum(bool(x) for x in status_items)
+    total_count = len(status_items)
+
+    if MACRO_SCORE <= 3:
+        market_title = f"🔴 紅色警戒 ({MACRO_SCORE}/10)"
+        market_msg = "市場偏弱，保留現金，不主動開新倉"
+        main_color = COLORS["red"]
+    elif MACRO_SCORE <= 5:
+        market_title = f"🟡 黃色警戒 ({MACRO_SCORE}/10)"
+        market_msg = "大盤偏弱，資金減半操作"
+        main_color = COLORS["accent"]
+    else:
+        market_title = f"🟢 可作戰 ({MACRO_SCORE}/10)"
+        market_msg = "盤勢允許短波段，但仍依禁追與停損"
+        main_color = COLORS["green"]
+
+    heat_title = "🔥 高檔過熱" if OVERHEAT_FLAG else "✅ 過熱未觸發"
+    heat_msg = "大盤乖離 >5%，限縮 AI 建議買量" if OVERHEAT_FLAG else "尚未觸發大盤過熱限制"
+    heat_color = COLORS["red"] if OVERHEAT_FLAG else COLORS["green"]
+
+    data_title = f"🧭 資料 {ok_count}/{total_count}"
+    data_msg = "全部正常" if ok_count == total_count else "部分異常，展開下方檢查"
+    data_color = COLORS["green"] if ok_count >= 5 else (COLORS["accent"] if ok_count >= 4 else COLORS["red"])
+
+    brief = build_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
+
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {main_color}; border-radius:10px; padding:12px 14px; margin:8px 0 14px 0;">
+        <div style="display:flex; flex-wrap:wrap; align-items:stretch; gap:10px;">
+            <div style="flex:1 1 230px; min-width:220px;">
+                <div style="font-size:15px; font-weight:800; color:{COLORS['text']};">{market_title}</div>
+                <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:3px;">{market_msg}</div>
+            </div>
+            <div style="flex:1 1 230px; min-width:220px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
+                <div style="font-size:15px; font-weight:800; color:{heat_color};">{heat_title}</div>
+                <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:3px;">{heat_msg}</div>
+            </div>
+            <div style="flex:1 1 210px; min-width:200px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
+                <div style="font-size:15px; font-weight:800; color:{data_color};">{data_title}</div>
+                <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:3px;">{data_msg}</div>
+            </div>
+        </div>
+        <div style="margin-top:10px; padding-top:9px; border-top:1px dashed {COLORS['border']}; font-size:13px; line-height:1.55; color:{COLORS['text']};">
+            <b>明日指令：</b>{brief['strategy']}
+            <span style="color:{COLORS['subtext']}; margin-left:8px;">{brief['risk']}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.expander("🔎 展開詳細資料健康燈號", expanded=False):
+        render_data_health_panel()
+
 
 with st.spinner("情報兵正在部署防線..."):
     chip_db = fetch_chips_data(FM_TOKEN)
@@ -387,7 +446,7 @@ if aar_sheet_url:
         aar_rows = 0
         aar_read_ok = False
 
-render_data_status_bar()
+render_top_status_panel()
 
 
 @st.fragment
