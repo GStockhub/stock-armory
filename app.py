@@ -113,15 +113,15 @@ try: fee_discount = float(configs.get("fee_discount", 1.0))
 except: fee_discount = 1.0
 operation_mode = configs.get("operation_mode", "標準模式")
 MODE_PROFILE = {
-    "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折，只打最有把握的球。"},
-    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V32短波段原始節奏。"},
+    "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折。"},
+    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持短波段原始節奏。"},
     "進攻模式": {"s": 84, "a": 60, "b": 40, "size": 1.15, "label": "⚔️ 進攻模式", "note": "略放寬B級觀察與買量，但仍受總曝險與停損控制。"},
-}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V32短波段原始節奏。"})
+}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持短波段原始節奏。"})
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v33.1</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD 司令官版 ✕ 快速沙盤 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD ✕ 快速沙盤 ✕ AAR修正 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
@@ -466,7 +466,7 @@ def render_sandbox_panel():
     with col_s1:
         sim_id = st.text_input("股票代號", placeholder="例: 2330 或 0050", label_visibility="collapsed", key="sandbox_stock_id")
         sim_btn = st.button("⚡執行體檢", use_container_width=True, key="sandbox_btn")
-        if st.button("🧹 清除結果", use_container_width=True, key="sandbox_clear_btn"):
+        if st.button("🧹清除結果", use_container_width=True, key="sandbox_clear_btn"):
             st.session_state.pop("sandbox_last_result", None)
             st.session_state.pop("sandbox_last_id", None)
 
@@ -482,19 +482,19 @@ def render_sandbox_panel():
             p_now, m5, m10, bias, win_rate, sl_price = res["現價"], res["M5"], res["M10"], res["乖離"], res["勝率"], res["停損價"]
             if p_now < m10:
                 grade_color, grade_text = COLORS["red"], "🛑 嚴禁接刀 (D級)"
-                advice = f"現價跌破 M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"
+                advice = f"現價跌破M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"
             elif p_now < m5:
                 grade_color, grade_text = COLORS["accent"], "⚠️ 等站回 M5"
-                advice = f"現價低於 M5 ({m5:.1f})。若 13:00 後站回 M5 且量能正常才觀察；站不回就等 M10。"
+                advice = f"現價低於M5 ({m5:.1f})。若 13:00 後站回 M5 且量能正常才觀察；站不回就等 M10。"
             elif bias > 7:
                 grade_color, grade_text = COLORS["accent"], "⚠️ 追高警告 (C級)"
-                advice = f"乖離 {bias:.1f}% 偏高。除非小幅突破且量能強，否則等回踩 M5。"
+                advice = f"乖離{bias:.1f}%偏高。除非小幅突破且量能強，否則等回踩 M5。"
             elif p_now > m5 and win_rate >= 50:
                 grade_color, grade_text = COLORS["primary"], "👑 准許出兵 (S/A級)"
-                advice = f"多頭結構且回測勝率 {win_rate:.0f}%。防守底線 {sl_price:.1f}；跳空 >4.5% 不追。"
+                advice = f"多頭結構且回測勝率{win_rate:.0f}%。防守底線 {sl_price:.1f}；跳空 >4.5% 不追。"
             else:
                 grade_color, grade_text = COLORS["green"], "⚖️ 穩健觀察 (B級)"
-                advice = f"結構普通，勝率 {win_rate:.0f}%。可小量試單，防守底線 {sl_price:.1f}。"
+                advice = f"結構普通，勝率{win_rate:.0f}%。可小量試單，防守底線 {sl_price:.1f}。"
 
             html_block = f"""
             <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:8px; margin-bottom:10px;">
@@ -514,7 +514,7 @@ def render_sandbox_panel():
         else:
             st.info("輸入代號後執行體檢；結果會暫存在本頁，不會因切換分頁立刻消失。")
 
-t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (機率模型)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
+t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (機率模型)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
 
 with t_rank:
     render_sandbox_panel()
