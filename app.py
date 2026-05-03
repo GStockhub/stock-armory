@@ -627,7 +627,7 @@ with t_rank:
                 return round(score, 1)
 
             final_rank["Quant_Score"] = final_rank.apply(calculate_quant_score, axis=1)
-            final_rank["改版安全指數"] = final_rank.apply(calc_refined_safety_score, axis=1)
+            final_rank["安全指數"] = final_rank.apply(calc_refined_safety_score, axis=1)
             final_rank["決策標籤"] = final_rank.apply(get_decision_label, axis=1)
             final_rank["下一步"] = final_rank.apply(get_next_action, axis=1)
             rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
@@ -663,7 +663,7 @@ with t_rank:
 
                 master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
                 master_list["法人狀態"] = master_list.apply(get_institution_state, axis=1)
-                master_list["改版安全指數"] = master_list.apply(calc_refined_safety_score, axis=1)
+                master_list["安全指數"] = master_list.apply(calc_refined_safety_score, axis=1)
                 master_list["決策標籤"] = master_list.apply(get_decision_label, axis=1)
                 master_list["下一步"] = master_list.apply(get_next_action, axis=1)
 
@@ -719,7 +719,7 @@ with t_rank:
                 def build_full_list(df_src):
                     cols = [
                         "名次", "評級", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "產業", "生命週期", "戰術型態",
-                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "改版安全指數", "現價", "M5", "M10", "M20",
+                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "安全指數", "現價", "M5", "M10", "M20",
                         "乖離(%)", "RSI", "MACD_Hist", "BB_Upper", "停損價", "停利價",
                         "建議買量(張)", "連買", "投信連賣", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"
                     ]
@@ -903,18 +903,18 @@ with t_chip:
         else:
             main_chips["安全指數"] = "-"
         main_chips["法人狀態"] = main_chips.apply(get_institution_state, axis=1)
-        main_chips["改版安全指數"] = main_chips.apply(calc_refined_safety_score, axis=1)
+        main_chips["安全指數"] = main_chips.apply(calc_refined_safety_score, axis=1)
         main_chips["決策標籤"] = main_chips.apply(get_decision_label, axis=1)
         main_chips["下一步"] = main_chips.apply(get_next_action, axis=1)
         main_codes = st.session_state.get("eod_main_codes", set())
         obs_mask = main_chips.apply(lambda r: is_institution_observation(r, main_codes), axis=1)
-        obs_df = main_chips[obs_mask].sort_values(["改版安全指數", "三大法人合計"], ascending=[False, False]).head(20).copy()
+        obs_df = main_chips[obs_mask].sort_values(["安全指數", "三大法人合計"], ascending=[False, False]).head(20).copy()
         if obs_df.empty:
             st.info("目前沒有符合條件的法人建倉觀察標的；代表主清單以外暫時不需要分心。")
         else:
-            view_cols = ["代號", "名稱", "法人狀態", "決策標籤", "下一步", "連買", "投信連賣", "改版安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
+            view_cols = ["代號", "名稱", "法人狀態", "決策標籤", "下一步", "連買", "投信連賣", "安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
             obs_df = obs_df[[c for c in view_cols if c in obs_df.columns]].copy()
-            styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["改版安全指數"])
+            styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["安全指數"])
             st.dataframe(styled_obs, height=430, use_container_width=True, hide_index=True)
     else:
         st.info("籌碼連線中斷，情報局暫停；沙盤與司令部仍可使用。")
