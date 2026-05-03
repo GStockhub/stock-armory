@@ -474,7 +474,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     # 🧬 AAR 進階分析：產業 × 戰術 × 心魔
     # ===================================================
     if results:
-        with st.expander("🧬 產業 × 戰術 × 心魔分析（找出你最容易賺/犯錯的情境）", expanded=True):
+        with st.expander("🧬 產業 × 戰術 × 心魔分析", expanded=True):
             render_context_insights(pd.DataFrame(results), COLORS)
 
     # ===================================================
@@ -493,7 +493,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         _metric_card_html("實戰勝率", f"{win_rate:.1f}%", bluegray, COLORS),
         _metric_card_html("最痛的賣飛", max_missed_stock if max_missed_stock else "無", red, COLORS),
         _metric_card_html("最大心魔", top_demon, green, COLORS),
-        _metric_card_html("🧙 神仙最大淨利", _money(god_total_pnl), primary, COLORS, sub=f"已平倉 {god_trade_count} 筆理論最高點"),
+        _metric_card_html("🧙 神仙模式", _money(god_total_pnl), primary, COLORS, sub=f"已平倉 {god_trade_count} 筆理論最高點"),
         _metric_card_html("📉 少賺空間", _money(missed_total), red if missed_total > 0 else green, COLORS, value_color=red if missed_total > 0 else green),
         _metric_card_html("🎯 獲利捕捉率", f"{capture_rate:.1f}%", bluegray, COLORS, sub="實際淨利 ÷ 神仙最大淨利"),
         _metric_card_html("👑 最強買點", god_best_stock if god_best_stock else "無", accent, COLORS),
