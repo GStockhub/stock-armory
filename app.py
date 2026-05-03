@@ -384,7 +384,7 @@ def render_top_status_panel():
     </div>
     """, unsafe_allow_html=True)
 
-    with st.expander("🔎 展開資料健康燈號", expanded=False):
+    with st.expander("🔎 資料燈號", expanded=False):
         render_data_health_panel()
 
 
