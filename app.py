@@ -122,7 +122,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v34.0</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD 司令官版 ✕ 快速沙盤 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 司令官回測室 ✕ 救援殘倉雷達 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
@@ -182,6 +182,81 @@ def render_data_status_bar():
     </div>
     """
     st.markdown(html_block, unsafe_allow_html=True)
+
+
+
+def _row_text(row, possible_keys, exclude_keys=None, default=""):
+    exclude_keys = exclude_keys or []
+    for col in row.index:
+        c = str(col).strip()
+        if any(x in c for x in exclude_keys):
+            continue
+        if c in possible_keys or any(k in c for k in possible_keys):
+            val = row[col]
+            if pd.notna(val) and str(val).strip() not in ["", "nan", "NaN", "None"]:
+                return str(val).strip()
+    return default
+
+
+def _to_float_safe(v, default=0.0):
+    try:
+        raw = str(v).replace(",", "").strip()
+        if raw in ["", "nan", "NaN", "None"]:
+            return default
+        import re
+        m = re.search(r"-?\d+\.?\d*", raw)
+        return float(m.group(0)) if m else default
+    except Exception:
+        return default
+
+
+def build_rescue_residual_map(aar_df, current_codes):
+    """從 AAR 交易日誌找出：同代號近期/歷史已有認賠紀錄，但目前仍持有的救援殘倉。"""
+    rescue = {}
+    if aar_df is None or aar_df.empty or not current_codes:
+        return rescue
+
+    df = aar_df.copy()
+    df.columns = df.columns.str.replace("\ufeff", "", regex=False).str.strip()
+    current_codes = {str(x).strip() for x in current_codes if str(x).strip()}
+
+    for _, row in df.iterrows():
+        sid = _row_text(row, ["代號", "股票代號", "證券代號", "股票代碼", "stock_id"])
+        sid = str(sid).strip()
+        if not sid or sid not in current_codes:
+            continue
+
+        buy_price = _to_float_safe(_row_text(row, ["買進價", "成本價", "成本", "買價", "均價"], exclude_keys=["賣", "平"]))
+        sell_price = _to_float_safe(_row_text(row, ["賣出價", "賣價", "平倉價"]))
+        shares = _to_float_safe(_row_text(row, ["張數", "庫存張數", "庫存", "股數", "數量"]), 0.0)
+        sell_date = _row_text(row, ["賣出日期", "賣出日", "平倉日"])
+        label = _row_text(row, ["心理標籤", "心魔", "標籤", "心理狀態"])
+
+        if buy_price <= 0 or sell_price <= 0 or shares <= 0 or not sell_date:
+            continue
+
+        raw_pnl = (sell_price - buy_price) * shares * 1000
+        loss_pct = (sell_price - buy_price) / buy_price * 100 if buy_price > 0 else 0
+        label_hit = any(k in label for k in ["凹單", "認賠", "停損", "砍", "虧"])
+
+        if raw_pnl < 0 or loss_pct < -2 or label_hit:
+            item = rescue.setdefault(sid, {
+                "count": 0,
+                "loss_sum": 0.0,
+                "worst_pct": 0.0,
+                "last_date": "",
+                "labels": set(),
+            })
+            item["count"] += 1
+            item["loss_sum"] += raw_pnl
+            item["worst_pct"] = min(item["worst_pct"], loss_pct)
+            item["last_date"] = sell_date or item["last_date"]
+            if label:
+                item["labels"].add(label.split("(")[0].strip())
+
+    for sid, item in rescue.items():
+        item["labels"] = "、".join(sorted(item["labels"])) if item["labels"] else "已認賠/停損"
+    return rescue
 
 
 def render_battle_summary(master_list, rank_sorted):
@@ -400,6 +475,8 @@ holding_rows = 0
 holding_read_ok = False
 aar_rows = 0
 aar_read_ok = False
+aar_probe_df = pd.DataFrame()
+rescue_residual_map = {}
 
 if len(chip_db) >= 1:
     dates = sorted(list(chip_db.keys()), reverse=True)
@@ -454,8 +531,12 @@ if aar_sheet_url:
         aar_rows = len(aar_probe_df)
         aar_read_ok = not aar_probe_df.empty
     except Exception:
+        aar_probe_df = pd.DataFrame()
         aar_rows = 0
         aar_read_ok = False
+
+if not m_df.empty and "代號" in m_df.columns:
+    rescue_residual_map = build_rescue_residual_map(aar_probe_df, m_df["代號"].astype(str).tolist())
 
 render_top_status_panel()
 
@@ -957,6 +1038,12 @@ with t_cmd:
             elif float_loss_pct <= -1.0:
                 st.warning(f"⚠️ **組合風控預警**：持倉總浮虧 {float_loss_pct:.1f}%，接近 2% 底線，請謹慎評估是否繼續加倉。")
 
+            if rescue_residual_map:
+                rescue_names = []
+                for code, info in rescue_residual_map.items():
+                    rescue_names.append(f"{TWSE_NAME_MAP.get(code, code)}({code})")
+                st.warning(f"🚑 **救援殘倉模式啟動：{len(rescue_residual_map)} 檔**｜{ '、'.join(rescue_names[:5]) }。這些是已在 AAR 出現認賠/停損紀錄但目前仍持有的標的；反彈減碼優先，站回結構前不加碼。", icon="🚑")
+
             html_cards = '<div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">'
             for _, r in m_df.iterrows():
                 try:
@@ -964,6 +1051,9 @@ with t_cmd:
                     p_now = float(p_now_raw) if pd.notna(p_now_raw) and str(p_now_raw).strip() != '' else 0.0
                     p_cost = get_cmd_val(r, ["成本價", "成本", "買進價", "成交均價", "建倉成本", "買價"])
                     qty = get_cmd_val(r, ["庫存張數", "張數", "庫存", "股數", "數量"])
+                    sid_hold = str(r.get("代號", "")).strip()
+                    rescue_info = rescue_residual_map.get(sid_hold, {}) if isinstance(rescue_residual_map, dict) else {}
+                    is_rescue_residual = bool(rescue_info)
 
                     buy_date_raw = ""
                     for col in r.index:
@@ -1046,11 +1136,49 @@ with t_cmd:
                     else:
                         next_action = "守M5/ATR，不追不攤"
 
+                    if is_rescue_residual:
+                        rescue_loss = abs(float(rescue_info.get("loss_sum", 0)))
+                        rescue_count = int(rescue_info.get("count", 0))
+                        rescue_worst = float(rescue_info.get("worst_pct", 0))
+                        rescue_note = f"AAR 已急救 {rescue_count} 次，已認賠約 {rescue_loss:,.0f} 元，最差單筆 {rescue_worst:.1f}%。"
+                        glow_class = ""
+                        if p_now == 0.0 or m10 == 0.0:
+                            conf_level = "救援"
+                            conf_color = COLORS.get('accent', '#79C0FF')
+                            struct = "🚑 救援殘倉｜資料待確認"
+                            next_action = "先確認報價/均線，不加碼"
+                        elif ret <= -10:
+                            conf_level = "急救"
+                            conf_color = COLORS.get('red', '#FF7B72')
+                            border_col = conf_color
+                            struct = "🚨 救援殘倉｜深虧破口"
+                            next_action = "反彈減碼優先，不再凹"
+                        elif ret <= -5:
+                            conf_level = "救援"
+                            conf_color = COLORS.get('red', '#FF7B72')
+                            border_col = conf_color
+                            struct = "🚑 救援殘倉｜風險未解除"
+                            next_action = "反彈減碼；站回M10前不加碼"
+                        elif p_now < m5:
+                            conf_level = "觀察"
+                            conf_color = COLORS.get('accent', '#79C0FF')
+                            border_col = conf_color
+                            struct = "🚑 救援殘倉｜跌破M5"
+                            next_action = "站不回M5就二次處理"
+                        else:
+                            conf_level = "修復中"
+                            conf_color = COLORS.get('primary', '#58A6FF')
+                            border_col = conf_color
+                            struct = "🚑 救援殘倉｜修復中"
+                            next_action = "守M5/M10；先不加碼"
+                        coach = f"<strong style='color:{conf_color}; font-size:14px;'>🚑 救援殘倉【{conf_level}】</strong><br>{rescue_note}<br>原則：反彈減碼優先，站回成本區前不加碼；再破 M5/M10 執行二次處理。"
+
                     name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                     display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
                     timer_html = f"<span style='color:{timer_color}; font-size:12px;'>{timer_warning}</span>" if timer_warning else ""
+                    rescue_badge = f" <span style='font-size:12px; color:{COLORS['red']}; font-weight:700;'>🚑救援殘倉</span>" if is_rescue_residual else ""
                     
-                    html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 10px 15px; background-color: {COLORS['card']}; border-radius: 4px; margin-bottom: 8px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']})</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} {timer_html}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>🎯 下一步：</span><span style='color:{conf_color}; font-weight:700;'>{next_action}</span></div></div></div>"
+                    html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 10px 15px; background-color: {COLORS['card']}; border-radius: 4px; margin-bottom: 8px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']}){rescue_badge}</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} {timer_html}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>🎯 下一步：</span><span style='color:{conf_color}; font-weight:700;'>{next_action}</span></div></div></div>"
                 except Exception as e: continue
             html_cards += '</div>'
             
