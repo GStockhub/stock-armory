@@ -1042,7 +1042,7 @@ with t_cmd:
                 rescue_names = []
                 for code, info in rescue_residual_map.items():
                     rescue_names.append(f"{TWSE_NAME_MAP.get(code, code)}({code})")
-                st.warning(f"🚑 **救援殘倉模式啟動：{len(rescue_residual_map)} 檔**｜{ '、'.join(rescue_names[:5]) }。這些是已在 AAR 出現認賠/停損紀錄但目前仍持有的標的；反彈減碼優先，站回結構前不加碼。", icon="🚑")
+                st.warning(f"**救援殘倉模式啟動：{len(rescue_residual_map)} 檔**｜{ '、'.join(rescue_names[:5]) }。這些是已在 AAR 出現認賠/停損紀錄但目前仍持有的標的；反彈減碼優先，站回結構前不加碼。", icon="🚑")
 
             html_cards = '<div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">'
             for _, r in m_df.iterrows():
