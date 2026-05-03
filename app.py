@@ -146,18 +146,18 @@ def render_data_health_panel():
     health.append(("持股CSV", holding_read_ok, f"{holding_rows} 筆" if holding_read_ok else ("未設定" if not sheet_url else "讀取失敗/空表")))
     health.append(("AAR日誌", aar_read_ok, f"{aar_rows} 筆" if aar_read_ok else ("未設定" if not aar_sheet_url else "讀取失敗/空表")))
     health.append(("FinMind Token", bool(str(FM_TOKEN).strip()), "已設定" if str(FM_TOKEN).strip() else "未設定"))
-    with st.expander("🧭 資料健康燈號（抓不到資料先看這裡）", expanded=False):
-        cols = st.columns(3)
-        for idx, (name, ok, msg) in enumerate(health):
-            color = COLORS["green"] if ok else COLORS["red"]
-            icon = "✅" if ok else "⚠️"
-            with cols[idx % 3]:
-                st.markdown(f"""
-                <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:4px solid {color}; padding:10px 12px; border-radius:8px; margin-bottom:8px;">
-                    <div style="font-size:13px; color:{COLORS['subtext']};">{icon} {name}</div>
-                    <div style="font-size:16px; font-weight:700; color:{COLORS['text']};">{msg}</div>
-                </div>
-                """, unsafe_allow_html=True)
+
+    cols = st.columns(3)
+    for idx, (name, ok, msg) in enumerate(health):
+        color = COLORS["green"] if ok else COLORS["red"]
+        icon = "✅" if ok else "⚠️"
+        with cols[idx % 3]:
+            st.markdown(f"""
+            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:4px solid {color}; padding:10px 12px; border-radius:8px; margin-bottom:8px;">
+                <div style="font-size:13px; color:{COLORS['subtext']};">{icon} {name}</div>
+                <div style="font-size:16px; font-weight:700; color:{COLORS['text']};">{msg}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 def render_data_status_bar():
@@ -384,7 +384,7 @@ def render_top_status_panel():
     </div>
     """, unsafe_allow_html=True)
 
-    with st.expander("🔎 展開詳細資料健康燈號", expanded=False):
+    with st.expander("🔎 展開資料健康燈號", expanded=False):
         render_data_health_panel()
 
 
