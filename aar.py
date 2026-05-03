@@ -309,8 +309,8 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                             min_date = pd.to_datetime(min_idx)
                             cal_days_max = (max_date - s_date).days
                             cal_days_min = (min_date - s_date).days
-                            disp_days_max = f"{k_days_max}根K（約{cal_days_max}天）" if 0 <= k_days_max <= 50 else "?"
-                            disp_days_min = f"{k_days_min}根K（約{cal_days_min}天）" if 0 <= k_days_min <= 50 else "?"
+                            disp_days_max = f"{k_days_max}根K" if 0 <= k_days_max <= 50 else "?"
+                            disp_days_min = f"{k_days_min}根K" if 0 <= k_days_min <= 50 else "?"
                             missed_pnl = (max_after_sell - sell_price) * shares * 1000
                             avoided_loss = (sell_price - min_after_sell) * shares * 1000
                             if missed_pnl > buy_cost * 0.03:
