@@ -832,7 +832,7 @@ with t_chip:
         st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
         surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
         if not surprise_atk.empty:
-            st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
+            st.markdown("#### 🚨 <span class='highlight-accent'>土洋合擊區</span>", unsafe_allow_html=True)
             st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.set_properties(**table_style).format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
             st.markdown("---")
         st.markdown("#### 🛳️ <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
