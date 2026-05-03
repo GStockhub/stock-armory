@@ -113,15 +113,15 @@ try: fee_discount = float(configs.get("fee_discount", 1.0))
 except: fee_discount = 1.0
 operation_mode = configs.get("operation_mode", "標準模式")
 MODE_PROFILE = {
-    "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折。"},
-    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持短波段原始節奏。"},
+    "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折，只打最有把握的球。"},
+    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V32短波段原始節奏。"},
     "進攻模式": {"s": 84, "a": 60, "b": 40, "size": 1.15, "label": "⚔️ 進攻模式", "note": "略放寬B級觀察與買量，但仍受總曝險與停損控制。"},
-}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持短波段原始節奏。"})
+}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V32短波段原始節奏。"})
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD ✕ 快速沙盤 ✕ AAR修正 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v33.1</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD 司令官版 ✕ 快速沙盤 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
@@ -466,7 +466,7 @@ def render_sandbox_panel():
     with col_s1:
         sim_id = st.text_input("股票代號", placeholder="例: 2330 或 0050", label_visibility="collapsed", key="sandbox_stock_id")
         sim_btn = st.button("⚡執行體檢", use_container_width=True, key="sandbox_btn")
-        if st.button("🧹清除結果", use_container_width=True, key="sandbox_clear_btn"):
+        if st.button("🧹 清除結果", use_container_width=True, key="sandbox_clear_btn"):
             st.session_state.pop("sandbox_last_result", None)
             st.session_state.pop("sandbox_last_id", None)
 
@@ -482,19 +482,19 @@ def render_sandbox_panel():
             p_now, m5, m10, bias, win_rate, sl_price = res["現價"], res["M5"], res["M10"], res["乖離"], res["勝率"], res["停損價"]
             if p_now < m10:
                 grade_color, grade_text = COLORS["red"], "🛑 嚴禁接刀 (D級)"
-                advice = f"現價跌破M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"
+                advice = f"現價跌破 M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"
             elif p_now < m5:
                 grade_color, grade_text = COLORS["accent"], "⚠️ 等站回 M5"
-                advice = f"現價低於M5 ({m5:.1f})。若 13:00 後站回 M5 且量能正常才觀察；站不回就等 M10。"
+                advice = f"現價低於 M5 ({m5:.1f})。若 13:00 後站回 M5 且量能正常才觀察；站不回就等 M10。"
             elif bias > 7:
                 grade_color, grade_text = COLORS["accent"], "⚠️ 追高警告 (C級)"
-                advice = f"乖離{bias:.1f}%偏高。除非小幅突破且量能強，否則等回踩 M5。"
+                advice = f"乖離 {bias:.1f}% 偏高。除非小幅突破且量能強，否則等回踩 M5。"
             elif p_now > m5 and win_rate >= 50:
                 grade_color, grade_text = COLORS["primary"], "👑 准許出兵 (S/A級)"
-                advice = f"多頭結構且回測勝率{win_rate:.0f}%。防守底線 {sl_price:.1f}；跳空 >4.5% 不追。"
+                advice = f"多頭結構且回測勝率 {win_rate:.0f}%。防守底線 {sl_price:.1f}；跳空 >4.5% 不追。"
             else:
                 grade_color, grade_text = COLORS["green"], "⚖️ 穩健觀察 (B級)"
-                advice = f"結構普通，勝率{win_rate:.0f}%。可小量試單，防守底線 {sl_price:.1f}。"
+                advice = f"結構普通，勝率 {win_rate:.0f}%。可小量試單，防守底線 {sl_price:.1f}。"
 
             html_block = f"""
             <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:8px; margin-bottom:10px;">
@@ -514,7 +514,7 @@ def render_sandbox_panel():
         else:
             st.info("輸入代號後執行體檢；結果會暫存在本頁，不會因切換分頁立刻消失。")
 
-t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (機率模型)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
+t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (機率模型)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
 
 with t_rank:
     render_sandbox_panel()
@@ -804,49 +804,84 @@ with t_rank:
 
               # 確保這行與上面的 if not ui_a.empty: 對齊 (通常是 16 個半形空格)
                 st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 </span>", unsafe_allow_html=True)
-                if ui_b.empty: 
+                show_bc_full = st.toggle(
+                    "顯示 B/C 完整欄位",
+                    value=False,
+                    key="show_bc_full_detail",
+                    help="預設精簡，只看決策標籤、下一步、法人狀態與量化評分；打開後才顯示生命週期、戰術型態、勝率、現價等完整資料。"
+                )
+
+                if ui_b.empty:
                     st.info("今日無 B 級備選。")
                 else:
-                    # 🚀 V32.4 統帥優化：為 B 級添加極簡版輔助徽章
                     def generate_b_badges(row):
                         b_tags = []
-                        if row.get("MACD_Cross"): b_tags.append("✅M")
-                        if row.get("RSI", 50) > 75: b_tags.append("⚠️R")
-                        elif 50 <= row.get("RSI", 50) <= 70: b_tags.append("🟢R")
-                        if row["現價"] > row.get("BB_Upper", 9999) * 1.02: b_tags.append("🌋B")
-                        
+                        if row.get("MACD_Cross"):
+                            b_tags.append("✅M")
+                        if row.get("RSI", 50) > 75:
+                            b_tags.append("⚠️R")
+                        elif 50 <= row.get("RSI", 50) <= 70:
+                            b_tags.append("🟢R")
+                        if row["現價"] > row.get("BB_Upper", 9999) * 1.02:
+                            b_tags.append("🌋B")
                         tag_str = " ".join(b_tags)
-                        return f"{row['戰術型態']} {tag_str}" if tag_str else row['戰術型態']
+                        return f"{row['戰術型態']} {tag_str}" if tag_str else row["戰術型態"]
 
                     disp_b = ui_b.copy()
                     disp_b["戰術型態"] = disp_b.apply(generate_b_badges, axis=1)
 
-                    disp_b = disp_b[["名次", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
+                    if show_bc_full:
+                        b_cols = ["名次", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]
+                    else:
+                        b_cols = ["名次", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "Quant_Score"]
+
+                    b_cols = [c for c in b_cols if c in disp_b.columns]
+                    disp_b = disp_b[b_cols].copy()
                     disp_b = disp_b.rename(columns={"Quant_Score": "量化評分", "停損價": "ATR停損"})
-                    disp_b["現價"] = disp_b["現價"].apply(lambda x: f"{x:.2f}")
-                    disp_b["ATR停損"] = disp_b["ATR停損"].apply(lambda x: f"{x:.2f}")
-                    disp_b["量化評分"] = disp_b["量化評分"].apply(lambda x: f"{x:.1f}")
-                    raw_win_rate = disp_b["勝率(%)"].copy()
-                    disp_b["勝率(%)"] = disp_b["勝率(%)"].apply(lambda x: f"{x:.1f}%")
 
-                    styled_b = (disp_b.style.set_properties(**table_style)
-                        .map(risk_color, subset=["量化評分"])
-                        .apply(lambda x: [f'color: {COLORS["green"]}; font-weight: bold;' if v > 60 else '' for v in raw_win_rate], subset=["勝率(%)"]))
+                    if "現價" in disp_b.columns:
+                        disp_b["現價"] = disp_b["現價"].apply(lambda x: f"{x:.2f}")
+                    if "ATR停損" in disp_b.columns:
+                        disp_b["ATR停損"] = disp_b["ATR停損"].apply(lambda x: f"{x:.2f}")
+                    if "量化評分" in disp_b.columns:
+                        disp_b["量化評分"] = disp_b["量化評分"].apply(lambda x: f"{x:.1f}")
+                    raw_win_rate = disp_b["勝率(%)"].copy() if "勝率(%)" in disp_b.columns else None
+                    if "勝率(%)" in disp_b.columns:
+                        disp_b["勝率(%)"] = disp_b["勝率(%)"].apply(lambda x: f"{x:.1f}%")
+
+                    styled_b = disp_b.style.set_properties(**table_style).map(risk_color, subset=["量化評分"])
+                    if raw_win_rate is not None:
+                        styled_b = styled_b.apply(
+                            lambda x: [f'color: {COLORS["green"]}; font-weight: bold;' if v > 60 else '' for v in raw_win_rate],
+                            subset=["勝率(%)"]
+                        )
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
-                    
-                st.markdown("#### 📡 <span class='highlight-primary'>【C級】潛伏遺珠</span>", unsafe_allow_html=True)
-                if ui_c.empty: st.info("今日無 C 級觀察名單。")
-                else:
-                    # 🚀 統帥優化：切除多餘的「評級」欄位
-                    disp_c = ui_c[["名次", "代號", "名稱", "決策標籤", "法人狀態", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]].copy()
-                    disp_c = disp_c.rename(columns={"Quant_Score": "量化評分"})
-                    disp_c["現價"] = disp_c["現價"].apply(lambda x: f"{x:.2f}")
-                    disp_c["量化評分"] = disp_c["量化評分"].apply(lambda x: f"{x:.1f}")
-                    disp_c["乖離(%)"] = disp_c["乖離(%)"].apply(lambda x: f"{x:.1f}%")
-                    disp_c["勝率(%)"] = disp_c["勝率(%)"].apply(lambda x: f"{x:.1f}%")
 
-                    styled_c = (disp_c.style.set_properties(**table_style)
-                        .map(risk_color, subset=["量化評分"]))
+                st.markdown("#### 📡 <span class='highlight-primary'>【C級】潛伏遺珠</span>", unsafe_allow_html=True)
+                if ui_c.empty:
+                    st.info("今日無 C 級觀察名單。")
+                else:
+                    disp_c = ui_c.copy()
+
+                    if show_bc_full:
+                        c_cols = ["名次", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]
+                    else:
+                        c_cols = ["名次", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "Quant_Score"]
+
+                    c_cols = [c for c in c_cols if c in disp_c.columns]
+                    disp_c = disp_c[c_cols].copy()
+                    disp_c = disp_c.rename(columns={"Quant_Score": "量化評分"})
+
+                    if "現價" in disp_c.columns:
+                        disp_c["現價"] = disp_c["現價"].apply(lambda x: f"{x:.2f}")
+                    if "量化評分" in disp_c.columns:
+                        disp_c["量化評分"] = disp_c["量化評分"].apply(lambda x: f"{x:.1f}")
+                    if "乖離(%)" in disp_c.columns:
+                        disp_c["乖離(%)"] = disp_c["乖離(%)"].apply(lambda x: f"{x:.1f}%")
+                    if "勝率(%)" in disp_c.columns:
+                        disp_c["勝率(%)"] = disp_c["勝率(%)"].apply(lambda x: f"{x:.1f}%")
+
+                    styled_c = disp_c.style.set_properties(**table_style).map(risk_color, subset=["量化評分"])
                     st.dataframe(styled_c, use_container_width=True, hide_index=True)
 
 with t_chip:
