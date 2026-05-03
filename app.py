@@ -8,6 +8,7 @@ from streamlit_cookies_controller import CookieController
 
 from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, read_remote_csv, convert_gsheet_url
 from quant_engine import run_sandbox_sim, level2_quant_engine
+from decision_logic import get_institution_state, get_decision_label, get_next_action, calc_refined_safety_score, is_institution_observation
 
 try:
     _create_unverified_https_context = ssl._create_unverified_context
@@ -38,7 +39,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v33.0 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v33.1 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -119,7 +120,7 @@ MODE_PROFILE = {
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v33.0</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v33.1</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD 司令官版 ✕ 快速沙盤 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -413,7 +414,16 @@ if len(chip_db) >= 1:
             else: break
         return s
 
+    def get_sell_streak(r):
+        s = 0
+        for i in range(len(dates)):
+            if r.get(f"D{i}", 0) < 0: s += 1
+            else: break
+        return s
+
     today_df["連買"] = today_df.apply(get_streak, axis=1)
+    today_df["投信連賣"] = today_df.apply(get_sell_streak, axis=1)
+    today_df["法人狀態"] = today_df.apply(get_institution_state, axis=1)
     top_80_chips = today_df.sort_values("投信(張)", ascending=False).head(80)["代號"].tolist()
 else:
     st.toast("籌碼連線失敗；沙盤與司令部仍可使用。", icon="⚠️")
@@ -565,6 +575,7 @@ with t_rank:
                 else: return "⏳ 觀望醞釀"
 
             final_rank["生命週期"] = final_rank.apply(determine_phase, axis=1)
+            final_rank["法人狀態"] = final_rank.apply(get_institution_state, axis=1)
 
             def calculate_quant_score(row):
                 score = 50
@@ -616,6 +627,9 @@ with t_rank:
                 return round(score, 1)
 
             final_rank["Quant_Score"] = final_rank.apply(calculate_quant_score, axis=1)
+            final_rank["改版安全指數"] = final_rank.apply(calc_refined_safety_score, axis=1)
+            final_rank["決策標籤"] = final_rank.apply(get_decision_label, axis=1)
+            final_rank["下一步"] = final_rank.apply(get_next_action, axis=1)
             rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
             is_phase_3 = rank_sorted["生命週期"].str.contains("第三段", na=False)
             
@@ -635,6 +649,7 @@ with t_rank:
             master_list = master_list[master_list["現價"] > master_list["停損價"]]
             master_list = master_list.head(20)
             master_list["名次"] = range(1, len(master_list) + 1)
+            st.session_state["eod_main_codes"] = set(master_list[master_list["評級"].isin(["S", "A", "B"])]["代號"].astype(str).tolist()) if not master_list.empty else set()
 
             if not master_list.empty:
                 def calc_suggested_lots(row):
@@ -647,6 +662,10 @@ with t_rank:
                     return format_lots(suggested_shares)
 
                 master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
+                master_list["法人狀態"] = master_list.apply(get_institution_state, axis=1)
+                master_list["改版安全指數"] = master_list.apply(calc_refined_safety_score, axis=1)
+                master_list["決策標籤"] = master_list.apply(get_decision_label, axis=1)
+                master_list["下一步"] = master_list.apply(get_next_action, axis=1)
 
                 ui_s = master_list[master_list["評級"] == "S"]
                 ui_a = master_list[master_list["評級"] == "A"]
@@ -682,6 +701,9 @@ with t_rank:
                             "評級": rr.get("評級", ""),
                             "代號": rr.get("代號", ""),
                             "名稱": rr.get("名稱", ""),
+                            "決策標籤": rr.get("決策標籤", ""),
+                            "下一步": rr.get("下一步", ""),
+                            "法人狀態": rr.get("法人狀態", ""),
                             "現價": round(price, 2),
                             "建議進場": entry_zone,
                             "禁追價(+4.5%)": round(price * 1.045, 2),
@@ -696,10 +718,10 @@ with t_rank:
 
                 def build_full_list(df_src):
                     cols = [
-                        "名次", "評級", "代號", "名稱", "產業", "生命週期", "戰術型態",
-                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "現價", "M5", "M10", "M20",
+                        "名次", "評級", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "產業", "生命週期", "戰術型態",
+                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "改版安全指數", "現價", "M5", "M10", "M20",
                         "乖離(%)", "RSI", "MACD_Hist", "BB_Upper", "停損價", "停利價",
-                        "建議買量(張)", "連買", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"
+                        "建議買量(張)", "連買", "投信連賣", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"
                     ]
                     keep = [c for c in cols if c in df_src.columns]
                     out = df_src[keep].copy()
@@ -767,7 +789,8 @@ with t_rank:
                                 card_html += f'<p style="color: #A0A0A0; margin: 0 0 8px 0; font-size: 12px;">{r["產業"]} | 投信連買 {r["連買"]} 天</p>'
                                 card_html += f'<div style="background-color: {COLORS["bg"]}; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid {COLORS["green"]};">'
                                 card_html += f'<div class="info-row"><span class="info-label" style="font-weight:bold; color: {COLORS["text"]};">🎯 量化評分</span><span class="info-value" style="font-size: 16px; color: {COLORS["text"]}; font-weight:bold;">{r["Quant_Score"]} 分</span></div>'
-                                card_html += f'<div style="color: {COLORS["text"]}; font-size: 12px; font-weight: bold; margin-top: 4px;">{r["戰術型態"]} | <span style="color:{COLORS["accent"]}">{r["生命週期"]}</span></div></div>'
+                                card_html += f'<div style="color: {COLORS["text"]}; font-size: 12px; font-weight: bold; margin-top: 4px;">{r["戰術型態"]} | <span style="color:{COLORS["accent"]}">{r["生命週期"]}</span></div>'
+                                card_html += f'<div style="color:{COLORS["subtext"]}; font-size:12px; margin-top:4px;">{r.get("決策標籤", "")} ｜ {r.get("法人狀態", "")}</div></div>'
                                 card_html += f'<div style="width: 100%;">'
                                 card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">📊 歷史勝率</span><span class="info-value"><span style="color: {COLORS["green"]}; font-weight:bold;">{r["勝率(%)"]:.1f}%</span> <span style="color: {COLORS["subtext"]}; font-size:11px;">(均報 +{r["均報(%)"]:.2f}%)</span></span></div>'
                                 card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">💰 現價</span><span class="info-value"><span style="color: {COLORS["primary"]};">{r["現價"]:.2f}</span> <span style="color: {COLORS["subtext"]}; font-size:11px;">(乖離 {r["乖離(%)"]:.1f}%)</span></span></div>'
@@ -798,7 +821,7 @@ with t_rank:
                     disp_b = ui_b.copy()
                     disp_b["戰術型態"] = disp_b.apply(generate_b_badges, axis=1)
 
-                    disp_b = disp_b[["名次", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
+                    disp_b = disp_b[["名次", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]].copy()
                     disp_b = disp_b.rename(columns={"Quant_Score": "量化評分", "停損價": "ATR停損"})
                     disp_b["現價"] = disp_b["現價"].apply(lambda x: f"{x:.2f}")
                     disp_b["ATR停損"] = disp_b["ATR停損"].apply(lambda x: f"{x:.2f}")
@@ -815,7 +838,7 @@ with t_rank:
                 if ui_c.empty: st.info("今日無 C 級觀察名單。")
                 else:
                     # 🚀 統帥優化：切除多餘的「評級」欄位
-                    disp_c = ui_c[["名次", "代號", "名稱", "產業", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]].copy()
+                    disp_c = ui_c[["名次", "代號", "名稱", "決策標籤", "法人狀態", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "乖離(%)", "連買"]].copy()
                     disp_c = disp_c.rename(columns={"Quant_Score": "量化評分"})
                     disp_c["現價"] = disp_c["現價"].apply(lambda x: f"{x:.2f}")
                     disp_c["量化評分"] = disp_c["量化評分"].apply(lambda x: f"{x:.1f}")
@@ -835,13 +858,29 @@ with t_chip:
             st.markdown("#### 🚨 <span class='highlight-accent'>土洋合擊區</span>", unsafe_allow_html=True)
             st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.set_properties(**table_style).format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
             st.markdown("---")
-        st.markdown("#### 🛳️ <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
-        main_chips = today_df.sort_values("三大法人合計", ascending=False).head(200)
-        if "intel_df" in locals() and intel_df is not None and not intel_df.empty:
-            main_chips = pd.merge(main_chips, intel_df[["代號", "安全指數"]], on="代號", how="left")
-            main_chips["安全指數"] = main_chips["安全指數"].apply(lambda x: f"{int(x)}" if pd.notna(x) else "-")
-        else: main_chips["安全指數"] = "-"
-        st.dataframe(main_chips[["代號", "名稱", "連買", "安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]].style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["安全指數"]), height=500, use_container_width=True, hide_index=True)
+        st.markdown("#### 🛳️ <span class='highlight-accent'>法人建倉觀察雷達</span>", unsafe_allow_html=True)
+        st.caption("只保留：安全指數≥7、三大法人合計買超、法人偏建倉，並排除已進入 S/A/B 主清單的標的。")
+        main_chips = today_df.copy()
+        chip_intel = st.session_state.get("eod_intel_df", None)
+        if chip_intel is not None and not getattr(chip_intel, "empty", True):
+            intel_cols = [c for c in ["代號", "安全指數", "現價", "M5", "M10", "M20", "RSI", "乖離(%)"] if c in chip_intel.columns]
+            main_chips = pd.merge(main_chips, chip_intel[intel_cols], on="代號", how="left")
+        else:
+            main_chips["安全指數"] = "-"
+        main_chips["法人狀態"] = main_chips.apply(get_institution_state, axis=1)
+        main_chips["改版安全指數"] = main_chips.apply(calc_refined_safety_score, axis=1)
+        main_chips["決策標籤"] = main_chips.apply(get_decision_label, axis=1)
+        main_chips["下一步"] = main_chips.apply(get_next_action, axis=1)
+        main_codes = st.session_state.get("eod_main_codes", set())
+        obs_mask = main_chips.apply(lambda r: is_institution_observation(r, main_codes), axis=1)
+        obs_df = main_chips[obs_mask].sort_values(["改版安全指數", "三大法人合計"], ascending=[False, False]).head(20).copy()
+        if obs_df.empty:
+            st.info("目前沒有符合條件的法人建倉觀察標的；代表主清單以外暫時不需要分心。")
+        else:
+            view_cols = ["代號", "名稱", "法人狀態", "決策標籤", "下一步", "連買", "投信連賣", "改版安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
+            obs_df = obs_df[[c for c in view_cols if c in obs_df.columns]].copy()
+            styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["改版安全指數"])
+            st.dataframe(styled_obs, height=430, use_container_width=True, hide_index=True)
     else:
         st.info("籌碼連線中斷，情報局暫停；沙盤與司令部仍可使用。")
 
@@ -1001,4 +1040,4 @@ with t_hist:
     st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v33.0</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v33.1</p>", unsafe_allow_html=True)
