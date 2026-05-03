@@ -272,7 +272,7 @@ def build_macro_brief(macro_df, macro_score, overheat_flag):
 
     risk_items = []
     if hot:
-        risk_items.append(f"台股乖離偏高{f'（{tw_bias:.2f}%）' if pd.notna(tw_bias) else ''}，短線拉回風險增加")
+        risk_items.append(f"台股乖離偏高{f'({tw_bias:.2f}%)'if pd.notna(tw_bias) else ''}，短線拉回風險增加")
     if fx_bad:
         risk_items.append("美元/台幣偏強，資金面需留意")
     if not vix_ok:
@@ -288,7 +288,7 @@ def build_macro_brief(macro_df, macro_score, overheat_flag):
     elif hot:
         title = "偏多過熱：小量，不追高"
         body = "趨勢仍有支撐，但台股乖離偏高，早盤追高容易被倒貨。"
-        strategy = "S/A 小量；B 等 13:00 後確認；跳空 >4.5% 不追。"
+        strategy = "S/A 小量；B等13:00後確認；跳空>4.5% 不追。"
         color, icon = COLORS["accent"], "🔥"
     elif macro_score >= 7 and equity_bulls >= 2 and vix_ok:
         title = "偏多可作戰：優先 S/A"
