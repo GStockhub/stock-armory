@@ -393,10 +393,9 @@ render_data_status_bar()
 
 @st.fragment
 def render_sandbox_panel():
-    st.markdown("### 🔮 <span class='highlight-primary'>快速沙盤推演（盤中獨立查詢）</span>", unsafe_allow_html=True)
+    st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演(買前體檢)</span>", unsafe_allow_html=True)
     col_s1, col_s2 = st.columns([1, 3])
     with col_s1:
-        st.caption("💡 盤中頻繁查股用；不會重跑下方 S/A/B/C 名單")
         sim_id = st.text_input("股票代號", placeholder="例: 2330 或 0050", label_visibility="collapsed", key="sandbox_stock_id")
         sim_btn = st.button("⚡執行體檢", use_container_width=True, key="sandbox_btn")
         if st.button("🧹 清除沙盤結果", use_container_width=True, key="sandbox_clear_btn"):
