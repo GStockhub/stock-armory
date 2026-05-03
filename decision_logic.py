@@ -87,7 +87,7 @@ def get_institution_state(row):
         return '🟢 土洋合擊'
     if total > 0 and trust > 0:
         return '⚪ 法人偏買'
-    return '⚪ 暫無方向'
+    return '⚪ 無明確方向'
 
 
 def get_decision_label(row, holding=False):

@@ -9,6 +9,7 @@ from streamlit_cookies_controller import CookieController
 from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, read_remote_csv, convert_gsheet_url
 from quant_engine import run_sandbox_sim, level2_quant_engine
 from decision_logic import get_institution_state, get_decision_label, get_next_action, calc_refined_safety_score, is_institution_observation
+from backtest_engine import BacktestConfig, run_portfolio_backtest
 
 try:
     _create_unverified_https_context = ssl._create_unverified_context
@@ -39,7 +40,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v33.1 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v34.0 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -114,13 +115,13 @@ except: fee_discount = 1.0
 operation_mode = configs.get("operation_mode", "標準模式")
 MODE_PROFILE = {
     "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折，只打最有把握的球。"},
-    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V32短波段原始節奏。"},
+    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V34司令官短波段原始節奏。"},
     "進攻模式": {"s": 84, "a": 60, "b": 40, "size": 1.15, "label": "⚔️ 進攻模式", "note": "略放寬B級觀察與買量，但仍受總曝險與停損控制。"},
-}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V32短波段原始節奏。"})
+}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V34司令官短波段原始節奏。"})
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v33.1</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v34.0</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD 司令官版 ✕ 快速沙盤 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
@@ -514,7 +515,7 @@ def render_sandbox_panel():
         else:
             st.info("輸入代號後執行體檢；結果會暫存在本頁，不會因切換分頁立刻消失。")
 
-t_rank, t_chip, t_cmd, t_book, t_hist = st.tabs(["🎯 戰術指揮所 (機率模型)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📖 游擊兵工廠 (教戰手冊)", "🏛️ 軍史館 (系統演進)"])
+t_rank, t_chip, t_cmd, t_backtest, t_book = st.tabs(["🎯 戰術指揮所 (機率模型)", "📡 情報局 (法人籌碼)", "🏦 總司令部 (風控與AAR)", "📊 司令官回測室", "📖 兵工廠與軍史館"])
 
 with t_rank:
     render_sandbox_panel()
@@ -627,7 +628,7 @@ with t_rank:
                 return round(score, 1)
 
             final_rank["Quant_Score"] = final_rank.apply(calculate_quant_score, axis=1)
-            final_rank["安全指數"] = final_rank.apply(calc_refined_safety_score, axis=1)
+            final_rank["改版安全指數"] = final_rank.apply(calc_refined_safety_score, axis=1)
             final_rank["決策標籤"] = final_rank.apply(get_decision_label, axis=1)
             final_rank["下一步"] = final_rank.apply(get_next_action, axis=1)
             rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
@@ -663,7 +664,7 @@ with t_rank:
 
                 master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
                 master_list["法人狀態"] = master_list.apply(get_institution_state, axis=1)
-                master_list["安全指數"] = master_list.apply(calc_refined_safety_score, axis=1)
+                master_list["改版安全指數"] = master_list.apply(calc_refined_safety_score, axis=1)
                 master_list["決策標籤"] = master_list.apply(get_decision_label, axis=1)
                 master_list["下一步"] = master_list.apply(get_next_action, axis=1)
 
@@ -719,7 +720,7 @@ with t_rank:
                 def build_full_list(df_src):
                     cols = [
                         "名次", "評級", "代號", "名稱", "決策標籤", "下一步", "法人狀態", "產業", "生命週期", "戰術型態",
-                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "安全指數", "現價", "M5", "M10", "M20",
+                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "改版安全指數", "現價", "M5", "M10", "M20",
                         "乖離(%)", "RSI", "MACD_Hist", "BB_Upper", "停損價", "停利價",
                         "建議買量(張)", "連買", "投信連賣", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"
                     ]
@@ -903,18 +904,18 @@ with t_chip:
         else:
             main_chips["安全指數"] = "-"
         main_chips["法人狀態"] = main_chips.apply(get_institution_state, axis=1)
-        main_chips["安全指數"] = main_chips.apply(calc_refined_safety_score, axis=1)
+        main_chips["改版安全指數"] = main_chips.apply(calc_refined_safety_score, axis=1)
         main_chips["決策標籤"] = main_chips.apply(get_decision_label, axis=1)
         main_chips["下一步"] = main_chips.apply(get_next_action, axis=1)
         main_codes = st.session_state.get("eod_main_codes", set())
         obs_mask = main_chips.apply(lambda r: is_institution_observation(r, main_codes), axis=1)
-        obs_df = main_chips[obs_mask].sort_values(["安全指數", "三大法人合計"], ascending=[False, False]).head(20).copy()
+        obs_df = main_chips[obs_mask].sort_values(["改版安全指數", "三大法人合計"], ascending=[False, False]).head(20).copy()
         if obs_df.empty:
             st.info("目前沒有符合條件的法人建倉觀察標的；代表主清單以外暫時不需要分心。")
         else:
-            view_cols = ["代號", "名稱", "法人狀態", "決策標籤", "下一步", "連買", "投信連賣", "安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
+            view_cols = ["代號", "名稱", "法人狀態", "決策標籤", "下一步", "連買", "投信連賣", "改版安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
             obs_df = obs_df[[c for c in view_cols if c in obs_df.columns]].copy()
-            styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["安全指數"])
+            styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["改版安全指數"])
             st.dataframe(styled_obs, height=430, use_container_width=True, hide_index=True)
     else:
         st.info("籌碼連線中斷，情報局暫停；沙盤與司令部仍可使用。")
@@ -1062,17 +1063,98 @@ with t_cmd:
     st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
     aar.render_aar_tab(aar_sheet_url, fee_discount, FM_TOKEN, COLORS)
 
+with t_backtest:
+    st.markdown("### 📊 <span class='highlight-primary'>司令官回測室：資金限制版</span>", unsafe_allow_html=True)
+    st.caption("用歷史日K模擬：本金、總曝險、整張/零股、跳空不追、+5.5%出半、M5/M10/ATR出場。這是驗證系統期望值，不是預測未來。")
+
+    default_symbols = []
+    if "eod_master_list" in st.session_state and isinstance(st.session_state["eod_master_list"], pd.DataFrame) and not st.session_state["eod_master_list"].empty:
+        default_symbols = st.session_state["eod_master_list"]["代號"].astype(str).head(20).tolist()
+    elif "eod_rank_sorted" in st.session_state and isinstance(st.session_state["eod_rank_sorted"], pd.DataFrame) and not st.session_state["eod_rank_sorted"].empty:
+        default_symbols = st.session_state["eod_rank_sorted"]["代號"].astype(str).head(30).tolist()
+    elif not today_df.empty and "代號" in today_df.columns:
+        default_symbols = today_df.sort_values("三大法人合計", ascending=False).head(30)["代號"].astype(str).tolist()
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        bt_capital = st.number_input("回測本金", min_value=50000, max_value=2000000, value=int(total_capital), step=10000)
+        bt_period = st.selectbox("歷史期間", ["6mo", "1y", "2y"], index=1)
+    with c2:
+        bt_total_exp = st.slider("總曝險上限", 0.2, 1.0, 0.60, 0.05)
+        bt_single = st.slider("單檔上限", 0.05, 0.30, 0.15, 0.01)
+    with c3:
+        bt_max_pos = st.slider("最多持股檔數", 1, 8, 4, 1)
+        bt_new_per_day = st.slider("每日最多新買", 1, 3, 2, 1)
+    with c4:
+        bt_slip = st.slider("滑價估計", 0.0, 0.005, 0.0015, 0.0005, format="%.4f")
+        bt_odd = st.checkbox("允許零股", value=True)
+
+    default_text = ",".join(default_symbols[:30])
+    symbol_text = st.text_area("回測股票池（逗號分隔；預設取目前主清單/法人買超前排）", value=default_text, height=90)
+    run_bt = st.button("🚀 執行資金回測", type="primary", use_container_width=True)
+
+    if run_bt:
+        symbols = [x.strip() for x in symbol_text.replace("，", ",").replace("\n", ",").split(",") if x.strip()]
+        cfg = BacktestConfig(
+            initial_capital=float(bt_capital),
+            total_exposure_pct=float(bt_total_exp),
+            single_position_pct=float(bt_single),
+            max_positions=int(bt_max_pos),
+            max_new_positions_per_day=int(bt_new_per_day),
+            fee_discount=float(fee_discount),
+            slippage_pct=float(bt_slip),
+            allow_odd_lot=bool(bt_odd),
+        )
+        with st.spinner("📡 正在執行資金限制回測，請稍候..."):
+            result = run_portfolio_backtest(symbols, TWSE_NAME_MAP, FM_TOKEN, period=bt_period, config=cfg)
+        st.session_state["commander_backtest_result"] = result
+
+    result = st.session_state.get("commander_backtest_result")
+    if result:
+        if not result.get("ok"):
+            st.warning(result.get("message", "回測無結果"))
+        else:
+            summary = result["summary"]
+            m1, m2, m3, m4 = st.columns(4)
+            metrics = [
+                ("最終資金", f"{summary['最終資金']:,.0f}", COLORS['primary']),
+                ("總報酬", f"{summary['總報酬(%)']:.2f}%", COLORS['green'] if summary['總報酬(%)'] >= 0 else COLORS['red']),
+                ("最大回撤", f"{summary['最大回撤(%)']:.2f}%", COLORS['red']),
+                ("勝率", f"{summary['勝率(%)']:.1f}%", COLORS['accent']),
+            ]
+            for col, (title, val, color) in zip([m1, m2, m3, m4], metrics):
+                with col:
+                    st.markdown(f"""
+                    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:10px; padding:12px 14px;">
+                        <div style="font-size:13px; color:{COLORS['subtext']};">{title}</div>
+                        <div style="font-size:24px; font-weight:800; color:{COLORS['text']};">{val}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            st.info(f"交易筆數：{summary['交易筆數']}｜平均單筆報酬：{summary['平均單筆報酬(%)']:.2f}%｜平均持有：{summary['平均持有天數']:.1f}天｜回測股票數：{summary['回測股票數']}")
+            curve = result.get("equity_curve", pd.DataFrame())
+            if not curve.empty:
+                st.line_chart(curve.set_index("日期")[["總資產"]])
+            tabs_bt = st.tabs(["分級績效", "交易明細"])
+            with tabs_bt[0]:
+                tier_stats = result.get("tier_stats", pd.DataFrame())
+                if not tier_stats.empty:
+                    st.dataframe(tier_stats.style.format({"勝率": "{:.1f}%", "平均報酬": "{:.2f}%", "總損益": "{:,.0f}"}), use_container_width=True, hide_index=True)
+                else:
+                    st.info("尚無足夠分級統計。")
+            with tabs_bt[1]:
+                trades = result.get("trades", pd.DataFrame())
+                if not trades.empty:
+                    st.dataframe(trades, use_container_width=True, hide_index=True, height=420)
+
 with t_book:
-    st.markdown("### 📖 <span class='highlight-primary'>游擊兵工廠：實戰教戰手冊</span>", unsafe_allow_html=True)
-    quick_tab, full_tab = st.tabs(["⚡ 快速版", "📚 完整版"])
+    st.markdown("### 📖 <span class='highlight-primary'>游擊兵工廠與軍史館</span>", unsafe_allow_html=True)
+    quick_tab, full_tab, hist_tab = st.tabs(["⚡ 快速版", "📚 完整兵工廠", "🏛️ 軍史館"])
     with quick_tab:
         st.markdown(QUICK_MANUAL_TEXT, unsafe_allow_html=True)
     with full_tab:
         st.markdown(MANUAL_TEXT, unsafe_allow_html=True)
-
-with t_hist:
-    st.markdown("### 🏛️ <span class='highlight-primary'>皇家軍史館：兵器開發檔案</span>", unsafe_allow_html=True)
-    st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
+    with hist_tab:
+        st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v33.1</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v34.0</p>", unsafe_allow_html=True)
