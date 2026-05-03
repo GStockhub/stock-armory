@@ -93,8 +93,7 @@ def render_context_insights(res_df, COLORS):
         st.info("AAR 產業 × 戰術 × 心魔分析至少需要 5 筆平倉資料。")
         return
 
-    st.markdown("### 🧬 AAR 產業 × 戰術 × 心魔分析")
-    st.caption("這區不是拿來篩選股票，而是找出你在哪種產業、戰術與心理情境最容易賺錢或犯錯。")
+    st.caption("此區用處非篩選股票，而是找出在哪種產業、戰術與心理情境最容易賺錢或犯錯。")
 
     c1, c2, c3 = st.columns(3)
     industry_df = _build_group(df, "產業")
