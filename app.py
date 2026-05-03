@@ -121,7 +121,6 @@ table_style = {"text-align": "center", "background-color": COLORS["card"], "colo
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v33.0</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;' class='text-sub'>—— EOD 司令官版 ✕ 快速沙盤 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
-st.caption(f"<div style='text-align: center;' class='text-sub'>📡 雷達最後掃描時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}</div>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
@@ -326,9 +325,9 @@ def render_macro_brief(macro_df, macro_score, overheat_flag):
     """, unsafe_allow_html=True)
 
 
-if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃！保留現金。", icon="🚨")
+if MACRO_SCORE <= 3: st.error(f"🔴 **最高紅色警戒 ({MACRO_SCORE}/10)**：市場恐慌或資金外逃，保留現金。", icon="🚨")
 elif MACRO_SCORE <= 5: st.warning(f"🟡 **黃色警戒 ({MACRO_SCORE}/10)**：大盤偏弱。資金減半操作。", icon="⚠️")
-if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：台股大盤偏離月線已突破 5%！隨時可能劇烈拉回，已限縮 AI 建議買量！", icon="🌋")
+if OVERHEAT_FLAG: st.error("🔥 **高檔過熱警戒**：大盤偏離月線突破5%，可能劇烈拉回，限縮AI建議買量。", icon="🌋")
 
 with st.spinner("情報兵正在部署防線..."):
     chip_db = fetch_chips_data(FM_TOKEN)
@@ -393,12 +392,12 @@ render_data_status_bar()
 
 @st.fragment
 def render_sandbox_panel():
-    st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演(買前體檢)</span>", unsafe_allow_html=True)
+    st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演</span>", unsafe_allow_html=True)
     col_s1, col_s2 = st.columns([1, 3])
     with col_s1:
         sim_id = st.text_input("股票代號", placeholder="例: 2330 或 0050", label_visibility="collapsed", key="sandbox_stock_id")
         sim_btn = st.button("⚡執行體檢", use_container_width=True, key="sandbox_btn")
-        if st.button("🧹 清除沙盤結果", use_container_width=True, key="sandbox_clear_btn"):
+        if st.button("🧹 清除結果", use_container_width=True, key="sandbox_clear_btn"):
             st.session_state.pop("sandbox_last_result", None)
             st.session_state.pop("sandbox_last_id", None)
 
@@ -457,7 +456,7 @@ with t_rank:
         force_eod_scan = st.button("🔄 重新掃描明日清單", use_container_width=True, key="force_eod_scan")
     with scan_col2:
         last_scan = st.session_state.get("eod_last_scan_time", "尚未掃描")
-        st.caption(f"EOD 排名主引擎只在首次載入或按下重新掃描時更新；沙盤查詢不會拖動此區。最後掃描：{last_scan}")
+        st.caption(f"最後掃描時間：{last_scan}")
 
     with st.expander("🌍 國際大盤數值"):
         render_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
@@ -487,7 +486,7 @@ with t_rank:
             intel_df = st.session_state.get("eod_intel_df")
 
         if intel_df is None:
-            st.error("🚨 **資料斷線警告**：Yahoo 與 FinMind 皆無回應。請稍後重整或確認 API 額度！", icon="💀")
+            st.error("🚨 **資料斷線警告**：Yahoo與FinMind皆無回應。請稍後重整或確認 API 額度", icon="💀")
         elif not intel_df.empty:
             final_rank = pd.merge(today_df, intel_df, on="代號", suffixes=("_chip", "_intel"))
             if "名稱_chip" in final_rank.columns: final_rank = final_rank.rename(columns={"名稱_chip": "名稱"})
@@ -669,7 +668,7 @@ with t_rank:
                         use_container_width=True,
                     )
 
-                st.markdown("#### 🥇 <span class='highlight-primary'>【S / A 級】主力狙擊區</span>", unsafe_allow_html=True)
+                st.markdown("#### 🥇 <span class='highlight-primary'>【S/A級】主力狙擊區</span>", unsafe_allow_html=True)
                 
                 if ui_s.empty and ui_a.empty: 
                     st.info("今日無 S/A 主攻標的；不追高，等下一輪訊號。")
@@ -719,7 +718,7 @@ with t_rank:
                     if not ui_a.empty: render_tier_cards(ui_a, "badge-a", "🥈 A級", COLORS["accent"])
 
               # 確保這行與上面的 if not ui_a.empty: 對齊 (通常是 16 個半形空格)
-                st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 (量化評分 >= 45)</span>", unsafe_allow_html=True)
+                st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 </span>", unsafe_allow_html=True)
                 if ui_b.empty: 
                     st.info("今日無 B 級備選。")
                 else:
@@ -750,7 +749,7 @@ with t_rank:
                         .apply(lambda x: [f'color: {COLORS["green"]}; font-weight: bold;' if v > 60 else '' for v in raw_win_rate], subset=["勝率(%)"]))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
                     
-                st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠 (Top 20 觀察名單)</span>", unsafe_allow_html=True)
+                st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠</span>", unsafe_allow_html=True)
                 if ui_c.empty: st.info("今日無 C 級觀察名單。")
                 else:
                     # 🚀 統帥優化：切除多餘的「評級」欄位
@@ -767,14 +766,14 @@ with t_rank:
 
 with t_chip:
     if not today_df.empty:
-        st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：主力兵力動向</span>", unsafe_allow_html=True)
+        st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：法人動向</span>", unsafe_allow_html=True)
         st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
         surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
         if not surprise_atk.empty:
             st.markdown("#### 🚨 <span class='highlight-green'>土洋合擊區</span>", unsafe_allow_html=True)
             st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.set_properties(**table_style).format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
             st.markdown("---")
-        st.markdown("#### <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
+        st.markdown("#### 🛳️ <span class='highlight-accent'>穩健建倉部隊 (依三大法人合計排序)</span>", unsafe_allow_html=True)
         main_chips = today_df.sort_values("三大法人合計", ascending=False).head(200)
         if "intel_df" in locals() and intel_df is not None and not intel_df.empty:
             main_chips = pd.merge(main_chips, intel_df[["代號", "安全指數"]], on="代號", how="left")
@@ -817,7 +816,7 @@ with t_cmd:
 
             float_loss_pct = (total_float_pnl / total_capital * 100) if total_capital > 0 else 0
             if float_loss_pct <= -2.0:
-                st.error(f"🔒 **組合風控鎖倉警報**：當前持倉總浮虧已達 **{float_loss_pct:.1f}%**（超過本金 2% 底線）！依紀律今日停止一切新進場，專注處理虧損部位。", icon="🚨")
+                st.error(f"🔒 **風控鎖倉警報**：當前持倉總浮虧已達 **{float_loss_pct:.1f}%**（超過本金 2% 底線）依律停止進場，專注處理虧損部位。", icon="🚨")
             elif float_loss_pct <= -1.0:
                 st.warning(f"⚠️ **組合風控預警**：持倉總浮虧 {float_loss_pct:.1f}%，接近 2% 底線，請謹慎評估是否繼續加倉。")
 
