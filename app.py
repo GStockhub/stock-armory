@@ -709,10 +709,13 @@ with t_rank:
 
                 mobile_csv = build_mobile_list(master_list).to_csv(index=False).encode("utf-8-sig")
                 full_csv = build_full_list(master_list).to_csv(index=False).encode("utf-8-sig")
+                
+                st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+                
                 dl1, dl2 = st.columns(2)
                 with dl1:
                     st.download_button(
-                        "📱 下載手機簡表 CSV",
+                        "📱 下載簡表 CSV",
                         data=mobile_csv,
                         file_name=f"Mobile_Tactical_List_{datetime.now().strftime('%Y%m%d')}.csv",
                         mime="text/csv",
@@ -720,7 +723,7 @@ with t_rank:
                     )
                 with dl2:
                     st.download_button(
-                        "📊 下載完整戰術 CSV",
+                        "📊 下載完整 CSV",
                         data=full_csv,
                         file_name=f"Full_Tactical_List_{datetime.now().strftime('%Y%m%d')}.csv",
                         mime="text/csv",
