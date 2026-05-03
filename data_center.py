@@ -1,7 +1,6 @@
 import io
 import time
 from datetime import datetime, timedelta
-import concurrent.futures
 import numpy as np
 import pandas as pd
 import requests
@@ -307,47 +306,3 @@ def safe_download(sid, fm_token=None, period="60d"):
     except Exception: pass
          
     return None
-
-@st.cache_data(ttl=900, show_spinner=False)
-def get_holding_intel(id_tuple, TWSE_IND_MAP, fm_token=None):
-    id_list = [str(x).strip() for x in list(id_tuple) if str(x).strip()]
-    if not id_list: return pd.DataFrame()
-    bulk_data = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, sid, fm_token): sid for sid in id_list}
-        for future in concurrent.futures.as_completed(futures):
-            sid, df = future.result()
-            if df is not None and not df.empty: bulk_data[sid] = df
-
-    results = []
-    for sid in id_list:
-        try:
-            df = bulk_data.get(sid)
-            if df is None or df.empty: continue
-            df = df[~df.index.duplicated(keep="last")].copy()
-            close_s = pd.to_numeric(df["Close"], errors="coerce")
-            if close_s.isna().all() or len(close_s.dropna()) < 10: continue
-
-            p_now = float(close_s.iloc[-1])
-            m5 = float(close_s.rolling(5).mean().iloc[-1])
-            m10 = float(close_s.rolling(10).mean().iloc[-1])
-
-            try:
-                high_s = pd.to_numeric(df["High"], errors="coerce")
-                low_s = pd.to_numeric(df["Low"], errors="coerce")
-                tmp = pd.DataFrame({"Close": close_s, "High": high_s, "Low": low_s}).dropna()
-                tmp["PrevClose"] = tmp["Close"].shift(1)
-                tr1 = tmp["High"] - tmp["Low"]
-                tr2 = (tmp["High"] - tmp["PrevClose"]).abs()
-                tr3 = (tmp["Low"] - tmp["PrevClose"]).abs()
-                tmp["TR"] = np.maximum(tr1, np.maximum(tr2, tr3))
-                tmp["ATR"] = tmp["TR"].rolling(14).mean()
-                atr_now = float(tmp["ATR"].iloc[-1])
-                if pd.isna(atr_now) or atr_now <= 0: atr_now = p_now * 0.03
-            except Exception: atr_now = p_now * 0.03
-
-            ind = TWSE_IND_MAP.get(sid, "未知")
-            results.append({"代號": sid, "產業": ind, "現價": round(p_now, 2), "M5": round(m5, 2), "M10": round(m10, 2), "ATR": round(atr_now, 2)})
-        except Exception: continue
-
-    return pd.DataFrame(results)

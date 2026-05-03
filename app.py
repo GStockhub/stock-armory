@@ -40,7 +40,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v34.0 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v34.2 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -65,42 +65,7 @@ if auth_status not in ["admin_auth", "guest_auth"]:
                 st.error("❌ 密碼錯誤！防禦系統已啟動。")
     st.stop()
 
-st.markdown("""
-<style>
-/* 標籤絕對保護區：強制不換行、大小固定，不受標題長度影響 */
-.tier-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap !important; flex-shrink: 0; }
-.badge-s { background-color: rgba(255, 75, 75, 0.1); color: #FF4B4B; border: 1px solid #FF4B4B; }
-.badge-a { background-color: rgba(255, 165, 0, 0.1); color: #FFA500; border: 1px solid #FFA500; }
-
-/* 🚀 統帥級卡片重構：強制高度 100%，消除高低落差 */
-.tier-card { border-radius: 6px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; box-sizing: border-box; margin-bottom: 12px; height: 100%; }
-.info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; width: 100%; }
-.info-label { font-size: 13px; opacity: 0.8; white-space: nowrap; }
-.info-value { font-size: 13px; font-weight: 500; text-align: right; white-space: nowrap; }
-
-/* 🚀 長檔名自適應區：字體微縮、自動換行、絕對限制最多兩行 */
-.stock-title { 
-    margin: 0; 
-    font-size: clamp(15px, 1.2rem, 19px); 
-    line-height: 1.25; 
-    white-space: normal; 
-    word-break: break-word; 
-    display: -webkit-box;
-    -webkit-line-clamp: 2; 
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-@media (max-width: 768px) {
-    .rwd-flex-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
-    .rwd-flex-title { flex-direction: column !important; gap: 4px !important; }
-    .rwd-flex-profit { text-align: left !important; width: 100%; border-bottom: 1px dashed gray; padding-bottom: 8px; }
-    .rwd-flex-info { flex-direction: column !important; gap: 8px !important; }
-    .rwd-flex-info > div { white-space: normal !important; }
-}
-</style>
-""", unsafe_allow_html=True)
-
+# UI 共用樣式已固化於 theme.py，由 sidebar.render_sidebar() 套用。
 configs = sidebar.render_sidebar(auth_status)
 COLORS = configs["COLORS"]
 sheet_url = str(configs["sheet_url"]).strip()
@@ -115,14 +80,14 @@ except: fee_discount = 1.0
 operation_mode = configs.get("operation_mode", "標準模式")
 MODE_PROFILE = {
     "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折，只打最有把握的球。"},
-    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V34司令官短波段原始節奏。"},
+    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V34.2司令官短波段原始節奏。"},
     "進攻模式": {"s": 84, "a": 60, "b": 40, "size": 1.15, "label": "⚔️ 進攻模式", "note": "略放寬B級觀察與買量，但仍受總曝險與停損控制。"},
-}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V34司令官短波段原始節奏。"})
+}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V34.2司令官短波段原始節奏。"})
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v34.0</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 司令官回測室 ✕ 救援殘倉雷達 ✕ AAR行為修正 ——</p>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢 v34.2</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 司令官回測室 ✕ AAR情境分析 ✕ 救援殘倉雷達 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
@@ -1042,7 +1007,7 @@ with t_cmd:
                 rescue_names = []
                 for code, info in rescue_residual_map.items():
                     rescue_names.append(f"{TWSE_NAME_MAP.get(code, code)}({code})")
-                st.warning(f"**救援殘倉模式啟動：{len(rescue_residual_map)} 檔**｜{ '、'.join(rescue_names[:5]) }。這些是已在 AAR 出現認賠/停損紀錄但目前仍持有的標的；反彈減碼優先，站回結構前不加碼。", icon="🚑")
+                st.warning(f"🚑 **救援殘倉模式啟動：{len(rescue_residual_map)} 檔**｜{ '、'.join(rescue_names[:5]) }。這些是已在 AAR 出現認賠/停損紀錄但目前仍持有的標的；反彈減碼優先，站回結構前不加碼。", icon="🚑")
 
             html_cards = '<div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">'
             for _, r in m_df.iterrows():
@@ -1285,4 +1250,4 @@ with t_book:
         st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v34.0</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v34.2</p>", unsafe_allow_html=True)

@@ -134,6 +134,63 @@ def apply_custom_theme(mode="navy"):
     }}
     .holding-card:hover {{ border-color: {t['primary']} !important; }}
 
+
+    /* =========================
+       🧱 永久 UI 裝甲：卡片等高、標籤保護、長名稱自適應
+       這段統一放 theme.py，避免 app.py 改版時漏掉。
+    ========================= */
+    [data-testid="column"] > div {{
+        height: 100%;
+    }}
+    [data-testid="column"] [data-testid="stVerticalBlock"] {{
+        height: 100%;
+    }}
+    .tier-badge {{
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap !important;
+        flex-shrink: 0;
+    }}
+    .badge-s {{ background-color: rgba(255, 75, 75, 0.10); color: #FF4B4B !important; border: 1px solid #FF4B4B; }}
+    .badge-a {{ background-color: rgba(255, 165, 0, 0.10); color: #FFA500 !important; border: 1px solid #FFA500; }}
+    .tier-card {{
+        background-color: {t['card']};
+        border: 1px solid {t['border']};
+        border-radius: 8px;
+        padding: 14px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        margin-bottom: 12px;
+        min-height: 100%;
+    }}
+    .stock-title {{
+        margin: 0;
+        font-size: clamp(15px, 1.2rem, 19px);
+        line-height: 1.25;
+        white-space: normal;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }}
+    .info-row {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; width: 100%; }}
+    .info-label {{ font-size: 13px; opacity: 0.8; white-space: nowrap; }}
+    .info-value {{ font-size: 13px; font-weight: 500; text-align: right; white-space: nowrap; }}
+
+    @media (max-width: 768px) {{
+        .rwd-flex-header {{ flex-direction: column !important; align-items: flex-start !important; gap: 8px; }}
+        .rwd-flex-title {{ flex-direction: column !important; gap: 4px !important; }}
+        .rwd-flex-profit {{ text-align: left !important; width: 100%; border-bottom: 1px dashed {t['border']}; padding-bottom: 8px; }}
+        .rwd-flex-info {{ flex-direction: column !important; gap: 8px !important; }}
+        .rwd-flex-info > div {{ white-space: normal !important; }}
+    }}
+
     /* =========================
        📌 Sidebar & 滾輪
     ========================= */

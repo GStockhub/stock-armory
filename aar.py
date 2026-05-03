@@ -8,6 +8,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from data_center import load_industry_map, read_remote_csv, safe_download
+from aar_insights import normalize_demon, infer_tactic, render_context_insights
 
 
 # 🚀 終極日期解析器：暴力斬斷尾巴，並封殺 1970 年的幽靈數字
@@ -202,7 +203,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     missed_k_records = []
     missed_money_records = []
 
-    _, TWSE_NAME_MAP = load_industry_map()
+    TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
     with st.spinner("🧠 AAR 戰術教練正在深度覆盤您的交易歷史..."):
         for i, row in df.iterrows():
@@ -354,6 +355,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         comment = "⚠️ 已跌破 M10 防守線，強烈建議檢視是否該停損！"
                         demon = "⚓ 凹單"
 
+                clean_demon_label = normalize_demon(user_demon, demon)
                 if user_demon:
                     clean_demon = str(user_demon).split("(")[0].split("（")[0].strip()
                     demon = f"👤 {clean_demon}"
@@ -361,9 +363,15 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 if demon and "紀律" not in demon and "完美" not in demon:
                     demons.append(demon)
 
+                industry = "ETF" if sid.startswith("00") else TWSE_IND_MAP.get(sid, "未知")
+                tactic_guess = infer_tactic(roi, held_days, clean_demon_label, comment, grade)
+
                 results.append({
                     "代號": sid,
                     "名稱": TWSE_NAME_MAP.get(sid, sid),
+                    "產業": industry,
+                    "戰術推定": tactic_guess,
+                    "心魔分類": clean_demon_label,
                     "診斷詳情": comment,
                     "評級": grade,
                     "買進日": buy_date.strftime("%m-%d"),
@@ -461,6 +469,13 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                         f"<div style='margin-bottom:8px;'><div style='display:flex; justify-content:space-between; font-size:13px;'><span style='color:{COLORS['text']}'>{dm}</span><span style='color:{dm_color}; font-weight:bold;'>{cnt}次 ({pct:.0f}%)</span></div><div style='background:{COLORS['border']}; border-radius:4px; height:6px; margin-top:3px;'><div style='background:{dm_color}; width:{pct:.0f}%; height:6px; border-radius:4px;'></div></div></div>",
                         unsafe_allow_html=True,
                     )
+
+    # ===================================================
+    # 🧬 AAR 進階分析：產業 × 戰術 × 心魔
+    # ===================================================
+    if results:
+        with st.expander("🧬 產業 × 戰術 × 心魔分析（找出你最容易賺/犯錯的情境）", expanded=True):
+            render_context_insights(pd.DataFrame(results), COLORS)
 
     # ===================================================
     # 📌 指標卡片區：用同一個 grid，避免兩排卡片黏在一起
