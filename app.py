@@ -808,7 +808,7 @@ with t_rank:
                         .apply(lambda x: [f'color: {COLORS["green"]}; font-weight: bold;' if v > 60 else '' for v in raw_win_rate], subset=["勝率(%)"]))
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
                     
-                st.markdown("### 📡 <span class='highlight-primary'>【C級】潛伏遺珠</span>", unsafe_allow_html=True)
+                st.markdown("#### 📡 <span class='highlight-primary'>【C級】潛伏遺珠</span>", unsafe_allow_html=True)
                 if ui_c.empty: st.info("今日無 C 級觀察名單。")
                 else:
                     # 🚀 統帥優化：切除多餘的「評級」欄位
