@@ -119,7 +119,6 @@ def render_context_insights(res_df, COLORS):
         st.info("AAR 產業 × 戰術 × 心魔分析至少需要 5 筆平倉資料。")
         return
 
-    st.caption("此區把三張表收斂成一張情境總表；詳細明細放在下方展開，避免心魔欄位重複出現太多次。")
 
     industry_df = _build_group(df, "產業")
     tactic_df = _build_group(df, "戰術推定")
@@ -142,7 +141,7 @@ def render_context_insights(res_df, COLORS):
         淨利=("淨利_num", "sum"),
         代表股票=("名稱", _dominant_text),
     ).reset_index().sort_values("淨利", ascending=False)
-    with st.expander("🔎 查看產業 / 戰術 / 心魔詳細表", expanded=False):
+    with st.expander("🔎 查看詳細表", expanded=False):
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown("##### 產業績效")
