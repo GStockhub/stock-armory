@@ -11,8 +11,28 @@ def _detect_mobile_by_context():
         return False
 
 
+def _compact_divider():
+    st.markdown("<div class='side-divider'></div>", unsafe_allow_html=True)
+
+
 def render_sidebar(auth_status="guest_auth"):
     with st.sidebar:
+        st.markdown("""
+        <style>
+        [data-testid="stSidebar"] .block-container { padding-top: 1.0rem; padding-bottom: .8rem; }
+        [data-testid="stSidebar"] h3 { margin: 0 0 .45rem 0 !important; }
+        [data-testid="stSidebar"] h4 { margin: .25rem 0 .35rem 0 !important; }
+        [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { line-height: 1.25 !important; }
+        [data-testid="stSidebar"] div[data-testid="stRadio"] { margin-top: -.2rem; }
+        [data-testid="stSidebar"] div[data-testid="stRadio"] label { padding-top: 1px !important; padding-bottom: 1px !important; }
+        [data-testid="stSidebar"] div[data-testid="stExpander"] { margin: .35rem 0 .55rem 0 !important; }
+        [data-testid="stSidebar"] div[data-testid="stAlert"] { padding: .45rem .55rem !important; margin: .35rem 0 !important; }
+        .side-divider { height:1px; background:rgba(128,128,128,.22); margin:.75rem 0 .65rem 0; }
+        .side-note-card { border-left:4px solid #A68A75; background:rgba(128,128,128,.07); padding:.52rem .65rem; border-radius:6px; font-size:12.5px; line-height:1.45; margin:.35rem 0 .2rem 0; }
+        .side-status-card { border-left:4px solid #20A05D; background:rgba(128,128,128,.07); padding:.45rem .6rem; border-radius:6px; font-size:12.5px; line-height:1.45; margin:.35rem 0 .45rem 0; }
+        </style>
+        """, unsafe_allow_html=True)
+
         st.markdown("### ⚙️ 操盤控制台")
 
         # ===================================================
@@ -26,14 +46,14 @@ def render_sidebar(auth_status="guest_auth"):
             horizontal=False,
             help="保守：提高門檻、減少買量；標準：維持原本節奏；進攻：略放寬B級與買量，但仍遵守停損。"
         )
-        if operation_mode == "保守模式":
-            st.warning("🛡️ 保守：只打高把握標的，建議買量減少30%")
-        elif operation_mode == "進攻模式":
-            st.info("⚔️ 進攻：B級備選更積極，建議買量最多提高15%")
-        else:
-            st.success("⚖️ 標準：短波段模型正常執行")
+        mode_note = {
+            "保守模式": "🛡️ 保守：只打高把握標的，建議買量減少30%",
+            "標準模式": "⚖️ 標準：短波段模型正常執行",
+            "進攻模式": "⚔️ 進攻：B級備選更積極，買量最多提高15%",
+        }.get(operation_mode, "⚖️ 標準：短波段模型正常執行")
+        st.markdown(f"<div class='side-note-card'>{mode_note}</div>", unsafe_allow_html=True)
 
-        st.markdown("---")
+        _compact_divider()
 
         # ===================================================
         # 📱 手機快查模式：自動偵測 + 手動備援 + URL 永久入口
@@ -48,30 +68,29 @@ def render_sidebar(auth_status="guest_auth"):
         mobile_quick_mode = st.toggle(
             "📱 手機快查模式",
             value=default_quick,
-            help="手機快查只載入沙盤推演與快速兵工廠，避免盤中手機重開時整套系統重跑。可在網址加 ?quick=1 固定進入。"
+            help="手機快查只載入沙盤推演與快速兵工廠；網址加 ?quick=1 可固定進入。"
         )
-        if mobile_quick_mode:
-            st.caption("目前為快查模式：只載入沙盤與快速兵工廠。")
-        else:
-            st.caption("完整模式：載入ETF、法人、持股、AAR與回測。")
+        st.caption("快查：只跑沙盤與快速兵工廠" if mobile_quick_mode else "完整：載入 ETF / 法人 / AAR / 回測")
 
-        st.markdown("---")
+        _compact_divider()
 
         # ===================================================
-        # 🔗 資料連線
+        # 🔗 資料連線 + 健康燈號
         # ===================================================
         st.markdown("#### 🔗 資料連線")
         if auth_status == "admin_auth":
             default_sheet_url = st.secrets.get("sheet_url", "")
             default_aar_url = st.secrets.get("aar_sheet_url", "")
             default_etf_holdings_url = st.secrets.get("active_etf_holdings_url", "")
-            if default_sheet_url or default_aar_url or default_etf_holdings_url:
-                st.success("✅ 已讀取 secrets 內的資料連線", icon="🔗")
+            secret_count = sum(bool(x) for x in [default_sheet_url, default_aar_url, default_etf_holdings_url])
+            st.caption(f"已讀取 secrets：{secret_count}/3")
         else:
             default_sheet_url = ""
             default_aar_url = ""
             default_etf_holdings_url = ""
-            st.info("💡 友軍請手動貼上 CSV 網址", icon="👋")
+            st.caption("友軍模式：可手動貼 CSV")
+
+        health_slot = st.empty()
 
         with st.expander("🔧 CSV 網址設定", expanded=False):
             manual_sheet_url = st.text_input("【持股部位】CSV 網址", value="", placeholder="貼上您的持股 CSV 網址")
@@ -82,8 +101,7 @@ def render_sidebar(auth_status="guest_auth"):
         aar_sheet_url = manual_aar_url.strip() if manual_aar_url.strip() else default_aar_url
         etf_holdings_url = manual_etf_url.strip() if manual_etf_url.strip() else default_etf_holdings_url
 
-        # 資料健康燈號由 app.py 在資料讀取後補進 sidebar，避免 Sidebar 自己重抓資料。
-        st.markdown("---")
+        _compact_divider()
 
         # ===================================================
         # 🎨 介面主題
@@ -101,6 +119,7 @@ def render_sidebar(auth_status="guest_auth"):
             list(theme_options.keys()),
             index=0,
             format_func=lambda x: theme_options.get(x),
+            label_visibility="collapsed",
         )
 
         try:
@@ -115,10 +134,10 @@ def render_sidebar(auth_status="guest_auth"):
             }
             st.error("⚠️ 偵測到雲端 theme.py 尚未更新，目前使用備用色碼。")
 
-        st.markdown("---")
-        if st.button("🔄 一鍵清空情報快取", use_container_width=True):
-            st.cache_data.clear()
-            st.success("快取已清除，請重新載入。")
+        with st.expander("🧹 快取工具", expanded=False):
+            if st.button("🔄 一鍵清空情報快取", use_container_width=True):
+                st.cache_data.clear()
+                st.success("快取已清除，請重新載入。")
 
         return {
             "COLORS": COLORS,
@@ -130,4 +149,5 @@ def render_sidebar(auth_status="guest_auth"):
             "fee_discount": 1.0,
             "operation_mode": operation_mode,
             "mobile_quick_mode": mobile_quick_mode,
+            "health_slot": health_slot,
         }

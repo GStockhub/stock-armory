@@ -122,6 +122,8 @@ def render_context_insights(res_df, COLORS):
         st.info("AAR 產業 × 戰術 × 心魔分析至少需要 5 筆平倉資料。")
         return
 
+    st.caption("此區把三張表收斂成一張情境總表；詳細明細放在下方展開，避免心魔欄位重複出現太多次。")
+
     industry_df = _build_group(df, "產業")
     tactic_df = _build_group(df, "戰術推定")
     demon_df = _build_group(df, "心魔分類")

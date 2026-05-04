@@ -47,8 +47,13 @@ DEFAULT_ACTIVE_ETFS: Dict[str, Dict[str, str]] = {
 }
 
 # Generic sources. 這些網頁格式可能變動，所以 fetch 會自動 fail-soft。
+# MoneyDJ 目前可直接在持股頁看到「持股明細」與「投資比例」，
+# Pocket / Yahoo 作為備援來源；若網站改版，前端仍會回到 CSV 備援。
 GENERIC_SOURCE_TEMPLATES = [
-    "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code}.tw",
+    "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code_l}.tw",
+    "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid={code_l}.tw&topc=",
+    "https://tw.stock.yahoo.com/quote/{code}.TW/holding",
+    "https://www.pocket.tw/etf//tw/{code}",
     "https://www.pocket.tw/etf//tw/{code}/fundholding",
 ]
 
@@ -124,6 +129,95 @@ def _name_reverse_map(name_map: Dict[str, str]) -> Dict[str, str]:
     return rev
 
 
+def _strip_html_to_text(html: str) -> str:
+    text = re.sub(r"<script[\s\S]*?</script>", " ", html, flags=re.I)
+    text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html_unescape(text)
+    text = re.sub(r"[\t\r\f\v]+", " ", text)
+    text = re.sub(r" +", " ", text)
+    return text
+
+
+def html_unescape(text: str) -> str:
+    # 避免額外 import html 與既有 html 變數撞名。
+    try:
+        import html as _html
+        return _html.unescape(text)
+    except Exception:
+        return text
+
+
+def _parse_holdings_from_moneydj_text(html: str, etf_code: str, etf_name: str, name_map: Optional[Dict[str, str]], source_url: str) -> pd.DataFrame:
+    """MoneyDJ 持股明細文字備援解析。
+
+    MoneyDJ 頁面常可直接看到：
+    台積電(2330.TW) 8.99 10,039,000.00
+    若 read_html 解析不到規格化表格，就用此法抓前十大持股。
+    """
+    if not html:
+        return pd.DataFrame()
+    text = _strip_html_to_text(html)
+    # 優先抓「持股明細」後面的區段，避免誤抓相關 ETF 或新聞文字。
+    pos = text.find("持股明細")
+    if pos >= 0:
+        segment = text[pos: pos + 6000]
+    else:
+        segment = text[:8000]
+
+    # 日期：取持股明細後最接近的資料日期。
+    date = pd.Timestamp(datetime.now().date())
+    date_matches = re.findall(r"資料日期[:：]?\s*(\d{4})[/-](\d{1,2})[/-](\d{1,2})", segment)
+    if date_matches:
+        y, m, d = date_matches[-1]
+        try:
+            date = pd.Timestamp(f"{int(y):04d}-{int(m):02d}-{int(d):02d}")
+        except Exception:
+            pass
+
+    # 主要格式：名稱(2330.TW) 8.99 10,039,000.00
+    pattern = re.compile(r"([\u4e00-\u9fffA-Za-z0-9*\-]+)\((\d{4}[A-Z]?)\.TW\)\s*([0-9]+(?:\.[0-9]+)?)\s+([0-9,]+(?:\.[0-9]+)?)")
+    rows = []
+    seen = set()
+    for name, code, weight, shares in pattern.findall(segment):
+        code = _clean_code(code)
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        rows.append({
+            "日期": date,
+            "ETF代號": _clean_code(etf_code),
+            "ETF名稱": etf_name or etf_code,
+            "成分股代號": code,
+            "成分股名稱": (name_map or {}).get(code, str(name).strip()),
+            "權重": _to_float(weight),
+            "持有股數": _to_float(shares),
+            "來源": source_url,
+        })
+    if rows:
+        return pd.DataFrame(rows)
+
+    # Yahoo 等來源常只有「台積電 9.57%」沒有代號；能用 name_map 反查就保留。
+    rev = _name_reverse_map(name_map or {})
+    loose = re.findall(r"([\u4e00-\u9fffA-Za-z0-9*\-]{2,20})\s+([0-9]+(?:\.[0-9]+)?)%", segment)
+    for name, weight in loose:
+        code = rev.get(str(name).strip(), "")
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        rows.append({
+            "日期": date,
+            "ETF代號": _clean_code(etf_code),
+            "ETF名稱": etf_name or etf_code,
+            "成分股代號": code,
+            "成分股名稱": str(name).strip(),
+            "權重": _to_float(weight),
+            "持有股數": 0.0,
+            "來源": source_url,
+        })
+    return pd.DataFrame(rows)
+
+
 # -----------------------------
 # ETF 名單與自動來源
 # -----------------------------
@@ -159,20 +253,42 @@ def get_active_etf_candidates(momentum_df: Optional[pd.DataFrame] = None, top_n:
 
 def _source_urls_for(code: str, custom_sources: Optional[Dict[str, str]] = None) -> List[str]:
     custom_sources = custom_sources or {}
+    code = _clean_code(code)
     urls = []
     if code in custom_sources and str(custom_sources[code]).strip():
         urls.append(str(custom_sources[code]).strip())
-    urls.extend([tpl.format(code=code) for tpl in GENERIC_SOURCE_TEMPLATES])
-    return urls
+    for tpl in GENERIC_SOURCE_TEMPLATES:
+        try:
+            urls.append(tpl.format(code=code, code_l=code.lower()))
+        except Exception:
+            continue
+    # 去重保序
+    out, seen = [], set()
+    for u in urls:
+        if u and u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
 
 
-def _read_html_tables(url: str, timeout: int = 18) -> List[pd.DataFrame]:
+def _fetch_html(url: str, timeout: int = 18) -> str:
     try:
         resp = _session().get(url, timeout=timeout, verify=False)
         resp.raise_for_status()
+        # MoneyDJ 常見 Big5 / cp950；apparent_encoding 可避免中文欄位變亂碼。
+        enc = getattr(resp, "apparent_encoding", None) or resp.encoding or "utf-8"
+        resp.encoding = enc
         html = resp.text
-        if not html or len(html) < 100:
-            return []
+        return html if html and len(html) > 100 else ""
+    except Exception:
+        return ""
+
+
+def _read_html_tables(url: str, timeout: int = 18) -> List[pd.DataFrame]:
+    html = _fetch_html(url, timeout=timeout)
+    if not html:
+        return []
+    try:
         return pd.read_html(io.StringIO(html))
     except Exception:
         return []
@@ -246,14 +362,22 @@ def fetch_active_etf_holding_one(
     code = _clean_code(etf_code)
     name = etf_name or DEFAULT_ACTIVE_ETFS.get(code, {}).get("名稱", code)
     for url in _source_urls_for(code, custom_sources):
-        tables = _read_html_tables(url)
+        html = _fetch_html(url)
         best = pd.DataFrame()
-        for t in tables:
-            std = _standardize_holding_table(t, code, name, name_map=name_map, source_url=url)
-            if std.empty:
-                continue
-            if len(std) > len(best):
-                best = std
+        if html:
+            try:
+                tables = pd.read_html(io.StringIO(html))
+            except Exception:
+                tables = []
+            for t in tables:
+                std = _standardize_holding_table(t, code, name, name_map=name_map, source_url=url)
+                if std.empty:
+                    continue
+                if len(std) > len(best):
+                    best = std
+            # MoneyDJ / Yahoo 文字備援：read_html 抓不到時仍可解析「持股明細」文字。
+            if best.empty:
+                best = _parse_holdings_from_moneydj_text(html, code, name, name_map=name_map, source_url=url)
         if not best.empty:
             return best
         time.sleep(0.25)
@@ -431,7 +555,7 @@ def build_active_etf_manager_radar(
     if latest.empty:
         return {
             "ok": False,
-            "message": "自動持股來源目前抓不到資料，請使用 CSV 備援。",
+            "message": "自動來源未成功解析：MoneyDJ / Yahoo / Pocket 皆未取得持股表，請暫用 CSV 備援。",
             "candidates": pd.DataFrame(candidates),
             "holdings": pd.DataFrame(),
             "summary": summarize_holdings(pd.DataFrame(), industry_map, name_map, top_n=top_n, lookback_days=lookback_days),

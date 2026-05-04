@@ -545,26 +545,35 @@ if not m_df.empty and "代號" in m_df.columns:
     rescue_residual_map = build_rescue_residual_map(aar_probe_df, m_df["代號"].astype(str).tolist())
 
 # 資料健康燈號移至 Sidebar，主畫面不再佔用 S/A/B 空間。
-with st.sidebar:
-    st.markdown("---")
-    status_items = [
-        ("產業", len(TWSE_NAME_MAP) > 0),
-        ("大盤", not MACRO_DF.empty),
-        ("法人", len(chip_db) > 0),
-        ("持股", holding_read_ok or not sheet_url),
-        ("AAR", aar_read_ok or not aar_sheet_url),
-        ("Token", bool(str(FM_TOKEN).strip())),
-    ]
-    ok_count = sum(ok for _, ok in status_items)
-    color = COLORS["green"] if ok_count >= 5 else (COLORS["accent"] if ok_count >= 4 else COLORS["red"])
-    st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; padding:8px 10px; border-radius:8px; font-size:13px;">
-        <b>🧭 資料狀態：{ok_count}/6 正常</b>
-    </div>
-    """, unsafe_allow_html=True)
-    with st.expander("查看詳細燈號", expanded=False):
-        for name, ok in status_items:
-            st.markdown(f"{'✅' if ok else '⚠️'} {name}")
+status_items = [
+    ("產業", len(TWSE_NAME_MAP) > 0),
+    ("大盤", not MACRO_DF.empty),
+    ("法人", len(chip_db) > 0),
+    ("持股", holding_read_ok or not sheet_url),
+    ("AAR", aar_read_ok or not aar_sheet_url),
+    ("Token", bool(str(FM_TOKEN).strip())),
+]
+ok_count = sum(ok for _, ok in status_items)
+color = COLORS["green"] if ok_count >= 5 else (COLORS["accent"] if ok_count >= 4 else COLORS["red"])
+health_html = f"""
+<div class="side-status-card" style="border-left-color:{color};">
+    <b>🧭 資料狀態：{ok_count}/6 正常</b><br>
+    <span style="font-size:12px; opacity:.75;">{'全部正常' if ok_count == 6 else '部分異常，請展開查看'}</span>
+</div>
+"""
+health_slot = configs.get("health_slot") if isinstance(configs, dict) else None
+try:
+    if health_slot is not None:
+        with health_slot.container():
+            st.markdown(health_html, unsafe_allow_html=True)
+            with st.expander("查看詳細燈號", expanded=False):
+                st.markdown("｜".join([f"{'✅' if ok else '⚠️'} {name}" for name, ok in status_items]))
+    else:
+        with st.sidebar:
+            st.markdown(health_html, unsafe_allow_html=True)
+except Exception:
+    with st.sidebar:
+        st.markdown(health_html, unsafe_allow_html=True)
 
 render_top_status_panel()
 
