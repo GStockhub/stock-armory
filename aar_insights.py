@@ -76,10 +76,36 @@ def _build_group(df, key):
         主要心魔=("心魔分類", _dominant_text),
     ).reset_index()
     grp = grp.sort_values(["淨利", "勝率"], ascending=[False, False])
-    grp["勝率"] = grp["勝率"].map(lambda x: f"{x:.0f}%")
-    grp["平均報酬"] = grp["平均報酬"].map(lambda x: f"{x:+.2f}%")
-    grp["淨利"] = grp["淨利"].map(lambda x: f"{x:,.0f}")
     return grp
+
+
+def _best_worst_text(group_df, key_name):
+    if group_df is None or group_df.empty:
+        return "樣本不足", "樣本不足", "-", "先累積更多交易紀錄"
+    best = group_df.sort_values(["淨利", "勝率"], ascending=[False, False]).iloc[0]
+    worst = group_df.sort_values(["淨利", "勝率"], ascending=[True, True]).iloc[0]
+    main_demon = worst.get("主要心魔", "-")
+    if "凹單" in str(main_demon):
+        advice = "破線就走，救援單不要拖成大虧"
+    elif "恐高" in str(main_demon):
+        advice = "+5.5%～6% 出半，剩餘守 M5"
+    elif "耐心" in str(main_demon):
+        advice = "未破 M5/M10 前，不因盤整就亂跑"
+    else:
+        advice = "維持 SOP，避免因單筆結果過度修正"
+    best_txt = f"{best.get(key_name, '-')}: {best.get('淨利', 0):,.0f} 元 / 勝率 {best.get('勝率', 0):.0f}%"
+    worst_txt = f"{worst.get(key_name, '-')}: {worst.get('淨利', 0):,.0f} 元 / 勝率 {worst.get('勝率', 0):.0f}%"
+    return best_txt, worst_txt, main_demon, advice
+
+
+def _format_group(df, key_name):
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy().rename(columns={key_name: "分類"})
+    out["勝率"] = out["勝率"].map(lambda x: f"{x:.0f}%")
+    out["平均報酬"] = out["平均報酬"].map(lambda x: f"{x:+.2f}%")
+    out["淨利"] = out["淨利"].map(lambda x: f"{x:,.0f}")
+    return out
 
 
 def render_context_insights(res_df, COLORS):
@@ -93,57 +119,41 @@ def render_context_insights(res_df, COLORS):
         st.info("AAR 產業 × 戰術 × 心魔分析至少需要 5 筆平倉資料。")
         return
 
-    st.caption("此區用處非篩選股票，而是找出在哪種產業、戰術與心理情境最容易賺錢或犯錯。")
+    st.caption("此區把三張表收斂成一張情境總表；詳細明細放在下方展開，避免心魔欄位重複出現太多次。")
 
-    c1, c2, c3 = st.columns(3)
     industry_df = _build_group(df, "產業")
     tactic_df = _build_group(df, "戰術推定")
     demon_df = _build_group(df, "心魔分類")
 
-    with c1:
-        st.markdown("#### 🏭 產業績效")
-        if not industry_df.empty:
-            st.dataframe(industry_df.rename(columns={"產業":"產業/類型"}).head(8), use_container_width=True, hide_index=True)
-    with c2:
-        st.markdown("#### ⚔️ 戰術績效")
-        if not tactic_df.empty:
-            st.dataframe(tactic_df.rename(columns={"戰術推定":"戰術"}).head(8), use_container_width=True, hide_index=True)
-    with c3:
-        st.markdown("#### 👤 心魔績效")
-        if not demon_df.empty:
-            st.dataframe(demon_df.rename(columns={"心魔分類":"心魔"}).head(8), use_container_width=True, hide_index=True)
+    b1, w1, d1, a1 = _best_worst_text(industry_df, "產業")
+    b2, w2, d2, a2 = _best_worst_text(tactic_df, "戰術推定")
+    b3, w3, d3, a3 = _best_worst_text(demon_df, "心魔分類")
+    summary = pd.DataFrame([
+        {"維度": "產業", "最順": b1, "最傷": w1, "主要問題": d1, "建議": a1},
+        {"維度": "戰術", "最順": b2, "最傷": w2, "主要問題": d2, "建議": a2},
+        {"維度": "心魔", "最順": b3, "最傷": w3, "主要問題": d3, "建議": a3},
+    ])
+    st.dataframe(summary, use_container_width=True, hide_index=True, height=150)
 
-    # 組合診斷：找出最賺與最傷的情境
     work = df.copy()
     work["淨利_num"] = _num(work["淨利"])
     combo = work.groupby(["產業", "戰術推定", "心魔分類"], dropna=False).agg(
         筆數=("代號", "count"),
         淨利=("淨利_num", "sum"),
         代表股票=("名稱", _dominant_text),
-    ).reset_index()
-    combo = combo[combo["筆數"] >= 1].sort_values("淨利", ascending=False)
-
-    best = combo.head(1)
-    worst = combo.tail(1)
-    best_txt = "樣本不足"
-    worst_txt = "樣本不足"
-    if not best.empty:
-        r = best.iloc[0]
-        best_txt = f"最順：{r['產業']} / {r['戰術推定']} / {r['心魔分類']}，累計 {r['淨利']:,.0f} 元，代表：{r['代表股票']}。"
-    if not worst.empty:
-        r = worst.iloc[0]
-        worst_txt = f"最傷：{r['產業']} / {r['戰術推定']} / {r['心魔分類']}，累計 {r['淨利']:,.0f} 元，代表：{r['代表股票']}。"
-
-    st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; border-radius:10px; padding:12px 14px; margin:10px 0 14px 0;">
-        <div style="font-weight:800; margin-bottom:6px; color:{COLORS['text']};">🧭 情境診斷</div>
-        <div style="font-size:13px; line-height:1.55; color:{COLORS['text']};">{best_txt}</div>
-        <div style="font-size:13px; line-height:1.55; color:{COLORS['text']}; margin-top:4px;">{worst_txt}</div>
-        <div style="font-size:12px; color:{COLORS['subtext']}; margin-top:6px;">提醒：樣本少時只當方向參考；不要因為單次結果就封印某產業。</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    with st.expander("🔎 查看產業 × 戰術 × 心魔明細", expanded=False):
+    ).reset_index().sort_values("淨利", ascending=False)
+    with st.expander("🔎 查看產業 / 戰術 / 心魔詳細表", expanded=False):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown("##### 產業績效")
+            st.dataframe(_format_group(industry_df, "產業").head(12), use_container_width=True, hide_index=True)
+        with c2:
+            st.markdown("##### 戰術績效")
+            st.dataframe(_format_group(tactic_df, "戰術推定").head(12), use_container_width=True, hide_index=True)
+        with c3:
+            st.markdown("##### 心魔績效")
+            st.dataframe(_format_group(demon_df, "心魔分類").head(12), use_container_width=True, hide_index=True)
+        st.markdown("##### 組合情境明細")
         detail = combo.copy()
         detail["淨利"] = detail["淨利"].map(lambda x: f"{x:,.0f}")
         st.dataframe(detail.head(30), use_container_width=True, hide_index=True)

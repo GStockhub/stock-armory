@@ -157,8 +157,8 @@ def _render_metric_grid(cards_html, COLORS):
                 overflow:hidden;
             }}
             .aar-metric-title {{ font-size:14px; line-height:1.2; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-            .aar-metric-value {{ font-size:24px; line-height:1.15; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-            .aar-metric-sub {{ font-size:12px; line-height:1.25; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+            .aar-metric-value {{ font-size:clamp(18px, 2.2vw, 24px); line-height:1.18; font-weight:800; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }}
+            .aar-metric-sub {{ font-size:12px; line-height:1.35; margin-top:6px; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }}
             @media (max-width: 900px) {{ .aar-metric-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); gap:12px; }} }}
             @media (max-width: 520px) {{ .aar-metric-grid {{ grid-template-columns: 1fr; }} }}
         </style>
@@ -166,7 +166,7 @@ def _render_metric_grid(cards_html, COLORS):
         <body><div class="aar-metric-grid">{''.join(cards_html)}</div></body>
         </html>
         """,
-        height=210,
+        height=245,
         scrolling=False,
     )
 
@@ -562,8 +562,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
             name = html.escape(str(r.get("名稱", "")))
             detail = html.escape(str(r.get("診斷詳情", "")))
             grade = html.escape(str(r.get("評級", "")))
-            buy_date = html.escape(str(r.get("買進日", "")))
-            sell_date = html.escape(str(r.get("賣出日", "")))
             held = html.escape(str(r.get("持有天數", "")))
             roi_raw = r.get("報酬率(%)", 0)
             pnl_raw = r.get("淨利", 0)
@@ -575,8 +573,6 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                 <td class="aar-name">{name}</td>
                 <td class="aar-detail">{detail}</td>
                 <td class="aar-grade" style="color:{grade_text_color(grade)};">{grade}</td>
-                <td class="aar-date">{buy_date}</td>
-                <td class="aar-date">{sell_date}</td>
                 <td class="aar-days">{held}</td>
                 <td class="aar-roi" style="color:{pnl_text_color(roi_raw)};">{roi}</td>
                 <td class="aar-pnl" style="color:{pnl_text_color(pnl_raw)};">{pnl}</td>
@@ -591,20 +587,19 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
         <meta charset="UTF-8">
         <style>
             html, body {{ margin:0; padding:0; background:transparent; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:{COLORS['text']}; }}
-            .aar-wrap {{ width:100%; height:520px; overflow:auto; border:1px solid {COLORS['border']}; border-radius:8px; background:{COLORS['card']}; }}
-            table.aar-table {{ width:100%; min-width:980px; border-collapse:collapse; table-layout:fixed; font-size:13px; background:{COLORS['card']}; color:{COLORS['text']}; }}
+            .aar-wrap {{ width:100%; height:560px; overflow:auto; border:1px solid {COLORS['border']}; border-radius:8px; background:{COLORS['card']}; }}
+            table.aar-table {{ width:100%; min-width:760px; border-collapse:collapse; table-layout:fixed; font-size:13px; background:{COLORS['card']}; color:{COLORS['text']}; }}
             table.aar-table th {{ position:sticky; top:0; z-index:5; background:{COLORS['card']}; color:{COLORS['subtext']}; font-weight:700; padding:8px 7px; border-bottom:1px solid {COLORS['border']}; border-right:1px solid {COLORS['border']}; text-align:left; white-space:nowrap; box-shadow:0 1px 0 {COLORS['border']}; }}
             table.aar-table td {{ padding:8px 7px; border-bottom:1px solid {COLORS['border']}; border-right:1px solid {COLORS['border']}; vertical-align:top; color:{COLORS['text']}; }}
             table.aar-table tr:last-child td {{ border-bottom:none; }}
-            .aar-code {{ width:6%; white-space:nowrap; }}
-            .aar-name {{ width:8%; white-space:normal !important; word-break:break-all; overflow-wrap:anywhere; line-height:1.35; }}
-            .aar-detail {{ width:48%; text-align:left; white-space:normal !important; word-break:break-word; overflow-wrap:anywhere; line-height:1.45; }}
-            .aar-grade {{ width:7%; white-space:nowrap; font-weight:700; }}
-            .aar-date {{ width:7%; white-space:nowrap; }}
-            .aar-days {{ width:6%; white-space:nowrap; text-align:right; }}
-            .aar-roi {{ width:7%; white-space:nowrap; text-align:right; font-weight:700; }}
-            .aar-pnl {{ width:6%; white-space:nowrap; text-align:right; font-weight:700; }}
-            @media (max-width:900px) {{ table.aar-table {{ min-width:1050px; }} .aar-detail {{ width:44%; }} }}
+            .aar-code {{ width:7%; white-space:nowrap; }}
+            .aar-name {{ width:10%; white-space:normal !important; word-break:break-all; overflow-wrap:anywhere; line-height:1.35; }}
+            .aar-detail {{ width:52%; text-align:left; white-space:normal !important; word-break:break-word; overflow-wrap:anywhere; line-height:1.48; }}
+            .aar-grade {{ width:8%; white-space:normal; font-weight:700; }}
+            .aar-days {{ width:7%; white-space:nowrap; text-align:right; }}
+            .aar-roi {{ width:8%; white-space:nowrap; text-align:right; font-weight:700; }}
+            .aar-pnl {{ width:8%; white-space:nowrap; text-align:right; font-weight:700; }}
+            @media (max-width:900px) {{ table.aar-table {{ min-width:820px; }} .aar-detail {{ width:50%; }} }}
         </style>
         </head>
         <body>
@@ -613,7 +608,7 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
                     <thead>
                         <tr>
                             <th class="aar-code">代號</th><th class="aar-name">名稱</th><th class="aar-detail">診斷詳情</th><th class="aar-grade">評級</th>
-                            <th class="aar-date">買進日</th><th class="aar-date">賣出日</th><th class="aar-days">持有天數</th><th class="aar-roi">報酬率(%)</th><th class="aar-pnl">淨利</th>
+                            <th class="aar-days">持有天數</th><th class="aar-roi">報酬率(%)</th><th class="aar-pnl">淨利</th>
                         </tr>
                     </thead>
                     <tbody>{table_rows}</tbody>

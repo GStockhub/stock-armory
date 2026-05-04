@@ -41,7 +41,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.0 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.1 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -72,6 +72,7 @@ COLORS = configs["COLORS"]
 sheet_url = str(configs["sheet_url"]).strip()
 aar_sheet_url = str(configs["aar_sheet_url"]).strip()
 etf_holdings_url = str(configs.get("etf_holdings_url", "")).strip()
+mobile_quick_mode = bool(configs.get("mobile_quick_mode", False))
 
 try: total_capital = float(configs.get("total_capital", 100000))
 except: total_capital = 100000.0
@@ -82,16 +83,76 @@ except: fee_discount = 1.0
 operation_mode = configs.get("operation_mode", "標準模式")
 MODE_PROFILE = {
     "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折，只打最有把握的球。"},
-    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V35 ETF主體倉 + 個股游擊節奏。"},
+    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V35.1 ETF主體倉 + 個股游擊節奏。"},
     "進攻模式": {"s": 84, "a": 60, "b": 40, "size": 1.15, "label": "⚔️ 進攻模式", "note": "略放寬B級觀察與買量，但仍受總曝險與停損控制。"},
-}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V35 ETF主體倉 + 個股游擊節奏。"})
+}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V35.1 ETF主體倉 + 個股游擊節奏。"})
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— ETF主體倉 ✕ 個股游擊 ✕ 總司令部三室合一 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 介面瘦身 ✕ 手機快查 ✕ ETF/個股分流 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
+
+# =========================================================
+# 📱 手機快查模式：避免手機重開時載入完整主系統
+# =========================================================
+def render_quick_sandbox_panel():
+    st.markdown("### 🔮 <span class='highlight-primary'>手機快查｜沙盤推演</span>", unsafe_allow_html=True)
+    sim_id = st.text_input("股票代號", placeholder="例：2330 / 0052 / 3033", key="quick_sandbox_stock_id")
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        sim_btn = st.button("⚡ 執行體檢", use_container_width=True, key="quick_sandbox_btn")
+    with c2:
+        if st.button("🧹 清除", use_container_width=True, key="quick_sandbox_clear_btn"):
+            st.session_state.pop("quick_sandbox_last_result", None)
+            st.session_state.pop("quick_sandbox_last_id", None)
+
+    if sim_btn and sim_id:
+        with st.spinner("正在查詢，不載入完整主系統..."):
+            res = run_sandbox_sim(str(sim_id).strip(), TWSE_NAME_MAP, FM_TOKEN)
+            st.session_state["quick_sandbox_last_result"] = res
+            st.session_state["quick_sandbox_last_id"] = str(sim_id).strip()
+
+    res = st.session_state.get("quick_sandbox_last_result")
+    if res:
+        p_now, m5, m10 = res["現價"], res["M5"], res["M10"]
+        bias, win_rate, sl_price = res["乖離"], res["勝率"], res["停損價"]
+        if p_now < m10:
+            color, title = COLORS["red"], "🛑 嚴禁接刀"
+            advice = f"跌破 M10 ({m10:.2f})，短線轉弱；站不回 M5 前不追。"
+        elif p_now < m5:
+            color, title = COLORS["accent"], "⚠️ 等站回 M5"
+            advice = f"低於 M5 ({m5:.2f})；13:00 後站回且量能正常才觀察。"
+        elif bias > 7:
+            color, title = COLORS["accent"], "⚠️ 乖離偏高"
+            advice = f"乖離 {bias:.1f}% 偏高；不追高，等回踩 M5。"
+        elif win_rate >= 50:
+            color, title = COLORS["primary"], "👑 可列入觀察"
+            advice = f"多頭結構，勝率 {win_rate:.0f}%；防守底線 {sl_price:.2f}，跳空 >4.5% 不追。"
+        else:
+            color, title = COLORS["green"], "⚖️ 穩健觀察"
+            advice = f"結構普通，勝率 {win_rate:.0f}%；小量且守防線。"
+        st.markdown(f"""
+        <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {color}; border-radius:10px; padding:14px 16px; margin:10px 0;">
+            <div style="font-size:18px; font-weight:900; color:{color};">{title}｜{res['名稱']} ({res['代號']})</div>
+            <div style="font-size:13px; color:{COLORS['text']}; margin-top:8px; line-height:1.65;">
+                現價 <b>{p_now:.2f}</b>｜M5 <b>{m5:.2f}</b>｜M10 <b>{m10:.2f}</b>｜乖離 <b>{bias:.1f}%</b>｜勝率 <b>{win_rate:.0f}%</b>
+            </div>
+            <div style="font-size:13px; color:{COLORS['text']}; background:{COLORS['bg']}; padding:10px; border-radius:8px; margin-top:8px;"><b>建議：</b>{advice}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("輸入代號後查詢。手機快查模式不載入 ETF / 法人 / AAR / 回測，速度會比較快。")
+
+if mobile_quick_mode:
+    st.markdown("<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢｜手機快查</h1>", unsafe_allow_html=True)
+    st.caption("若要回完整系統，關閉左側 Sidebar 的【📱 手機快查模式】。也可在網址加 `?quick=1` 固定快查入口。")
+    render_quick_sandbox_panel()
+    with st.expander("⚡ 快速兵工廠", expanded=True):
+        st.markdown(QUICK_MANUAL_TEXT, unsafe_allow_html=True)
+    st.stop()
+
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
 
 def risk_color(val):
@@ -370,67 +431,45 @@ def render_macro_brief(macro_df, macro_score, overheat_flag):
 
 
 def render_top_status_panel():
-    """把大盤警戒、過熱警戒、資料狀態濃縮成一張戰情總覽卡，避免首頁堆太多 alert。"""
-    status_items = [
-        len(TWSE_NAME_MAP) > 0,
-        not MACRO_DF.empty,
-        len(chip_db) > 0,
-        holding_read_ok or not sheet_url,
-        aar_read_ok or not aar_sheet_url,
-        bool(str(FM_TOKEN).strip()),
-    ]
-    ok_count = sum(bool(x) for x in status_items)
-    total_count = len(status_items)
-
+    """市場警戒燈 + 大盤綜合判斷。資料健康移到 Sidebar，不佔主畫面。"""
     if MACRO_SCORE <= 3:
         market_title = f"🔴 紅色警戒 ({MACRO_SCORE}/10)"
-        market_msg = "市場偏弱，保留現金，不主動開新倉"
+        market_msg = "市場偏弱，保留現金，不主動開新倉。"
         main_color = COLORS["red"]
     elif MACRO_SCORE <= 5:
         market_title = f"🟡 黃色警戒 ({MACRO_SCORE}/10)"
-        market_msg = "大盤偏弱，資金減半操作"
+        market_msg = "大盤偏弱，資金減半操作。"
         main_color = COLORS["accent"]
     else:
         market_title = f"🟢 可作戰 ({MACRO_SCORE}/10)"
-        market_msg = "盤勢允許短波段，但仍依禁追與停損"
+        market_msg = "盤勢允許短波段，但仍依禁追與停損。"
         main_color = COLORS["green"]
 
     heat_title = "🔥 高檔過熱" if OVERHEAT_FLAG else "✅ 過熱未觸發"
-    heat_msg = "大盤乖離 >5%，限縮 AI 建議買量" if OVERHEAT_FLAG else "尚未觸發大盤過熱限制"
+    heat_msg = "大盤乖離 >5%，新倉限縮，嚴禁早盤追高。" if OVERHEAT_FLAG else "尚未觸發大盤過熱限制。"
     heat_color = COLORS["red"] if OVERHEAT_FLAG else COLORS["green"]
-
-    data_title = f"🧭 資料 {ok_count}/{total_count}"
-    data_msg = "全部正常" if ok_count == total_count else "部分異常，展開下方檢查"
-    data_color = COLORS["green"] if ok_count >= 5 else (COLORS["accent"] if ok_count >= 4 else COLORS["red"])
-
     brief = build_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
 
     st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {main_color}; border-radius:10px; padding:12px 14px; margin:8px 0 14px 0;">
-        <div style="display:flex; flex-wrap:wrap; align-items:stretch; gap:10px;">
-            <div style="flex:1 1 230px; min-width:220px;">
-                <div style="font-size:15px; font-weight:800; color:{COLORS['text']};">{market_title}</div>
-                <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:3px;">{market_msg}</div>
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {main_color}; border-radius:10px; padding:14px 16px; margin:8px 0 16px 0;">
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:stretch;">
+            <div style="flex:1 1 260px; min-width:240px;">
+                <div style="font-size:17px; font-weight:900; color:{COLORS['text']};">{market_title}</div>
+                <div style="font-size:13px; color:{COLORS['subtext']}; margin-top:4px; line-height:1.5;">{market_msg}</div>
             </div>
-            <div style="flex:1 1 230px; min-width:220px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
-                <div style="font-size:15px; font-weight:800; color:{heat_color};">{heat_title}</div>
-                <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:3px;">{heat_msg}</div>
-            </div>
-            <div style="flex:1 1 210px; min-width:200px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
-                <div style="font-size:15px; font-weight:800; color:{data_color};">{data_title}</div>
-                <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:3px;">{data_msg}</div>
+            <div style="flex:1 1 260px; min-width:240px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
+                <div style="font-size:17px; font-weight:900; color:{heat_color};">{heat_title}</div>
+                <div style="font-size:13px; color:{COLORS['subtext']}; margin-top:4px; line-height:1.5;">{heat_msg}</div>
             </div>
         </div>
-        <div style="margin-top:10px; padding-top:9px; border-top:1px dashed {COLORS['border']}; font-size:13px; line-height:1.55; color:{COLORS['text']};">
-            <b>明日指令：</b>{brief['strategy']}
-            <span style="color:{COLORS['subtext']}; margin-left:8px;">{brief['risk']}</span>
+        <div style="margin-top:11px; padding-top:10px; border-top:1px dashed {COLORS['border']}; color:{COLORS['text']}; line-height:1.62; font-size:13.5px;">
+            <b>{brief['icon']} 綜合判斷：{brief['title']}</b><br>
+            {brief['body']}<br>
+            <b>明日指令：</b>{brief['strategy']}<br>
+            <span style="color:{COLORS['subtext']};"><b>風險提醒：</b>{brief['risk']}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-    with st.expander("🔎 資料燈號", expanded=False):
-        render_data_health_panel()
-
 
 with st.spinner("情報兵正在部署防線..."):
     chip_db = fetch_chips_data(FM_TOKEN)
@@ -505,7 +544,31 @@ if aar_sheet_url:
 if not m_df.empty and "代號" in m_df.columns:
     rescue_residual_map = build_rescue_residual_map(aar_probe_df, m_df["代號"].astype(str).tolist())
 
+# 資料健康燈號移至 Sidebar，主畫面不再佔用 S/A/B 空間。
+with st.sidebar:
+    st.markdown("---")
+    status_items = [
+        ("產業", len(TWSE_NAME_MAP) > 0),
+        ("大盤", not MACRO_DF.empty),
+        ("法人", len(chip_db) > 0),
+        ("持股", holding_read_ok or not sheet_url),
+        ("AAR", aar_read_ok or not aar_sheet_url),
+        ("Token", bool(str(FM_TOKEN).strip())),
+    ]
+    ok_count = sum(ok for _, ok in status_items)
+    color = COLORS["green"] if ok_count >= 5 else (COLORS["accent"] if ok_count >= 4 else COLORS["red"])
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; padding:8px 10px; border-radius:8px; font-size:13px;">
+        <b>🧭 資料狀態：{ok_count}/6 正常</b>
+    </div>
+    """, unsafe_allow_html=True)
+    with st.expander("查看詳細燈號", expanded=False):
+        for name, ok in status_items:
+            st.markdown(f"{'✅' if ok else '⚠️'} {name}")
+
 render_top_status_panel()
+
+
 
 
 @st.fragment
@@ -577,7 +640,6 @@ with t_rank:
         st.caption(f"最後掃描時間：{last_scan}")
 
     with st.expander("🌍 國際大盤數值"):
-        render_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
         if not MACRO_DF.empty:
             disp_macro = MACRO_DF.copy()
             if "現價" in disp_macro.columns: disp_macro["現價"] = pd.to_numeric(disp_macro["現價"], errors='coerce').apply(lambda x: f"{x:.2f}")
@@ -592,7 +654,7 @@ with t_rank:
             st.dataframe(styled_macro, use_container_width=True, hide_index=True)
 
     if not today_df.empty and MACRO_SCORE > 3:
-        calc_list = tuple(set(today_df[today_df["連買"] >= 1]["代號"].tolist() + top_80_chips))
+        calc_list = tuple(x for x in set(today_df[today_df["連買"] >= 1]["代號"].tolist() + top_80_chips) if not str(x).startswith("00"))
         scan_key = f"{dates[0] if 'dates' in locals() and dates else 'nodate'}_{MACRO_SCORE}_{operation_mode}_{len(calc_list)}"
         needs_eod_scan = force_eod_scan or st.session_state.get("eod_scan_key") != scan_key or "eod_intel_df" not in st.session_state
         if needs_eod_scan:
@@ -607,6 +669,7 @@ with t_rank:
             st.error("🚨 **資料斷線警告**：Yahoo與FinMind皆無回應。請稍後重整或確認 API 額度", icon="💀")
         elif not intel_df.empty:
             final_rank = pd.merge(today_df, intel_df, on="代號", suffixes=("_chip", "_intel"))
+            final_rank = final_rank[~final_rank["代號"].astype(str).str.startswith("00")].copy()
             if "名稱_chip" in final_rank.columns: final_rank = final_rank.rename(columns={"名稱_chip": "名稱"})
             elif "名稱_x" in final_rank.columns: final_rank = final_rank.rename(columns={"名稱_x": "名稱"})
             if "名稱_intel" in final_rank.columns: final_rank = final_rank.drop(columns=["名稱_intel"])
@@ -744,7 +807,6 @@ with t_rank:
                 ui_a = master_list[master_list["評級"] == "A"]
                 ui_b = master_list[master_list["評級"] == "B"]
                 ui_c = master_list[master_list["評級"] == "C"]
-                render_battle_summary(master_list, rank_sorted)
 
                 # ===================================================
                 # 📱 明日清單下載：手機盤中快速查看
@@ -878,56 +940,52 @@ with t_rank:
               # 確保這行與上面的 if not ui_a.empty: 對齊 (通常是 16 個半形空格)
                 st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 </span>", unsafe_allow_html=True)
                 show_bc_full = st.toggle(
-                    "顯示 B/C 完整欄位",
+                    "顯示 B 級補充欄位",
                     value=False,
                     key="show_bc_full_detail",
-                    help="預設精簡，只看決策標籤、建議、法人狀態與量化評分；打開後才顯示生命週期、戰術型態、勝率、現價等完整資料。"
+                    help="預設只看戰術摘要；打開後才補現價、停損、勝率與連買。"
                 )
 
                 if ui_b.empty:
                     st.info("今日無 B 級備選。")
                 else:
-                    def generate_b_badges(row):
-                        b_tags = []
+                    def build_tactical_summary(row):
+                        tags = []
                         if row.get("MACD_Cross"):
-                            b_tags.append("✅M")
-                        if row.get("RSI", 50) > 75:
-                            b_tags.append("⚠️R")
-                        elif 50 <= row.get("RSI", 50) <= 70:
-                            b_tags.append("🟢R")
-                        if row["現價"] > row.get("BB_Upper", 9999) * 1.02:
-                            b_tags.append("🌋B")
-                        tag_str = " ".join(b_tags)
-                        return f"{row['戰術型態']} {tag_str}" if tag_str else row["戰術型態"]
+                            tags.append("✅MACD")
+                        rsi_v = float(row.get("RSI", 50) or 50)
+                        if rsi_v > 75:
+                            tags.append(f"⚠️RSI{rsi_v:.0f}")
+                        elif 50 <= rsi_v <= 70:
+                            tags.append("🟢RSI")
+                        try:
+                            if float(row.get("現價", 0) or 0) > float(row.get("BB_Upper", 999999) or 999999) * 1.02:
+                                tags.append("🌋BB上軌")
+                        except Exception:
+                            pass
+                        lines = [
+                            f"{row.get('決策標籤','')}｜{row.get('法人狀態','')}",
+                            f"{row.get('生命週期','')}｜{row.get('戰術型態','')}",
+                            " ".join(tags),
+                            f"建議：{row.get('建議','')}"
+                        ]
+                        return "\n".join([x for x in lines if str(x).strip()])
 
                     disp_b = ui_b.copy()
-                    disp_b["戰術型態"] = disp_b.apply(generate_b_badges, axis=1)
-
+                    disp_b["戰術摘要"] = disp_b.apply(build_tactical_summary, axis=1)
+                    b_cols = ["名次", "代號", "名稱", "戰術摘要", "Quant_Score"]
                     if show_bc_full:
-                        b_cols = ["名次", "代號", "名稱", "決策標籤", "建議", "法人狀態", "生命週期", "戰術型態", "Quant_Score", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]
-                    else:
-                        b_cols = ["名次", "代號", "名稱", "決策標籤", "建議", "法人狀態", "Quant_Score"]
-
+                        b_cols += ["勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]
                     b_cols = [c for c in b_cols if c in disp_b.columns]
-                    disp_b = disp_b[b_cols].copy()
-                    disp_b = disp_b.rename(columns={"Quant_Score": "量化評分", "停損價": "ATR停損"})
-
-                    if "現價" in disp_b.columns:
-                        disp_b["現價"] = disp_b["現價"].apply(lambda x: f"{x:.2f}")
-                    if "ATR停損" in disp_b.columns:
-                        disp_b["ATR停損"] = disp_b["ATR停損"].apply(lambda x: f"{x:.2f}")
+                    disp_b = disp_b[b_cols].copy().rename(columns={"Quant_Score": "量化評分", "停損價": "ATR停損"})
                     if "量化評分" in disp_b.columns:
-                        disp_b["量化評分"] = disp_b["量化評分"].apply(lambda x: f"{x:.1f}")
-                    raw_win_rate = disp_b["勝率(%)"].copy() if "勝率(%)" in disp_b.columns else None
+                        disp_b["量化評分"] = disp_b["量化評分"].apply(lambda x: f"{float(x):.0f}")
                     if "勝率(%)" in disp_b.columns:
-                        disp_b["勝率(%)"] = disp_b["勝率(%)"].apply(lambda x: f"{x:.1f}%")
-
-                    styled_b = disp_b.style.set_properties(**table_style).map(risk_color, subset=["量化評分"])
-                    if raw_win_rate is not None:
-                        styled_b = styled_b.apply(
-                            lambda x: [f'color: {COLORS["green"]}; font-weight: bold;' if v > 60 else '' for v in raw_win_rate],
-                            subset=["勝率(%)"]
-                        )
+                        disp_b["勝率(%)"] = disp_b["勝率(%)"].apply(lambda x: f"{float(x):.1f}%")
+                    for cc in ["現價", "ATR停損"]:
+                        if cc in disp_b.columns:
+                            disp_b[cc] = disp_b[cc].apply(lambda x: f"{float(x):.2f}")
+                    styled_b = disp_b.style.set_properties(**table_style).map(risk_color, subset=["量化評分"] if "量化評分" in disp_b.columns else None)
                     st.dataframe(styled_b, use_container_width=True, hide_index=True)
 
                 st.markdown("#### 🔎 <span class='highlight-primary'>特殊關注 Top 3</span>", unsafe_allow_html=True)
@@ -951,7 +1009,7 @@ with t_rank:
                                 <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:700;">候補 #{idx+1}</div>
                                 <div style="font-size:19px; font-weight:900; color:{COLORS['accent']}; line-height:1.25; margin:4px 0 6px 0;">{rr.get('名稱','')} ({rr.get('代號','')})</div>
                                 <div style="font-size:13px; color:{COLORS['text']}; margin-bottom:6px;"><b>分數：</b>{float(rr.get('Quant_Score',0) or 0):.1f}｜<b>安全：</b>{rr.get('改版安全指數','')}</div>
-                                <div style="font-size:13px; color:{COLORS['text']}; margin-bottom:6px;"><b>狀態：</b>{rr.get('決策標籤','')}｜{rr.get('法人狀態','')}</div>
+                                <div style="font-size:13px; color:{COLORS['text']}; margin-bottom:6px; line-height:1.45;"><b>戰術摘要：</b>{rr.get('決策標籤','')}｜{rr.get('法人狀態','')}<br>{rr.get('生命週期','')}｜{rr.get('戰術型態','')}</div>
                                 <div style="font-size:12.5px; color:{COLORS['subtext']}; line-height:1.45;"><b>關注理由：</b>{reason}<br><b>升級條件：</b>{rr.get('建議','站回M5/M10且量能正常')}</div>
                             </div>
                             """, unsafe_allow_html=True)
@@ -964,11 +1022,6 @@ with t_chip:
     if not today_df.empty:
         st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：法人動向</span>", unsafe_allow_html=True)
         st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
-        surprise_atk = today_df[(today_df['連買'] == 1) & (today_df['投信(張)'] > 0) & (today_df['外資(張)'] > 0)].sort_values('三大法人合計', ascending=False).head(3)
-        if not surprise_atk.empty:
-            st.markdown("#### 🚨 <span class='highlight-accent'>土洋合擊區</span>", unsafe_allow_html=True)
-            st.dataframe(surprise_atk[['代號','名稱','外資(張)','投信(張)','自營(張)','三大法人合計']].style.set_properties(**table_style).format({'外資(張)':'{:,.0f}','投信(張)':'{:,.0f}','自營(張)':'{:,.0f}','三大法人合計':'{:,.0f}'}), use_container_width=True, hide_index=True)
-            st.markdown("---")
         st.markdown("#### 🛳️ <span class='highlight-accent'>法人建倉觀察雷達</span>", unsafe_allow_html=True)
         st.caption("只保留：安全指數≥7、三大法人合計買超、法人偏建倉，並排除已進入 S/A/B 主清單的標的。")
         main_chips = today_df.copy()
@@ -988,7 +1041,8 @@ with t_chip:
         if obs_df.empty:
             st.info("目前沒有符合條件的法人建倉觀察標的；代表主清單以外暫時不需要分心。")
         else:
-            view_cols = ["代號", "名稱", "法人狀態", "決策標籤", "建議", "連買", "投信連賣", "改版安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
+            obs_df["法人戰術摘要"] = obs_df.apply(lambda r: f"{r.get('法人狀態','')}｜{r.get('決策標籤','')}\n建議：{r.get('建議','')}", axis=1)
+            view_cols = ["代號", "名稱", "法人戰術摘要", "連買", "改版安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
             obs_df = obs_df[[c for c in view_cols if c in obs_df.columns]].copy()
             styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["改版安全指數"])
             st.dataframe(styled_obs, height=430, use_container_width=True, hide_index=True)
