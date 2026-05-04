@@ -741,7 +741,7 @@ with t_rank:
                 return round(score, 1)
 
             final_rank["Quant_Score"] = final_rank.apply(calculate_quant_score, axis=1)
-            final_rank["改版安全指數"] = final_rank.apply(calc_refined_safety_score, axis=1)
+            final_rank["安全指數"] = final_rank.apply(calc_refined_safety_score, axis=1)
             final_rank["決策標籤"] = final_rank.apply(get_decision_label, axis=1)
             final_rank["建議"] = final_rank.apply(get_next_action, axis=1)
             rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
@@ -770,7 +770,7 @@ with t_rank:
             # v35：特殊關注 Top 3。不是買進名單，只抓接近達標、線型修復、法人未撤退的候補股。
             special_pool = rank_sorted[~rank_sorted["代號"].astype(str).isin(main_codes_now)].copy()
             if not special_pool.empty:
-                special_pool["改版安全指數"] = special_pool.apply(calc_refined_safety_score, axis=1)
+                special_pool["安全指數"] = special_pool.apply(calc_refined_safety_score, axis=1)
                 special_pool["決策標籤"] = special_pool.apply(get_decision_label, axis=1)
                 special_pool["建議"] = special_pool.apply(get_next_action, axis=1)
                 special_pool["法人狀態"] = special_pool.apply(get_institution_state, axis=1)
@@ -778,11 +778,11 @@ with t_rank:
                     (~special_pool["生命週期"].astype(str).str.contains("爆量出貨|高機率末升", na=False))
                     & (~special_pool["法人狀態"].astype(str).str.contains("撤退", na=False))
                     & (~special_pool["決策標籤"].astype(str).str.contains("禁買|出場", na=False))
-                    & (special_pool["改版安全指數"] >= 6)
+                    & (special_pool["安全指數"] >= 6)
                     & (special_pool["Quant_Score"] >= MODE_PROFILE["b"] - 12)
                     & (special_pool["現價"] > special_pool["停損價"])
                 )
-                special_watch = special_pool[special_mask].sort_values(["Quant_Score", "改版安全指數"], ascending=[False, False]).head(3).copy()
+                special_watch = special_pool[special_mask].sort_values(["Quant_Score", "安全指數"], ascending=[False, False]).head(3).copy()
                 special_watch["評級"] = "特殊關注"
                 special_watch["名次"] = range(1, len(special_watch) + 1)
             else:
@@ -801,7 +801,7 @@ with t_rank:
 
                 master_list["建議買量(張)"] = master_list.apply(calc_suggested_lots, axis=1)
                 master_list["法人狀態"] = master_list.apply(get_institution_state, axis=1)
-                master_list["改版安全指數"] = master_list.apply(calc_refined_safety_score, axis=1)
+                master_list["安全指數"] = master_list.apply(calc_refined_safety_score, axis=1)
                 master_list["決策標籤"] = master_list.apply(get_decision_label, axis=1)
                 master_list["建議"] = master_list.apply(get_next_action, axis=1)
 
@@ -856,7 +856,7 @@ with t_rank:
                 def build_full_list(df_src):
                     cols = [
                         "名次", "評級", "代號", "名稱", "決策標籤", "建議", "法人狀態", "產業", "生命週期", "戰術型態",
-                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "改版安全指數", "現價", "M5", "M10", "M20",
+                        "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "安全指數", "現價", "M5", "M10", "M20",
                         "乖離(%)", "RSI", "MACD_Hist", "BB_Upper", "停損價", "停利價",
                         "建議買量(張)", "連買", "投信連賣", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"
                     ]
@@ -999,7 +999,7 @@ with t_rank:
                     for idx, (_, rr) in enumerate(special_watch.iterrows()):
                         with cols_sp[idx % 3]:
                             reason_bits = []
-                            if float(rr.get("改版安全指數", 0) or 0) >= 7:
+                            if float(rr.get("安全指數", 0) or 0) >= 7:
                                 reason_bits.append("安全指數達標")
                             if "建倉" in str(rr.get("法人狀態", "")) or "偏買" in str(rr.get("法人狀態", "")):
                                 reason_bits.append(str(rr.get("法人狀態", "")))
@@ -1010,7 +1010,7 @@ with t_rank:
                             <div class="tier-card" style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['accent']}; border-radius:10px; padding:12px 14px; min-height:150px;">
                                 <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:700;">候補 #{idx+1}</div>
                                 <div style="font-size:19px; font-weight:900; color:{COLORS['accent']}; line-height:1.25; margin:4px 0 6px 0;">{rr.get('名稱','')} ({rr.get('代號','')})</div>
-                                <div style="font-size:13px; color:{COLORS['text']}; margin-bottom:6px;"><b>分數：</b>{float(rr.get('Quant_Score',0) or 0):.1f}｜<b>安全：</b>{rr.get('改版安全指數','')}</div>
+                                <div style="font-size:13px; color:{COLORS['text']}; margin-bottom:6px;"><b>分數：</b>{float(rr.get('Quant_Score',0) or 0):.1f}｜<b>安全：</b>{rr.get('安全指數','')}</div>
                                 <div style="font-size:13px; color:{COLORS['text']}; margin-bottom:6px; line-height:1.45;"><b>戰術摘要：</b>{rr.get('決策標籤','')}｜{rr.get('法人狀態','')}<br>{rr.get('生命週期','')}｜{rr.get('戰術型態','')}</div>
                                 <div style="font-size:12.5px; color:{COLORS['subtext']}; line-height:1.45;"><b>關注理由：</b>{reason}<br><b>升級條件：</b>{rr.get('建議','站回M5/M10且量能正常')}</div>
                             </div>
@@ -1034,19 +1034,19 @@ with t_chip:
         else:
             main_chips["安全指數"] = "-"
         main_chips["法人狀態"] = main_chips.apply(get_institution_state, axis=1)
-        main_chips["改版安全指數"] = main_chips.apply(calc_refined_safety_score, axis=1)
+        main_chips["安全指數"] = main_chips.apply(calc_refined_safety_score, axis=1)
         main_chips["決策標籤"] = main_chips.apply(get_decision_label, axis=1)
         main_chips["建議"] = main_chips.apply(get_next_action, axis=1)
         main_codes = st.session_state.get("eod_main_codes", set())
         obs_mask = main_chips.apply(lambda r: is_institution_observation(r, main_codes), axis=1)
-        obs_df = main_chips[obs_mask].sort_values(["改版安全指數", "三大法人合計"], ascending=[False, False]).head(20).copy()
+        obs_df = main_chips[obs_mask].sort_values(["安全指數", "三大法人合計"], ascending=[False, False]).head(20).copy()
         if obs_df.empty:
             st.info("目前沒有符合條件的法人建倉觀察標的；代表主清單以外暫時不需要分心。")
         else:
             obs_df["法人戰術摘要"] = obs_df.apply(lambda r: f"{r.get('法人狀態','')}｜{r.get('決策標籤','')}\n建議：{r.get('建議','')}", axis=1)
-            view_cols = ["代號", "名稱", "法人戰術摘要", "連買", "改版安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
+            view_cols = ["代號", "名稱", "法人戰術摘要", "連買", "安全指數", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
             obs_df = obs_df[[c for c in view_cols if c in obs_df.columns]].copy()
-            styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["改版安全指數"])
+            styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["安全指數"])
             st.dataframe(styled_obs, height=430, use_container_width=True, hide_index=True)
     else:
         st.info("籌碼連線中斷，情報局暫停；沙盤與司令部仍可使用。")
