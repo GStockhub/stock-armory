@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from etf_engine import load_active_etf_holdings, run_etf_momentum_radar, summarize_active_etf_holdings
+from active_etf_holdings import build_active_etf_manager_radar
 
 
 def _fmt_pct(x):
@@ -91,6 +92,7 @@ def _format_etf_table(df):
 def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url="", table_style=None):
     table_style = table_style or {"text-align": "center"}
     st.markdown("### 📈 <span class='highlight-primary'>ETF 主體倉雷達</span>", unsafe_allow_html=True)
+    st.caption("ETF 區服務你的 60% 主體倉：主動/被動 ETF 分開看，綜合排名放同一張表，不再用下拉切換。")
 
     radar = run_etf_momentum_radar(fm_token)
     if radar.empty:
@@ -118,13 +120,25 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
     st.markdown("#### 🧭 主動 ETF 經理人風向")
     st.caption("持股快照與近 5 日變化合併；自動資料若不可得，可用側邊欄 CSV 備援。這區看產業風向，不是照抄成分股。")
     holdings = load_active_etf_holdings(etf_holdings_url) if etf_holdings_url else pd.DataFrame()
-    summary = summarize_active_etf_holdings(holdings, industry_map, name_map, top_n=3, lookback_days=5) if not holdings.empty else None
-
-    if not etf_holdings_url:
-        st.info("尚未設定【主動 ETF 持股 CSV】。ETF 動能排行仍可正常使用；持股風向需等自動來源或 CSV 備援。")
-    elif holdings.empty or summary is None or summary.get("snapshot", pd.DataFrame()).empty:
-        st.warning("主動 ETF 持股資料讀取不到，或欄位格式不足。需要欄位：日期、ETF代號、成分股代號、權重。")
+    auto_note = ""
+    if holdings.empty:
+        # 先嘗試自動抓主動 ETF Top 5 / Top 10 的持股；抓不到才使用 CSV 備援提示。
+        auto_result = build_active_etf_manager_radar(
+            radar, industry_map, name_map, top_n=5, lookback_days=5,
+            cache_path="active_etf_holdings_history.csv"
+        )
+        summary = auto_result.get("summary")
+        holdings = auto_result.get("holdings", pd.DataFrame())
+        auto_note = auto_result.get("message", "")
     else:
+        summary = summarize_active_etf_holdings(holdings, industry_map, name_map, top_n=5, lookback_days=5)
+        auto_note = "已使用側邊欄 CSV 備援資料。"
+
+    if holdings.empty or summary is None or summary.get("snapshot", pd.DataFrame()).empty:
+        st.info(f"{auto_note or '自動持股來源目前抓不到資料。'} ETF 動能排行仍可正常使用；若要啟用經理人風向，請使用側邊欄 CSV 備援。")
+    else:
+        if auto_note:
+            st.success(auto_note)
         snapshot = summary["snapshot"]
         st.markdown("##### Top 3 主動 ETF 持股快照")
         st.dataframe(snapshot.style.set_properties(**table_style), use_container_width=True, hide_index=True, height=245)
