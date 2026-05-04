@@ -41,7 +41,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.4 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.1 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -83,28 +83,14 @@ except: fee_discount = 1.0
 operation_mode = configs.get("operation_mode", "標準模式")
 MODE_PROFILE = {
     "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折，只打最有把握的球。"},
-    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V35.4 ETF主體倉 + 個股游擊節奏。"},
+    "標準模式": {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V35.1 ETF主體倉 + 個股游擊節奏。"},
     "進攻模式": {"s": 84, "a": 60, "b": 40, "size": 1.15, "label": "⚔️ 進攻模式", "note": "略放寬B級觀察與買量，但仍受總曝險與停損控制。"},
-}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V35.4 ETF主體倉 + 個股游擊節奏。"})
+}.get(operation_mode, {"s": 88, "a": 65, "b": 45, "size": 1.00, "label": "⚖️ 標準模式", "note": "維持V35.1 ETF主體倉 + 個股游擊節奏。"})
 
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
-
-def _sandbox_result_valid(res):
-    """沙盤推演防呆：避免資料源回傳空列時把 nan 顯示給使用者。"""
-    if not isinstance(res, dict):
-        return False
-    for key in ["現價", "M5", "M10", "乖離", "勝率", "停損價"]:
-        try:
-            if not np.isfinite(float(res.get(key))):
-                return False
-        except Exception:
-            return False
-    return True
-
-
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— ETF歷史庫 ✕ 手機快查 ✕ ETF/個股分流 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 介面瘦身 ✕ 手機快查 ✕ ETF/個股分流 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -129,7 +115,7 @@ def render_quick_sandbox_panel():
             st.session_state["quick_sandbox_last_id"] = str(sim_id).strip()
 
     res = st.session_state.get("quick_sandbox_last_result")
-    if res and _sandbox_result_valid(res):
+    if res:
         p_now, m5, m10 = res["現價"], res["M5"], res["M10"]
         bias, win_rate, sl_price = res["乖離"], res["勝率"], res["停損價"]
         if p_now < m10:
@@ -156,8 +142,6 @@ def render_quick_sandbox_panel():
             <div style="font-size:13px; color:{COLORS['text']}; background:{COLORS['bg']}; padding:10px; border-radius:8px; margin-top:8px;"><b>建議：</b>{advice}</div>
         </div>
         """, unsafe_allow_html=True)
-    elif res:
-        st.error("⚠️ 這次沙盤資料不完整，已阻止 nan 顯示。請先按【清除】後重新查詢；若仍異常，按側邊欄【清空情報快取】再試。")
     else:
         st.info("輸入代號後查詢。手機快查模式不載入 ETF / 法人 / AAR / 回測，速度會比較快。")
 
@@ -615,7 +599,7 @@ def render_sandbox_panel():
                 st.session_state["sandbox_last_id"] = str(sim_id).strip()
 
         res = st.session_state.get("sandbox_last_result")
-        if res and _sandbox_result_valid(res):
+        if res:
             p_now, m5, m10, bias, win_rate, sl_price = res["現價"], res["M5"], res["M10"], res["乖離"], res["勝率"], res["停損價"]
             if p_now < m10:
                 grade_color, grade_text = COLORS["red"], "🛑 嚴禁接刀 (D級)"
@@ -646,8 +630,6 @@ def render_sandbox_panel():
             </div>
             """
             st.markdown(html_block, unsafe_allow_html=True)
-        elif res:
-            st.error("⚠️ 這次沙盤資料不完整，已阻止 nan 顯示。請先按【清除結果】後重新查詢；若仍異常，按側邊欄【清空情報快取】再試。")
         elif sim_btn:
             st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
         else:

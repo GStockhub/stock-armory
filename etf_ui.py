@@ -7,7 +7,6 @@ import streamlit.components.v1 as components
 
 from etf_engine import load_active_etf_holdings, run_etf_momentum_radar, summarize_active_etf_holdings
 from active_etf_holdings import build_active_etf_manager_radar, get_history_status
-from github_history_store import get_github_store_status
 
 
 # =========================
@@ -247,12 +246,9 @@ def _render_manager_visuals(summary, holdings, COLORS, table_style, history_stat
     msg = history_status.get("message", "")
     days = history_status.get("days", 0)
     latest = history_status.get("latest", "-")
-    gh_status = get_github_store_status()
-    gh_msg = str(gh_status.get("message", ""))
-    gh_line = f"<br><span style='color:{COLORS['subtext']};'>GitHub 歷史庫：{_safe_text(gh_msg)}</span>" if gh_msg else ""
     st.markdown(f"""
     <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:10px 12px; border-radius:8px; margin:6px 0 12px 0;">
-        <b>📦 歷史快照：</b>{days} 個交易日　<span style="color:{COLORS['subtext']};">最新：{_safe_text(latest)}｜{_safe_text(msg)}</span>{gh_line}
+        <b>📦 歷史快照：</b>{days} 個交易日　<span style="color:{COLORS['subtext']};">最新：{_safe_text(latest)}｜{_safe_text(msg)}</span>
     </div>
     """, unsafe_allow_html=True)
 

@@ -67,56 +67,31 @@ def _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s, max_hold_bars=1
     return returns
 
 
-
-
-def _prepare_sandbox_df(df):
-    """清理價格資料，避免最新一列空值讓沙盤顯示 nan。"""
-    if df is None or df.empty:
-        return pd.DataFrame()
-    work = df.copy()
-    if isinstance(work.columns, pd.MultiIndex):
-        work.columns = work.columns.get_level_values(0)
-    for col in ["Open", "High", "Low", "Close", "Volume"]:
-        if col not in work.columns:
-            work[col] = np.nan if col != "Volume" else 0
-        work[col] = pd.to_numeric(work[col], errors="coerce")
-    work = work.dropna(subset=["Open", "High", "Low", "Close"]).copy()
-    if work.empty:
-        return work
-    work = work[~work.index.duplicated(keep="last")].sort_index()
-    work["Volume"] = work["Volume"].replace(0, np.nan).ffill().fillna(1000)
-    return work
-
-def _finite(*vals):
-    try:
-        return all(np.isfinite(float(v)) for v in vals)
-    except Exception:
-        return False
-
 @st.cache_data(ttl=900, show_spinner=False)
 def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     sid = str(sid).strip()
     df = safe_download(sid, fm_token)
-    df = _prepare_sandbox_df(df)
-    if df is None or df.empty or len(df) < 20:
-        return None
+    if df is None or df.empty or len(df) < 20: return None
+    
+    df = df[~df.index.duplicated(keep="last")].copy()
+    if "Volume" not in df.columns: df["Volume"] = 0
+    df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0)
+    df["Volume"] = df["Volume"].replace(0, np.nan).ffill().fillna(1000)
 
-    close_s = df["Close"]
-    open_s = df["Open"]
-    high_s = df["High"]
-    low_s = df["Low"]
-    vol_s = df["Volume"]
+    close_s = pd.to_numeric(df["Close"], errors="coerce")
+    open_s = pd.to_numeric(df["Open"], errors="coerce")
+    high_s = pd.to_numeric(df["High"], errors="coerce")
+    low_s = pd.to_numeric(df["Low"], errors="coerce")
+    vol_s = pd.to_numeric(df["Volume"], errors="coerce")
 
-    if close_s.isna().all() or len(close_s.dropna()) < 20:
-        return None
+    if close_s.isna().all() or len(close_s.dropna()) < 20: return None
 
     p_now = float(close_s.iloc[-1])
     m5 = float(close_s.rolling(5).mean().iloc[-1])
     m10 = float(close_s.rolling(10).mean().iloc[-1])
     m20 = float(close_s.rolling(20).mean().iloc[-1])
-
-    if (not _finite(p_now, m5, m10, m20)) or m20 == 0:
-        return None
+    
+    if m20 == 0: return None
     bias = ((p_now - m20) / m20) * 100
 
     vol_now = float(vol_s.iloc[-1])
@@ -176,26 +151,24 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             df = bulk_data.get(sid)
             if df is None or df.empty: continue
             
-            df = _prepare_sandbox_df(df)
-            if df is None or df.empty or len(df) < 20:
-                continue
+            df = df[~df.index.duplicated(keep="last")].copy()
+            if "Volume" not in df.columns: df["Volume"] = 0
+            df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0).replace(0, np.nan).ffill().fillna(1000)
 
-            close_s = df["Close"]
-            open_s = df["Open"]
-            high_s = df["High"]
-            low_s = df["Low"]
-            vol_s = df["Volume"]
+            close_s = pd.to_numeric(df["Close"], errors="coerce")
+            open_s = pd.to_numeric(df["Open"], errors="coerce")
+            high_s = pd.to_numeric(df["High"], errors="coerce")
+            low_s = pd.to_numeric(df["Low"], errors="coerce")
+            vol_s = pd.to_numeric(df["Volume"], errors="coerce")
 
-            if close_s.isna().all() or len(close_s.dropna()) < 20:
-                continue
+            if close_s.isna().all() or len(close_s.dropna()) < 20: continue
 
             p_now = float(close_s.iloc[-1])
             m5 = float(close_s.rolling(5).mean().iloc[-1])
             m10 = float(close_s.rolling(10).mean().iloc[-1])
             m20 = float(close_s.rolling(20).mean().iloc[-1])
-
-            if (not _finite(p_now, m5, m10, m20)) or m20 == 0:
-                continue
+            
+            if m20 == 0: continue
             bias = ((p_now - m20) / m20) * 100
 
             vol_now = float(vol_s.iloc[-1])
