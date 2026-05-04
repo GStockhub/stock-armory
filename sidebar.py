@@ -45,11 +45,15 @@ def render_sidebar(auth_status="guest_auth"):
             default_sheet_url = st.secrets.get("sheet_url", "")
             default_aar_url = st.secrets.get("aar_sheet_url", "")
             default_etf_holdings_url = st.secrets.get("active_etf_holdings_url", "")
-            secret_count = sum(bool(x) for x in [default_sheet_url, default_aar_url, default_etf_holdings_url])
+            github_token = st.secrets.get("github_token", "")
+            github_repo = st.secrets.get("github_repo", "")
+            github_history_ready = bool(github_token and github_repo)
+            secret_count = sum(bool(x) for x in [default_sheet_url, default_aar_url, default_etf_holdings_url, github_history_ready])
         else:
             default_sheet_url = ""
             default_aar_url = ""
             default_etf_holdings_url = ""
+            github_history_ready = False
             secret_count = 0
 
         # ===================================================
@@ -163,7 +167,7 @@ def render_sidebar(auth_status="guest_auth"):
         # ===================================================
         st.markdown("#### 🔗 資料連線")
         if auth_status == "admin_auth":
-            st.caption(f"已讀取 secrets：{secret_count}/3")
+            st.caption(f"已讀取 secrets：{secret_count}/4（持股/AAR/ETF備援/GitHub歷史庫）")
         else:
             st.caption("友軍模式：可手動貼 CSV")
 

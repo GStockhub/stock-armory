@@ -31,6 +31,12 @@ import numpy as np
 import pandas as pd
 import requests
 
+from github_history_store import (
+    read_history_csv_from_github,
+    write_history_csv_to_github,
+    get_github_store_status,
+)
+
 try:
     import streamlit as st
 except Exception:  # 允許單元測試或命令列環境不載入 Streamlit
@@ -457,13 +463,22 @@ def merge_holdings_history(latest_df: pd.DataFrame, cache_path: str = CACHE_FILE
     2. /tmp CSV（某些雲端重跑期間仍可保留）。
     3. st.session_state（同一瀏覽 session 內可保留）。
 
-    若要跨重新部署永久保存，仍建議在 sidebar 填入外部歷史 CSV / Google Sheet 備援。
+    若已在 Streamlit secrets 設定 GitHub 歷史庫，會再讀寫 GitHub CSV，
+    避免 Streamlit Cloud 重新部署後近 5 日歷史消失。
     """
     latest = _normalize_history_df(latest_df)
     if latest.empty:
         return pd.DataFrame()
 
     frames = [latest]
+
+    # 讀取 GitHub 遠端歷史庫；若未設定或失敗，會 fail-soft 回空表。
+    try:
+        gh_old = _normalize_history_df(read_history_csv_from_github())
+        if not gh_old.empty:
+            frames.append(gh_old)
+    except Exception:
+        pass
 
     # 讀取專案目錄與 /tmp 的歷史快照。
     for p in [cache_path, ALT_CACHE_FILE]:
@@ -493,6 +508,13 @@ def merge_holdings_history(latest_df: pd.DataFrame, cache_path: str = CACHE_FILE
     # 寫回三層備援。
     _write_history_file(hist, cache_path)
     _write_history_file(hist, ALT_CACHE_FILE)
+
+    # 寫回 GitHub 遠端歷史庫；內容相同會自動略過 commit。
+    try:
+        write_history_csv_to_github(hist)
+    except Exception:
+        pass
+
     try:
         if st is not None:
             st.session_state[SESSION_HISTORY_KEY] = hist.copy()
@@ -650,11 +672,15 @@ def build_active_etf_manager_radar(
     hist = merge_holdings_history(latest, cache_path=cache_path, max_days=max(20, lookback_days + 10))
     summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days)
     history_status = get_history_status(hist, lookback_days=lookback_days)
+    gh_status = get_github_store_status()
+    gh_msg = str(gh_status.get("message", ""))
+    extra = f"｜{gh_msg}" if gh_msg else ""
     return {
         "ok": True,
-        "message": f"已自動更新 {latest['ETF代號'].nunique()} 檔主動 ETF 持股；{history_status.get('message', '')}",
+        "message": f"已自動更新 {latest['ETF代號'].nunique()} 檔主動 ETF 持股；{history_status.get('message', '')}{extra}",
         "candidates": pd.DataFrame(candidates),
         "holdings": hist,
         "summary": summary,
         "history_status": history_status,
+        "github_status": gh_status,
     }
