@@ -17,21 +17,26 @@ def _compact_divider():
 
 def render_sidebar(auth_status="guest_auth"):
     with st.sidebar:
-        st.markdown("""
-        <style>
-        [data-testid="stSidebar"] .block-container { padding-top: 1.0rem; padding-bottom: .8rem; }
-        [data-testid="stSidebar"] h3 { margin: 0 0 .45rem 0 !important; }
-        [data-testid="stSidebar"] h4 { margin: .25rem 0 .35rem 0 !important; }
-        [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { line-height: 1.25 !important; }
-        [data-testid="stSidebar"] div[data-testid="stRadio"] { margin-top: -.2rem; }
-        [data-testid="stSidebar"] div[data-testid="stRadio"] label { padding-top: 1px !important; padding-bottom: 1px !important; }
-        [data-testid="stSidebar"] div[data-testid="stExpander"] { margin: .35rem 0 .55rem 0 !important; }
-        [data-testid="stSidebar"] div[data-testid="stAlert"] { padding: .45rem .55rem !important; margin: .35rem 0 !important; }
-        .side-divider { height:1px; background:rgba(128,128,128,.22); margin:.75rem 0 .65rem 0; }
-        .side-note-card { border-left:4px solid #A68A75; background:rgba(128,128,128,.07); padding:.52rem .65rem; border-radius:6px; font-size:12.5px; line-height:1.45; margin:.35rem 0 .2rem 0; }
-        .side-status-card { border-left:4px solid #20A05D; background:rgba(128,128,128,.07); padding:.45rem .6rem; border-radius:6px; font-size:12.5px; line-height:1.45; margin:.35rem 0 .45rem 0; }
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            """
+            <style>
+            [data-testid="stSidebar"] .block-container { padding-top: .85rem; padding-bottom: .75rem; }
+            [data-testid="stSidebar"] h3 { margin: 0 0 .42rem 0 !important; }
+            [data-testid="stSidebar"] h4 { margin: .18rem 0 .30rem 0 !important; }
+            [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { line-height: 1.22 !important; }
+            [data-testid="stSidebar"] div[data-testid="stRadio"] { margin-top: -.25rem; }
+            [data-testid="stSidebar"] div[data-testid="stRadio"] label { padding-top: 0px !important; padding-bottom: 0px !important; }
+            [data-testid="stSidebar"] div[data-testid="stExpander"] { margin: .42rem 0 .52rem 0 !important; }
+            [data-testid="stSidebar"] div[data-testid="stAlert"] { padding: .42rem .55rem !important; margin: .30rem 0 !important; }
+            [data-testid="stSidebar"] button { min-height: 2.15rem !important; }
+            .side-divider { height:1px; background:rgba(128,128,128,.20); margin:.68rem 0 .58rem 0; }
+            .side-note-card { border-left:4px solid #A68A75; background:rgba(128,128,128,.07); padding:.48rem .60rem; border-radius:6px; font-size:12.5px; line-height:1.42; margin:.32rem 0 .12rem 0; }
+            .side-status-card { border-left:4px solid #20A05D; background:rgba(128,128,128,.07); padding:.45rem .60rem; border-radius:6px; font-size:12.5px; line-height:1.42; margin:.42rem 0 .45rem 0; }
+            .side-caption-tight { font-size:12px; opacity:.78; margin:.28rem 0 .25rem 0; }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
         st.markdown("### ⚙️ 操盤控制台")
 
@@ -44,7 +49,7 @@ def render_sidebar(auth_status="guest_auth"):
             ["保守模式", "標準模式", "進攻模式"],
             index=1,
             horizontal=False,
-            help="保守：提高門檻、減少買量；標準：維持原本節奏；進攻：略放寬B級與買量，但仍遵守停損。"
+            help="保守：提高門檻、減少買量；標準：維持原本節奏；進攻：略放寬B級與買量，但仍遵守停損。",
         )
         mode_note = {
             "保守模式": "🛡️ 保守：只打高把握標的，建議買量減少30%",
@@ -68,16 +73,21 @@ def render_sidebar(auth_status="guest_auth"):
         mobile_quick_mode = st.toggle(
             "📱 手機快查模式",
             value=default_quick,
-            help="手機快查只載入沙盤推演與快速兵工廠；網址加 ?quick=1 可固定進入。"
+            help="手機快查只載入沙盤推演與快速兵工廠；網址加 ?quick=1 可固定進入。",
         )
         st.caption("快查：只跑沙盤與快速兵工廠" if mobile_quick_mode else "完整：載入 ETF / 法人 / AAR / 回測")
 
         _compact_divider()
 
         # ===================================================
-        # 🔗 資料連線 + 健康燈號
+        # 🔗 資料連線與工具：快取按鈕放在資料燈號上方
         # ===================================================
-        st.markdown("#### 🔗 資料連線")
+        st.markdown("#### 🔗 資料連線與工具")
+
+        if st.button("🔄 清空情報快取", use_container_width=True, help="資料異常、ETF/法人抓不到時再使用。"):
+            st.cache_data.clear()
+            st.success("快取已清除，請重新載入。")
+
         if auth_status == "admin_auth":
             default_sheet_url = st.secrets.get("sheet_url", "")
             default_aar_url = st.secrets.get("aar_sheet_url", "")
@@ -90,12 +100,17 @@ def render_sidebar(auth_status="guest_auth"):
             default_etf_holdings_url = ""
             st.caption("友軍模式：可手動貼 CSV")
 
+        # app.py 會把資料健康燈號塞進這個 placeholder
         health_slot = st.empty()
 
         with st.expander("🔧 CSV 網址設定", expanded=False):
             manual_sheet_url = st.text_input("【持股部位】CSV 網址", value="", placeholder="貼上您的持股 CSV 網址")
             manual_aar_url = st.text_input("【交易日誌】CSV 網址", value="", placeholder="貼上您的 AAR CSV 網址")
-            manual_etf_url = st.text_input("【主動ETF持股快照】CSV 網址", value="", placeholder="欄位需日期、ETF代號、成分股代號、權重")
+            manual_etf_url = st.text_input(
+                "【主動ETF持股快照】CSV 網址",
+                value="",
+                placeholder="可選；欄位需含 日期、ETF代號、成分股代號、權重",
+            )
 
         sheet_url = manual_sheet_url.strip() if manual_sheet_url.strip() else default_sheet_url
         aar_sheet_url = manual_aar_url.strip() if manual_aar_url.strip() else default_aar_url
@@ -128,15 +143,17 @@ def render_sidebar(auth_status="guest_auth"):
                 raise TypeError("舊版 theme.py")
         except Exception:
             COLORS = {
-                "bg": "#0D1117", "card": "#161B22", "border": "#30363D",
-                "text": "#C9D1D9", "subtext": "#8B949E", "primary": "#58A6FF",
-                "accent": "#79C0FF", "green": "#3FB950", "red": "#FF7B72",
+                "bg": "#0D1117",
+                "card": "#161B22",
+                "border": "#30363D",
+                "text": "#C9D1D9",
+                "subtext": "#8B949E",
+                "primary": "#58A6FF",
+                "accent": "#79C0FF",
+                "green": "#3FB950",
+                "red": "#FF7B72",
             }
             st.error("⚠️ 偵測到雲端 theme.py 尚未更新，目前使用備用色碼。")
-
-        if st.button("🔄 清空情報快取", use_container_width=True, help="清除 Streamlit 快取，資料異常時再使用。"):
-            st.cache_data.clear()
-            st.success("✅ 已清空快取，請重新整理或重新掃描。")
 
         return {
             "COLORS": COLORS,
