@@ -64,12 +64,15 @@ def render_sidebar(auth_status="guest_auth"):
             default_aar_url = ""
             st.info("💡 友軍請手動貼上 CSV 網址", icon="👋")
 
+        default_etf_holdings_url = st.secrets.get("active_etf_holdings_url", "") if auth_status == "admin_auth" else ""
         with st.expander("🔧 手動輸入 CSV 網址", expanded=not default_sheet_url):
             manual_sheet_url = st.text_input("【持股部位】CSV 網址", value="", placeholder="貼上您的持股 CSV 網址")
             manual_aar_url = st.text_input("【交易日誌】CSV 網址", value="", placeholder="貼上您的 AAR CSV 網址")
+            manual_etf_url = st.text_input("【主動ETF持股快照】CSV 網址", value="", placeholder="可選；欄位需含 日期、ETF代號、成分股代號、權重")
 
         sheet_url = manual_sheet_url.strip() if manual_sheet_url.strip() else default_sheet_url
         aar_sheet_url = manual_aar_url.strip() if manual_aar_url.strip() else default_aar_url
+        etf_holdings_url = manual_etf_url.strip() if manual_etf_url.strip() else default_etf_holdings_url
 
         st.markdown("---")
 
@@ -112,6 +115,7 @@ def render_sidebar(auth_status="guest_auth"):
             "COLORS": COLORS,
             "sheet_url": sheet_url,
             "aar_sheet_url": aar_sheet_url,
+            "etf_holdings_url": etf_holdings_url,
             "total_capital": total_capital,
             "risk_amount": risk_amount,
             "fee_discount": fee_discount,
