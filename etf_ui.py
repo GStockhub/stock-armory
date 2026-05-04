@@ -91,7 +91,6 @@ def _format_etf_table(df):
 def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url="", table_style=None):
     table_style = table_style or {"text-align": "center"}
     st.markdown("### 📈 <span class='highlight-primary'>ETF 主體倉雷達</span>", unsafe_allow_html=True)
-    st.caption("ETF 區服務你的 60% 主體倉：主動/被動 ETF 分開看，綜合排名放同一張表，不再用下拉切換。")
 
     radar = run_etf_momentum_radar(fm_token)
     if radar.empty:
