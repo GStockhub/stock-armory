@@ -255,7 +255,8 @@ def _render_manager_visuals(summary, holdings, COLORS, table_style, history_stat
     st.markdown("##### Top 主動 ETF 產業占比")
     _render_industry_donut_cards(summary, COLORS, top_n=5)
 
-    c1, c2 = st.columns([1, 1])
+    # 左右兩區改用中間 spacer，避免共同重倉股與加減碼族群靠太近
+    c1, _gap, c2 = st.columns([1, 0.08, 1])
     with c1:
         st.markdown("##### 共同重倉股")
         common = summary.get("common_holdings", pd.DataFrame())
