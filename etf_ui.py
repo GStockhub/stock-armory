@@ -3,7 +3,6 @@ import math
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 from etf_engine import load_active_etf_holdings, run_etf_momentum_radar, summarize_active_etf_holdings
 from active_etf_holdings import build_active_etf_manager_radar, get_history_status
@@ -208,37 +207,10 @@ def _render_bar_list(df, COLORS, label_col, value_col, subtitle_col=None, max_ro
             </div>
         </div>
         """)
-    # 用 components.html 渲染，避免在某些 Streamlit / Markdown 情境下 HTML 語法外漏。
-    height = min(560, max(120, 44 + len(work) * 43))
-    html_doc = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            html, body {{
-                margin: 0;
-                padding: 0;
-                background: transparent;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                overflow: hidden;
-            }}
-            .bar-card {{
-                background: {COLORS['card']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 10px;
-                padding: 12px 14px;
-                box-sizing: border-box;
-                width: 100%;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="bar-card">{''.join(blocks)}</div>
-    </body>
-    </html>
-    """
-    components.html(html_doc, height=height, scrolling=False)
+    st.markdown(
+        f"<div style='background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:10px; padding:12px 14px;'>{''.join(blocks)}</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=None):
@@ -255,12 +227,7 @@ def _render_manager_visuals(summary, holdings, COLORS, table_style, history_stat
     st.markdown("##### Top 主動 ETF 產業占比")
     _render_industry_donut_cards(summary, COLORS, top_n=5)
 
-    # Top 主動 ETF 產業占比 與 下方共同重倉/加減碼區塊 的垂直間距
-    # 避免兩個區塊黏在一起，手機與桌機都保留呼吸感。
-    st.markdown("<div style='height:26px;'></div>", unsafe_allow_html=True)
-
-    # 左右兩區改用中間 spacer，避免共同重倉股與加減碼族群靠太近
-    c1, _gap, c2 = st.columns([1, 0.08, 1])
+    c1, c2 = st.columns([1, 1])
     with c1:
         st.markdown("##### 共同重倉股")
         common = summary.get("common_holdings", pd.DataFrame())
