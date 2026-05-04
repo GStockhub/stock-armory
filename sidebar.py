@@ -52,6 +52,8 @@ def render_sidebar(auth_status="guest_auth"):
         )
         if mobile_quick_mode:
             st.caption("目前為快查模式：只載入沙盤與快速兵工廠。")
+        else:
+            st.caption("完整模式：載入ETF、法人、持股、AAR與回測。")
 
         st.markdown("---")
 
