@@ -562,8 +562,9 @@ with st.sidebar:
         <b>🧭 資料狀態：{ok_count}/6 正常</b>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown
-    with st.expander("查看詳細燈號", expanded=False):
+   
+    st.markdown("---")
+    with st.expander("詳細燈號", expanded=False):
         for name, ok in status_items:
             st.markdown(f"{'✅' if ok else '⚠️'} {name}")
 
