@@ -255,6 +255,10 @@ def _render_manager_visuals(summary, holdings, COLORS, table_style, history_stat
     st.markdown("##### Top 主動 ETF 產業占比")
     _render_industry_donut_cards(summary, COLORS, top_n=5)
 
+    # Top 主動 ETF 產業占比 與 下方共同重倉/加減碼區塊 的垂直間距
+    # 避免兩個區塊黏在一起，手機與桌機都保留呼吸感。
+    st.markdown("<div style='height:26px;'></div>", unsafe_allow_html=True)
+
     # 左右兩區改用中間 spacer，避免共同重倉股與加減碼族群靠太近
     c1, _gap, c2 = st.columns([1, 0.08, 1])
     with c1:
