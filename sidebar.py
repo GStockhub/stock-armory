@@ -47,14 +47,16 @@ def render_sidebar(auth_status="guest_auth"):
             default_etf_holdings_url = st.secrets.get("active_etf_holdings_url", "")
             github_token = st.secrets.get("github_token", "")
             github_repo = st.secrets.get("github_repo", "")
-            github_history_ready = bool(github_token and github_repo)
-            secret_count = sum(bool(x) for x in [default_sheet_url, default_aar_url, default_etf_holdings_url, github_history_ready])
+            github_branch = st.secrets.get("github_branch", "")
+            github_history_path = st.secrets.get("github_etf_history_path", "")
+            github_history_ready = bool(github_token and github_repo and github_branch and github_history_path)
+            required_secret_count = sum(bool(x) for x in [default_sheet_url, default_aar_url, github_history_ready])
         else:
             default_sheet_url = ""
             default_aar_url = ""
             default_etf_holdings_url = ""
             github_history_ready = False
-            secret_count = 0
+            required_secret_count = 0
 
         # ===================================================
         # 📱 手機快查模式：第一順位
@@ -167,7 +169,9 @@ def render_sidebar(auth_status="guest_auth"):
         # ===================================================
         st.markdown("#### 🔗 資料連線")
         if auth_status == "admin_auth":
-            st.caption(f"已讀取 secrets：{secret_count}/4（持股/AAR/ETF備援/GitHub歷史庫）")
+            backup_msg = "ETF備援CSV：已設定" if default_etf_holdings_url else "ETF備援CSV：未設定（選填）"
+            st.caption(f"必要 secrets：{required_secret_count}/3（持股/AAR/GitHub歷史庫）")
+            st.caption(backup_msg)
         else:
             st.caption("友軍模式：可手動貼 CSV")
 
