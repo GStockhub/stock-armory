@@ -57,7 +57,9 @@ GENERIC_SOURCE_TEMPLATES = [
     "https://www.pocket.tw/etf//tw/{code}/fundholding",
 ]
 
-CACHE_FILE = "active_etf_holdings_history.csv"
+CACHE_FILE = os.environ.get("ACTIVE_ETF_HISTORY_PATH", "active_etf_holdings_history.csv")
+ALT_CACHE_FILE = os.environ.get("ACTIVE_ETF_HISTORY_TMP", "/tmp/active_etf_holdings_history.csv")
+SESSION_HISTORY_KEY = "_active_etf_holdings_history_df"
 
 
 # -----------------------------
@@ -402,34 +404,118 @@ def fetch_active_etf_holdings_auto(
 # 歷史快取與分析
 # -----------------------------
 
-def merge_holdings_history(latest_df: pd.DataFrame, cache_path: str = CACHE_FILE, max_days: int = 20) -> pd.DataFrame:
-    """把今日快照併入本地 CSV 歷史。Streamlit Cloud 若檔案系統不可寫，會自動只回今日資料。"""
-    if latest_df is None or latest_df.empty:
+def _normalize_history_df(df: pd.DataFrame) -> pd.DataFrame:
+    """標準化歷史快照欄位，避免同日多次抓取造成重複與日期時間不一致。"""
+    if df is None or df.empty:
         return pd.DataFrame()
-    latest = latest_df.copy()
-    latest["日期"] = pd.to_datetime(latest["日期"], errors="coerce")
-    frames = [latest]
+    work = df.copy()
+    work.columns = [str(c).replace("\ufeff", "").strip() for c in work.columns]
+    required = ["日期", "ETF代號", "成分股代號"]
+    if any(c not in work.columns for c in required):
+        return pd.DataFrame()
+    for c in ["ETF名稱", "成分股名稱", "來源"]:
+        if c not in work.columns:
+            work[c] = ""
+    if "權重" not in work.columns:
+        work["權重"] = 0.0
+    if "持有股數" not in work.columns:
+        work["持有股數"] = 0.0
+    work["日期"] = pd.to_datetime(work["日期"], errors="coerce").dt.normalize()
+    work["ETF代號"] = work["ETF代號"].map(_clean_code)
+    work["成分股代號"] = work["成分股代號"].map(_clean_code)
+    work["權重"] = work["權重"].map(_to_float)
+    work["持有股數"] = work["持有股數"].map(_to_float)
+    work = work.dropna(subset=["日期"])
+    work = work[(work["ETF代號"] != "") & (work["成分股代號"] != "")]
+    return work
+
+
+def _read_history_file(path: str) -> pd.DataFrame:
     try:
-        if cache_path and os.path.exists(cache_path):
-            old = pd.read_csv(cache_path, dtype=str)
-            if not old.empty:
-                old["日期"] = pd.to_datetime(old["日期"], errors="coerce")
-                frames.append(old)
-        hist = pd.concat(frames, ignore_index=True)
-        hist["日期"] = pd.to_datetime(hist["日期"], errors="coerce")
-        hist = hist.dropna(subset=["日期", "ETF代號", "成分股代號"])
-        hist["權重"] = hist["權重"].map(_to_float)
-        hist = hist.drop_duplicates(subset=["日期", "ETF代號", "成分股代號"], keep="last")
-        keep_dates = sorted(hist["日期"].dropna().unique())[-max_days:]
-        hist = hist[hist["日期"].isin(keep_dates)].copy()
-        try:
-            hist.to_csv(cache_path, index=False, encoding="utf-8-sig")
-        except Exception:
-            pass
-        return hist.reset_index(drop=True)
+        if path and os.path.exists(path):
+            return _normalize_history_df(pd.read_csv(path, dtype=str))
     except Exception:
+        return pd.DataFrame()
+    return pd.DataFrame()
+
+
+def _write_history_file(df: pd.DataFrame, path: str) -> None:
+    try:
+        if not path or df is None or df.empty:
+            return
+        os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
+        df.to_csv(path, index=False, encoding="utf-8-sig")
+    except Exception:
+        pass
+
+
+def merge_holdings_history(latest_df: pd.DataFrame, cache_path: str = CACHE_FILE, max_days: int = 30) -> pd.DataFrame:
+    """把最新快照併入歷史庫。
+
+    注意：Streamlit Cloud 的本機檔案在重新部署時可能消失，所以這裡採三層備援：
+    1. 專案目錄 CSV（同一次部署期間可累積）。
+    2. /tmp CSV（某些雲端重跑期間仍可保留）。
+    3. st.session_state（同一瀏覽 session 內可保留）。
+
+    若要跨重新部署永久保存，仍建議在 sidebar 填入外部歷史 CSV / Google Sheet 備援。
+    """
+    latest = _normalize_history_df(latest_df)
+    if latest.empty:
+        return pd.DataFrame()
+
+    frames = [latest]
+
+    # 讀取專案目錄與 /tmp 的歷史快照。
+    for p in [cache_path, ALT_CACHE_FILE]:
+        old = _read_history_file(p)
+        if not old.empty:
+            frames.append(old)
+
+    # 讀取 session_state 內的快照，避免一般 rerun 就遺失。
+    try:
+        if st is not None and SESSION_HISTORY_KEY in st.session_state:
+            ss = _normalize_history_df(st.session_state.get(SESSION_HISTORY_KEY))
+            if not ss.empty:
+                frames.append(ss)
+    except Exception:
+        pass
+
+    hist = pd.concat(frames, ignore_index=True)
+    hist = _normalize_history_df(hist)
+    if hist.empty:
         return latest.reset_index(drop=True)
 
+    # 同日同 ETF 同成分只保留最後一次，以每日快照概念處理。
+    hist = hist.drop_duplicates(subset=["日期", "ETF代號", "成分股代號"], keep="last")
+    keep_dates = sorted(hist["日期"].dropna().unique())[-max_days:]
+    hist = hist[hist["日期"].isin(keep_dates)].sort_values(["日期", "ETF代號", "權重"], ascending=[False, True, False]).reset_index(drop=True)
+
+    # 寫回三層備援。
+    _write_history_file(hist, cache_path)
+    _write_history_file(hist, ALT_CACHE_FILE)
+    try:
+        if st is not None:
+            st.session_state[SESSION_HISTORY_KEY] = hist.copy()
+    except Exception:
+        pass
+    return hist
+
+
+def get_history_status(holdings_df: pd.DataFrame, lookback_days: int = 5) -> Dict[str, object]:
+    if holdings_df is None or holdings_df.empty or "日期" not in holdings_df.columns:
+        return {"days": 0, "latest": "-", "oldest": "-", "ready": False, "message": "尚無歷史快照"}
+    dates = pd.to_datetime(holdings_df["日期"], errors="coerce").dropna().dt.normalize().drop_duplicates().sort_values()
+    days = len(dates)
+    latest = dates.iloc[-1].strftime("%Y-%m-%d") if days else "-"
+    oldest = dates.iloc[0].strftime("%Y-%m-%d") if days else "-"
+    ready = days >= 2
+    if days >= lookback_days:
+        msg = f"歷史快照已累積 {days} 個交易日，可看近 {lookback_days} 日變化。"
+    elif days >= 2:
+        msg = f"歷史快照目前 {days} 個交易日，可先看區間變化；累積到 {lookback_days} 日會更穩。"
+    else:
+        msg = "目前只有單日快照，近 5 日加減碼需等後續交易日累積。"
+    return {"days": days, "latest": latest, "oldest": oldest, "ready": ready, "message": msg}
 
 def _industry_of(code: str, industry_map: Dict[str, str]) -> str:
     return (industry_map or {}).get(str(code).strip(), "未分類")
@@ -559,13 +645,16 @@ def build_active_etf_manager_radar(
             "candidates": pd.DataFrame(candidates),
             "holdings": pd.DataFrame(),
             "summary": summarize_holdings(pd.DataFrame(), industry_map, name_map, top_n=top_n, lookback_days=lookback_days),
+            "history_status": get_history_status(pd.DataFrame(), lookback_days=lookback_days),
         }
     hist = merge_holdings_history(latest, cache_path=cache_path, max_days=max(20, lookback_days + 10))
     summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days)
+    history_status = get_history_status(hist, lookback_days=lookback_days)
     return {
         "ok": True,
-        "message": f"已自動更新 {latest['ETF代號'].nunique()} 檔主動 ETF 持股；若只有單日資料，近 5 日變化會等累積後顯示。",
+        "message": f"已自動更新 {latest['ETF代號'].nunique()} 檔主動 ETF 持股；{history_status.get('message', '')}",
         "candidates": pd.DataFrame(candidates),
         "holdings": hist,
         "summary": summary,
+        "history_status": history_status,
     }
