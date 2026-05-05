@@ -1049,14 +1049,17 @@ with t_rank:
                         width: 100%;
                         border: 1px solid {COLORS['border']};
                         border-radius: 9px;
-                        overflow: hidden;
+                        overflow-x: auto;
+                        overflow-y: hidden;
+                        -webkit-overflow-scrolling: touch;
                         background: {COLORS['card']};
                         margin: 6px 0 16px 0;
                     }}
                     .b-table {{
                         width: 100%;
+                        min-width: 1120px;
                         border-collapse: collapse;
-                        table-layout: auto;
+                        table-layout: fixed;
                         font-size: 13px;
                     }}
                     .b-table th {{
@@ -1075,24 +1078,23 @@ with t_rank:
                         vertical-align: top;
                     }}
                     .b-table tr:last-child td {{ border-bottom: none; }}
-                    .b-code {{ width: 64px; min-width: 56px; white-space: nowrap; }}
-                    .b-name {{ width: 96px; min-width: 82px; white-space: nowrap; }}
+                    .b-code {{ width: 64px; white-space: nowrap; }}
+                    .b-name {{ width: 104px; white-space: nowrap; }}
                     .b-summary {{
-                        width: auto;
-                        min-width: 520px;
+                        width: 610px;
                         white-space: normal;
                         overflow-wrap: anywhere;
                         word-break: break-word;
                         line-height: 1.55;
                         font-weight: 650;
                     }}
-                    .b-small {{ width: 68px; min-width: 58px; white-space: nowrap; text-align: right; }}
-                    .b-mini {{ width: 52px; min-width: 44px; white-space: nowrap; text-align: center; }}
-                    .b-score {{ width: 58px; min-width: 50px; white-space: nowrap; text-align: right; font-weight: 900; color: {COLORS['green']} !important; }}
+                    .b-small {{ width: 70px; white-space: nowrap; text-align: right; }}
+                    .b-mini {{ width: 54px; white-space: nowrap; text-align: center; }}
+                    .b-score {{ width: 60px; white-space: nowrap; text-align: right; font-weight: 900; color: {COLORS['green']} !important; }}
                     @media (max-width: 900px) {{
-                        .b-table {{ font-size: 12px; }}
-                        .b-summary {{ min-width: 360px; }}
-                        .b-name {{ min-width: 72px; }}
+                        .b-table {{ min-width: 980px; font-size: 12px; }}
+                        .b-summary {{ width: 520px; }}
+                        .b-name {{ width: 88px; }}
                     }}
                     </style>
                     <div class="b-table-wrap">
@@ -1113,7 +1115,7 @@ with t_rank:
                             <tbody>{''.join(b_rows)}</tbody>
                         </table>
                     </div>
-                    """, height=min(520, 92 + len(b_rows) * 46), scrolling=False)
+                    """, height=min(560, 105 + len(b_rows) * 58), scrolling=True)
 
                 st.markdown("#### 🔎 <span class='highlight-primary'>特殊關注 Top 3</span>", unsafe_allow_html=True)
                 st.caption("這裡不是買進清單，而是尚未進 S/A/B、但線型與籌碼接近可觀察區的候補股；隔天轉強再丟沙盤。")
