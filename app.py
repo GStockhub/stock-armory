@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -1041,7 +1042,8 @@ with t_rank:
                         </tr>
                         """)
 
-                    st.markdown(f"""
+                    # 用 components.html 渲染完整 HTML，避免 st.markdown 將 <tr>/<td> 當成程式碼區塊顯示。
+                    components.html(f"""
                     <style>
                     .b-table-wrap {{
                         width: 100%;
@@ -1111,7 +1113,7 @@ with t_rank:
                             <tbody>{''.join(b_rows)}</tbody>
                         </table>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """, height=min(520, 92 + len(b_rows) * 46), scrolling=False)
 
                 st.markdown("#### 🔎 <span class='highlight-primary'>特殊關注 Top 3</span>", unsafe_allow_html=True)
                 st.caption("這裡不是買進清單，而是尚未進 S/A/B、但線型與籌碼接近可觀察區的候補股；隔天轉強再丟沙盤。")
