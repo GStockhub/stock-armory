@@ -974,12 +974,6 @@ with t_rank:
 
               # 確保這行與上面的 if not ui_a.empty: 對齊 (通常是 16 個半形空格)
                 st.markdown("#### ⚔️ <span class='highlight-primary'>【B級】穩健波段 </span>", unsafe_allow_html=True)
-                show_bc_full = st.toggle(
-                    "顯示 B 級補充欄位",
-                    value=False,
-                    key="show_bc_full_detail",
-                    help="預設只看戰術摘要；打開後才補現價、停損、勝率與連買。"
-                )
 
                 if ui_b.empty:
                     st.info("今日無 B 級備選。")
@@ -998,19 +992,22 @@ with t_rank:
                                 tags.append("🌋BB上軌")
                         except Exception:
                             pass
-                        lines = [
+                        parts = [
                             f"{row.get('決策標籤','')}｜{row.get('法人狀態','')}",
                             f"{row.get('生命週期','')}｜{row.get('戰術型態','')}",
                             " ".join(tags),
                             f"建議：{row.get('建議','')}"
                         ]
-                        return "\n".join([x for x in lines if str(x).strip()])
+                        return " ｜ ".join([str(x).strip() for x in parts if str(x).strip()])
 
                     disp_b = ui_b.copy()
+                    if "名次" in disp_b.columns:
+                        disp_b = disp_b.sort_values("名次", ascending=True)
+                    elif "Quant_Score" in disp_b.columns:
+                        disp_b = disp_b.sort_values("Quant_Score", ascending=False)
+
                     disp_b["戰術摘要"] = disp_b.apply(build_tactical_summary, axis=1)
-                    b_cols = ["名次", "代號", "名稱", "戰術摘要", "Quant_Score"]
-                    if show_bc_full:
-                        b_cols += ["勝率(%)", "現價", "停損價", "建議買量(張)", "連買"]
+                    b_cols = ["代號", "名稱", "戰術摘要", "勝率(%)", "現價", "停損價", "建議買量(張)", "連買", "Quant_Score"]
                     b_cols = [c for c in b_cols if c in disp_b.columns]
                     disp_b = disp_b[b_cols].copy().rename(columns={"Quant_Score": "量化評分", "停損價": "ATR停損"})
                     if "量化評分" in disp_b.columns:
@@ -1020,8 +1017,26 @@ with t_rank:
                     for cc in ["現價", "ATR停損"]:
                         if cc in disp_b.columns:
                             disp_b[cc] = disp_b[cc].apply(lambda x: f"{float(x):.2f}")
-                    styled_b = disp_b.style.set_properties(**table_style).map(risk_color, subset=["量化評分"] if "量化評分" in disp_b.columns else None)
-                    st.dataframe(styled_b, use_container_width=True, hide_index=True)
+
+                    # B級不再用補充欄位開關；直接顯示完整資訊。
+                    # 「名次」只作排序依據，不顯示；戰術摘要給最大寬度，其餘欄位依字數自適應。
+                    st.dataframe(
+                        disp_b,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(420, 70 + len(disp_b) * 36),
+                        column_config={
+                            "代號": st.column_config.TextColumn("代號", width="small"),
+                            "名稱": st.column_config.TextColumn("名稱", width="small"),
+                            "戰術摘要": st.column_config.TextColumn("戰術摘要", width="large"),
+                            "勝率(%)": st.column_config.TextColumn("勝率", width="small"),
+                            "現價": st.column_config.TextColumn("現價", width="small"),
+                            "ATR停損": st.column_config.TextColumn("ATR停損", width="small"),
+                            "建議買量(張)": st.column_config.TextColumn("買量", width="small"),
+                            "連買": st.column_config.TextColumn("連買", width="small"),
+                            "量化評分": st.column_config.TextColumn("量化評分", width="small"),
+                        },
+                    )
 
                 st.markdown("#### 🔎 <span class='highlight-primary'>特殊關注 Top 3</span>", unsafe_allow_html=True)
                 st.caption("這裡不是買進清單，而是尚未進 S/A/B、但線型與籌碼接近可觀察區的候補股；隔天轉強再丟沙盤。")
