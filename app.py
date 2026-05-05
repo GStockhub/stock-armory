@@ -41,7 +41,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.5 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.5.2 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -172,7 +172,7 @@ def render_data_health_panel():
     health = []
     health.append(("產業地圖", len(TWSE_NAME_MAP) > 0, f"{len(TWSE_NAME_MAP):,} 筆" if TWSE_NAME_MAP else "未讀取"))
     health.append(("大盤儀表", not MACRO_DF.empty, f"{len(MACRO_DF)} 項" if not MACRO_DF.empty else "無資料"))
-    health.append(("法人籌碼", len(chip_db) > 0, f"近 {len(chip_db)} 日" if len(chip_db) > 0 else "連線失敗"))
+    health.append(("法人籌碼", chip_data_available, f"近 {len(chip_db)} 日｜{chips_data_source}" if chip_data_available else "暫缺/技術備援"))
     health.append(("持股CSV", holding_read_ok, f"{holding_rows} 筆" if holding_read_ok else ("未設定" if not sheet_url else "讀取失敗/空表")))
     health.append(("AAR日誌", aar_read_ok, f"{aar_rows} 筆" if aar_read_ok else ("未設定" if not aar_sheet_url else "讀取失敗/空表")))
     health.append(("FinMind Token", bool(str(FM_TOKEN).strip()), "已設定" if str(FM_TOKEN).strip() else "未設定"))
@@ -484,7 +484,10 @@ aar_read_ok = False
 aar_probe_df = pd.DataFrame()
 rescue_residual_map = {}
 
-if len(chip_db) >= 1:
+chip_data_available = len(chip_db) >= 1
+chips_data_source = st.session_state.get("chips_data_source", "即時")
+
+if chip_data_available:
     dates = sorted(list(chip_db.keys()), reverse=True)
     today_df = chip_db[dates[0]].copy()
 
@@ -510,7 +513,26 @@ if len(chip_db) >= 1:
     today_df["法人狀態"] = today_df.apply(get_institution_state, axis=1)
     top_80_chips = today_df.sort_values("投信(張)", ascending=False).head(80)["代號"].tolist()
 else:
-    st.toast("籌碼連線失敗；沙盤與司令部仍可使用。", icon="⚠️")
+    st.toast("籌碼連線失敗；啟用技術面備援，S/A/B 仍可掃描但法人欄位暫缺。", icon="⚠️")
+    # v35.5.2：法人籌碼完全失敗時，不讓個股游擊整區停擺。
+    # 以產業地圖建立一組技術面備援候選池；法人相關欄位歸零，僅供臨時觀察。
+    fallback_rows = []
+    for code, name in list(TWSE_NAME_MAP.items()):
+        code = str(code).strip()
+        ind = str(TWSE_IND_MAP.get(code, ""))
+        if not code.isdigit() or len(code) != 4 or code.startswith("00"):
+            continue
+        if any(x in ind for x in ["金融", "保險", "存託憑證"]):
+            continue
+        fallback_rows.append({
+            "代號": code, "名稱": name, "外資(張)": 0.0, "投信(張)": 0.0, "自營(張)": 0.0,
+            "三大法人合計": 0.0, "連買": 0, "投信連賣": 0, "法人狀態": "⚪ 法人資料暫缺"
+        })
+        if len(fallback_rows) >= 350:
+            break
+    today_df = pd.DataFrame(fallback_rows)
+    dates = ["TECH"]
+    top_80_chips = today_df["代號"].head(120).tolist() if not today_df.empty else []
 
 if sheet_url:
     try:
@@ -548,7 +570,7 @@ if not m_df.empty and "代號" in m_df.columns:
 status_items = [
     ("產業", len(TWSE_NAME_MAP) > 0),
     ("大盤", not MACRO_DF.empty),
-    ("法人", len(chip_db) > 0),
+    ("法人", chip_data_available),
     ("持股", holding_read_ok or not sheet_url),
     ("AAR", aar_read_ok or not aar_sheet_url),
     ("Token", bool(str(FM_TOKEN).strip())),
@@ -663,8 +685,12 @@ with t_rank:
             st.dataframe(styled_macro, use_container_width=True, hide_index=True)
 
     if not today_df.empty and MACRO_SCORE > 3:
-        calc_list = tuple(x for x in set(today_df[today_df["連買"] >= 1]["代號"].tolist() + top_80_chips) if not str(x).startswith("00"))
-        scan_key = f"{dates[0] if 'dates' in locals() and dates else 'nodate'}_{MACRO_SCORE}_{operation_mode}_{len(calc_list)}"
+        if chip_data_available:
+            calc_list = tuple(x for x in set(today_df[today_df["連買"] >= 1]["代號"].tolist() + top_80_chips) if not str(x).startswith("00"))
+        else:
+            st.info("⚠️ 法人籌碼暫缺，已啟用技術面備援掃描；法人狀態、連買天數僅供暫缺標示，不作籌碼判斷。")
+            calc_list = tuple(x for x in top_80_chips if not str(x).startswith("00"))
+        scan_key = f"{dates[0] if 'dates' in locals() and dates else 'nodate'}_{MACRO_SCORE}_{operation_mode}_{len(calc_list)}_{chips_data_source}"
         needs_eod_scan = force_eod_scan or st.session_state.get("eod_scan_key") != scan_key or "eod_intel_df" not in st.session_state
         if needs_eod_scan:
             intel_df = level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
@@ -1056,7 +1082,7 @@ with t_chip:
             styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["改版安全指數"])
             st.dataframe(styled_obs, height=430, use_container_width=True, hide_index=True)
     else:
-        st.info("籌碼連線中斷，情報局暫停；沙盤與司令部仍可使用。")
+        st.info("法人籌碼暫時無法取得，情報局暫停；個股游擊已改用技術面備援，沙盤、ETF、司令部仍可使用。")
 
 with t_cmd:
     cmd_hold_tab, cmd_aar_tab, cmd_bt_tab = st.tabs(["🛡️ 持股風控", "📊 AAR 戰術教練", "🧪 司令官回測室"])
