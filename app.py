@@ -1018,25 +1018,100 @@ with t_rank:
                         if cc in disp_b.columns:
                             disp_b[cc] = disp_b[cc].apply(lambda x: f"{float(x):.2f}")
 
-                    # B級不再用補充欄位開關；直接顯示完整資訊。
-                    # 「名次」只作排序依據，不顯示；戰術摘要給最大寬度，其餘欄位依字數自適應。
-                    st.dataframe(
-                        disp_b,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=min(420, 70 + len(disp_b) * 36),
-                        column_config={
-                            "代號": st.column_config.TextColumn("代號", width="small"),
-                            "名稱": st.column_config.TextColumn("名稱", width="small"),
-                            "戰術摘要": st.column_config.TextColumn("戰術摘要", width="large"),
-                            "勝率(%)": st.column_config.TextColumn("勝率", width="small"),
-                            "現價": st.column_config.TextColumn("現價", width="small"),
-                            "ATR停損": st.column_config.TextColumn("ATR停損", width="small"),
-                            "建議買量(張)": st.column_config.TextColumn("買量", width="small"),
-                            "連買": st.column_config.TextColumn("連買", width="small"),
-                            "量化評分": st.column_config.TextColumn("量化評分", width="small"),
-                        },
-                    )
+                    # B級不再用 dataframe，改用 HTML 表格：戰術摘要可換行，其餘欄位壓縮。
+                    # 這樣不會再被 Streamlit dataframe 固定欄寬截斷。
+                    import html as _html
+
+                    def _b_cell(v):
+                        return _html.escape(str(v if v is not None else ""))
+
+                    b_rows = []
+                    for _, br in disp_b.iterrows():
+                        b_rows.append(f"""
+                        <tr>
+                            <td class="b-code">{_b_cell(br.get('代號', ''))}</td>
+                            <td class="b-name">{_b_cell(br.get('名稱', ''))}</td>
+                            <td class="b-summary">{_b_cell(br.get('戰術摘要', ''))}</td>
+                            <td class="b-small">{_b_cell(br.get('勝率(%)', ''))}</td>
+                            <td class="b-small">{_b_cell(br.get('現價', ''))}</td>
+                            <td class="b-small">{_b_cell(br.get('ATR停損', ''))}</td>
+                            <td class="b-mini">{_b_cell(br.get('建議買量(張)', ''))}</td>
+                            <td class="b-mini">{_b_cell(br.get('連買', ''))}</td>
+                            <td class="b-score">{_b_cell(br.get('量化評分', ''))}</td>
+                        </tr>
+                        """)
+
+                    st.markdown(f"""
+                    <style>
+                    .b-table-wrap {{
+                        width: 100%;
+                        border: 1px solid {COLORS['border']};
+                        border-radius: 9px;
+                        overflow: hidden;
+                        background: {COLORS['card']};
+                        margin: 6px 0 16px 0;
+                    }}
+                    .b-table {{
+                        width: 100%;
+                        border-collapse: collapse;
+                        table-layout: auto;
+                        font-size: 13px;
+                    }}
+                    .b-table th {{
+                        background: rgba(128,128,128,.07);
+                        color: {COLORS['subtext']} !important;
+                        font-weight: 800;
+                        padding: 8px 8px;
+                        border-bottom: 1px solid {COLORS['border']};
+                        white-space: nowrap;
+                        text-align: left;
+                    }}
+                    .b-table td {{
+                        color: {COLORS['text']} !important;
+                        padding: 8px 8px;
+                        border-bottom: 1px solid rgba(128,128,128,.18);
+                        vertical-align: top;
+                    }}
+                    .b-table tr:last-child td {{ border-bottom: none; }}
+                    .b-code {{ width: 64px; min-width: 56px; white-space: nowrap; }}
+                    .b-name {{ width: 96px; min-width: 82px; white-space: nowrap; }}
+                    .b-summary {{
+                        width: auto;
+                        min-width: 520px;
+                        white-space: normal;
+                        overflow-wrap: anywhere;
+                        word-break: break-word;
+                        line-height: 1.55;
+                        font-weight: 650;
+                    }}
+                    .b-small {{ width: 68px; min-width: 58px; white-space: nowrap; text-align: right; }}
+                    .b-mini {{ width: 52px; min-width: 44px; white-space: nowrap; text-align: center; }}
+                    .b-score {{ width: 58px; min-width: 50px; white-space: nowrap; text-align: right; font-weight: 900; color: {COLORS['green']} !important; }}
+                    @media (max-width: 900px) {{
+                        .b-table {{ font-size: 12px; }}
+                        .b-summary {{ min-width: 360px; }}
+                        .b-name {{ min-width: 72px; }}
+                    }}
+                    </style>
+                    <div class="b-table-wrap">
+                        <table class="b-table">
+                            <thead>
+                                <tr>
+                                    <th class="b-code">代號</th>
+                                    <th class="b-name">名稱</th>
+                                    <th class="b-summary">戰術摘要</th>
+                                    <th class="b-small">勝率</th>
+                                    <th class="b-small">現價</th>
+                                    <th class="b-small">ATR</th>
+                                    <th class="b-mini">買量</th>
+                                    <th class="b-mini">連買</th>
+                                    <th class="b-score">評分</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(b_rows)}</tbody>
+                        </table>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 st.markdown("#### 🔎 <span class='highlight-primary'>特殊關注 Top 3</span>", unsafe_allow_html=True)
                 st.caption("這裡不是買進清單，而是尚未進 S/A/B、但線型與籌碼接近可觀察區的候補股；隔天轉強再丟沙盤。")
