@@ -32,9 +32,9 @@ import pandas as pd
 import requests
 
 from github_history_store import (
-    read_history_csv_from_github,
-    write_history_csv_to_github,
-    get_github_store_status,
+    normalize_history_df,
+    sync_history_with_github,
+    diagnose_github_history_connection,
 )
 
 try:
@@ -53,19 +53,15 @@ DEFAULT_ACTIVE_ETFS: Dict[str, Dict[str, str]] = {
 }
 
 # Generic sources. 這些網頁格式可能變動，所以 fetch 會自動 fail-soft。
-# MoneyDJ 目前可直接在持股頁看到「持股明細」與「投資比例」，
-# Pocket / Yahoo 作為備援來源；若網站改版，前端仍會回到 CSV 備援。
 GENERIC_SOURCE_TEMPLATES = [
-    "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code_l}.tw",
-    "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid={code_l}.tw&topc=",
-    "https://tw.stock.yahoo.com/quote/{code}.TW/holding",
-    "https://www.pocket.tw/etf//tw/{code}",
+    "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code}.tw",
     "https://www.pocket.tw/etf//tw/{code}/fundholding",
 ]
 
-CACHE_FILE = os.environ.get("ACTIVE_ETF_HISTORY_PATH", "active_etf_holdings_history.csv")
-ALT_CACHE_FILE = os.environ.get("ACTIVE_ETF_HISTORY_TMP", "/tmp/active_etf_holdings_history.csv")
+CACHE_FILE = "active_etf_holdings_history.csv"
+ALT_CACHE_FILE = "/tmp/active_etf_holdings_history.csv"
 SESSION_HISTORY_KEY = "_active_etf_holdings_history_df"
+GITHUB_DIAG_KEY = "_active_etf_github_diag"
 
 
 # -----------------------------
@@ -137,95 +133,6 @@ def _name_reverse_map(name_map: Dict[str, str]) -> Dict[str, str]:
     return rev
 
 
-def _strip_html_to_text(html: str) -> str:
-    text = re.sub(r"<script[\s\S]*?</script>", " ", html, flags=re.I)
-    text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)
-    text = re.sub(r"<[^>]+>", " ", text)
-    text = html_unescape(text)
-    text = re.sub(r"[\t\r\f\v]+", " ", text)
-    text = re.sub(r" +", " ", text)
-    return text
-
-
-def html_unescape(text: str) -> str:
-    # 避免額外 import html 與既有 html 變數撞名。
-    try:
-        import html as _html
-        return _html.unescape(text)
-    except Exception:
-        return text
-
-
-def _parse_holdings_from_moneydj_text(html: str, etf_code: str, etf_name: str, name_map: Optional[Dict[str, str]], source_url: str) -> pd.DataFrame:
-    """MoneyDJ 持股明細文字備援解析。
-
-    MoneyDJ 頁面常可直接看到：
-    台積電(2330.TW) 8.99 10,039,000.00
-    若 read_html 解析不到規格化表格，就用此法抓前十大持股。
-    """
-    if not html:
-        return pd.DataFrame()
-    text = _strip_html_to_text(html)
-    # 優先抓「持股明細」後面的區段，避免誤抓相關 ETF 或新聞文字。
-    pos = text.find("持股明細")
-    if pos >= 0:
-        segment = text[pos: pos + 6000]
-    else:
-        segment = text[:8000]
-
-    # 日期：取持股明細後最接近的資料日期。
-    date = pd.Timestamp(datetime.now().date())
-    date_matches = re.findall(r"資料日期[:：]?\s*(\d{4})[/-](\d{1,2})[/-](\d{1,2})", segment)
-    if date_matches:
-        y, m, d = date_matches[-1]
-        try:
-            date = pd.Timestamp(f"{int(y):04d}-{int(m):02d}-{int(d):02d}")
-        except Exception:
-            pass
-
-    # 主要格式：名稱(2330.TW) 8.99 10,039,000.00
-    pattern = re.compile(r"([\u4e00-\u9fffA-Za-z0-9*\-]+)\((\d{4}[A-Z]?)\.TW\)\s*([0-9]+(?:\.[0-9]+)?)\s+([0-9,]+(?:\.[0-9]+)?)")
-    rows = []
-    seen = set()
-    for name, code, weight, shares in pattern.findall(segment):
-        code = _clean_code(code)
-        if not code or code in seen:
-            continue
-        seen.add(code)
-        rows.append({
-            "日期": date,
-            "ETF代號": _clean_code(etf_code),
-            "ETF名稱": etf_name or etf_code,
-            "成分股代號": code,
-            "成分股名稱": (name_map or {}).get(code, str(name).strip()),
-            "權重": _to_float(weight),
-            "持有股數": _to_float(shares),
-            "來源": source_url,
-        })
-    if rows:
-        return pd.DataFrame(rows)
-
-    # Yahoo 等來源常只有「台積電 9.57%」沒有代號；能用 name_map 反查就保留。
-    rev = _name_reverse_map(name_map or {})
-    loose = re.findall(r"([\u4e00-\u9fffA-Za-z0-9*\-]{2,20})\s+([0-9]+(?:\.[0-9]+)?)%", segment)
-    for name, weight in loose:
-        code = rev.get(str(name).strip(), "")
-        if not code or code in seen:
-            continue
-        seen.add(code)
-        rows.append({
-            "日期": date,
-            "ETF代號": _clean_code(etf_code),
-            "ETF名稱": etf_name or etf_code,
-            "成分股代號": code,
-            "成分股名稱": str(name).strip(),
-            "權重": _to_float(weight),
-            "持有股數": 0.0,
-            "來源": source_url,
-        })
-    return pd.DataFrame(rows)
-
-
 # -----------------------------
 # ETF 名單與自動來源
 # -----------------------------
@@ -261,42 +168,20 @@ def get_active_etf_candidates(momentum_df: Optional[pd.DataFrame] = None, top_n:
 
 def _source_urls_for(code: str, custom_sources: Optional[Dict[str, str]] = None) -> List[str]:
     custom_sources = custom_sources or {}
-    code = _clean_code(code)
     urls = []
     if code in custom_sources and str(custom_sources[code]).strip():
         urls.append(str(custom_sources[code]).strip())
-    for tpl in GENERIC_SOURCE_TEMPLATES:
-        try:
-            urls.append(tpl.format(code=code, code_l=code.lower()))
-        except Exception:
-            continue
-    # 去重保序
-    out, seen = [], set()
-    for u in urls:
-        if u and u not in seen:
-            seen.add(u)
-            out.append(u)
-    return out
-
-
-def _fetch_html(url: str, timeout: int = 18) -> str:
-    try:
-        resp = _session().get(url, timeout=timeout, verify=False)
-        resp.raise_for_status()
-        # MoneyDJ 常見 Big5 / cp950；apparent_encoding 可避免中文欄位變亂碼。
-        enc = getattr(resp, "apparent_encoding", None) or resp.encoding or "utf-8"
-        resp.encoding = enc
-        html = resp.text
-        return html if html and len(html) > 100 else ""
-    except Exception:
-        return ""
+    urls.extend([tpl.format(code=code) for tpl in GENERIC_SOURCE_TEMPLATES])
+    return urls
 
 
 def _read_html_tables(url: str, timeout: int = 18) -> List[pd.DataFrame]:
-    html = _fetch_html(url, timeout=timeout)
-    if not html:
-        return []
     try:
+        resp = _session().get(url, timeout=timeout, verify=False)
+        resp.raise_for_status()
+        html = resp.text
+        if not html or len(html) < 100:
+            return []
         return pd.read_html(io.StringIO(html))
     except Exception:
         return []
@@ -370,22 +255,14 @@ def fetch_active_etf_holding_one(
     code = _clean_code(etf_code)
     name = etf_name or DEFAULT_ACTIVE_ETFS.get(code, {}).get("名稱", code)
     for url in _source_urls_for(code, custom_sources):
-        html = _fetch_html(url)
+        tables = _read_html_tables(url)
         best = pd.DataFrame()
-        if html:
-            try:
-                tables = pd.read_html(io.StringIO(html))
-            except Exception:
-                tables = []
-            for t in tables:
-                std = _standardize_holding_table(t, code, name, name_map=name_map, source_url=url)
-                if std.empty:
-                    continue
-                if len(std) > len(best):
-                    best = std
-            # MoneyDJ / Yahoo 文字備援：read_html 抓不到時仍可解析「持股明細」文字。
-            if best.empty:
-                best = _parse_holdings_from_moneydj_text(html, code, name, name_map=name_map, source_url=url)
+        for t in tables:
+            std = _standardize_holding_table(t, code, name, name_map=name_map, source_url=url)
+            if std.empty:
+                continue
+            if len(std) > len(best):
+                best = std
         if not best.empty:
             return best
         time.sleep(0.25)
@@ -410,134 +287,103 @@ def fetch_active_etf_holdings_auto(
 # 歷史快取與分析
 # -----------------------------
 
-def _normalize_history_df(df: pd.DataFrame) -> pd.DataFrame:
-    """標準化歷史快照欄位，避免同日多次抓取造成重複與日期時間不一致。"""
-    if df is None or df.empty:
-        return pd.DataFrame()
-    work = df.copy()
-    work.columns = [str(c).replace("\ufeff", "").strip() for c in work.columns]
-    required = ["日期", "ETF代號", "成分股代號"]
-    if any(c not in work.columns for c in required):
-        return pd.DataFrame()
-    for c in ["ETF名稱", "成分股名稱", "來源"]:
-        if c not in work.columns:
-            work[c] = ""
-    if "權重" not in work.columns:
-        work["權重"] = 0.0
-    if "持有股數" not in work.columns:
-        work["持有股數"] = 0.0
-    work["日期"] = pd.to_datetime(work["日期"], errors="coerce").dt.normalize()
-    work["ETF代號"] = work["ETF代號"].map(_clean_code)
-    work["成分股代號"] = work["成分股代號"].map(_clean_code)
-    work["權重"] = work["權重"].map(_to_float)
-    work["持有股數"] = work["持有股數"].map(_to_float)
-    work = work.dropna(subset=["日期"])
-    work = work[(work["ETF代號"] != "") & (work["成分股代號"] != "")]
-    return work
+def merge_holdings_history(latest_df: pd.DataFrame, cache_path: str = CACHE_FILE, max_days: int = 20) -> pd.DataFrame:
+    """把今日快照併入歷史庫。
 
-
-def _read_history_file(path: str) -> pd.DataFrame:
-    try:
-        if path and os.path.exists(path):
-            return _normalize_history_df(pd.read_csv(path, dtype=str))
-    except Exception:
-        return pd.DataFrame()
-    return pd.DataFrame()
-
-
-def _write_history_file(df: pd.DataFrame, path: str) -> None:
-    try:
-        if not path or df is None or df.empty:
-            return
-        os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
-        df.to_csv(path, index=False, encoding="utf-8-sig")
-    except Exception:
-        pass
-
-
-def merge_holdings_history(latest_df: pd.DataFrame, cache_path: str = CACHE_FILE, max_days: int = 30) -> pd.DataFrame:
-    """把最新快照併入歷史庫。
-
-    注意：Streamlit Cloud 的本機檔案在重新部署時可能消失，所以這裡採三層備援：
-    1. 專案目錄 CSV（同一次部署期間可累積）。
-    2. /tmp CSV（某些雲端重跑期間仍可保留）。
-    3. st.session_state（同一瀏覽 session 內可保留）。
-
-    若已在 Streamlit secrets 設定 GitHub 歷史庫，會再讀寫 GitHub CSV，
-    避免 Streamlit Cloud 重新部署後近 5 日歷史消失。
+    順序：今日快照 + session + 本機 CSV + /tmp CSV + GitHub CSV → 去重 → 寫回本機與 GitHub。
+    GitHub 若失敗，不影響前端分析；診斷資訊會放在 st.session_state。
     """
-    latest = _normalize_history_df(latest_df)
-    if latest.empty:
+    frames = []
+    if latest_df is not None and not latest_df.empty:
+        frames.append(latest_df.copy())
+
+    if st is not None:
+        try:
+            sess_df = st.session_state.get(SESSION_HISTORY_KEY)
+            if isinstance(sess_df, pd.DataFrame) and not sess_df.empty:
+                frames.append(sess_df.copy())
+        except Exception:
+            pass
+
+    for p in [cache_path, ALT_CACHE_FILE]:
+        try:
+            if p and os.path.exists(p):
+                old = pd.read_csv(p, dtype=str)
+                if old is not None and not old.empty:
+                    frames.append(old)
+        except Exception:
+            pass
+
+    if not frames:
         return pd.DataFrame()
 
-    frames = [latest]
+    local_hist = normalize_history_df(pd.concat(frames, ignore_index=True), max_days=max_days)
 
-    # 讀取 GitHub 遠端歷史庫；若未設定或失敗，會 fail-soft 回空表。
+    # 優先同步 GitHub；失敗時仍沿用本機/session 歷史。
     try:
-        gh_old = _normalize_history_df(read_history_csv_from_github())
-        if not gh_old.empty:
-            frames.append(gh_old)
-    except Exception:
-        pass
-
-    # 讀取專案目錄與 /tmp 的歷史快照。
-    for p in [cache_path, ALT_CACHE_FILE]:
-        old = _read_history_file(p)
-        if not old.empty:
-            frames.append(old)
-
-    # 讀取 session_state 內的快照，避免一般 rerun 就遺失。
-    try:
-        if st is not None and SESSION_HISTORY_KEY in st.session_state:
-            ss = _normalize_history_df(st.session_state.get(SESSION_HISTORY_KEY))
-            if not ss.empty:
-                frames.append(ss)
-    except Exception:
-        pass
-
-    hist = pd.concat(frames, ignore_index=True)
-    hist = _normalize_history_df(hist)
-    if hist.empty:
-        return latest.reset_index(drop=True)
-
-    # 同日同 ETF 同成分只保留最後一次，以每日快照概念處理。
-    hist = hist.drop_duplicates(subset=["日期", "ETF代號", "成分股代號"], keep="last")
-    keep_dates = sorted(hist["日期"].dropna().unique())[-max_days:]
-    hist = hist[hist["日期"].isin(keep_dates)].sort_values(["日期", "ETF代號", "權重"], ascending=[False, True, False]).reset_index(drop=True)
-
-    # 寫回三層備援。
-    _write_history_file(hist, cache_path)
-    _write_history_file(hist, ALT_CACHE_FILE)
-
-    # 寫回 GitHub 遠端歷史庫；內容相同會自動略過 commit。
-    try:
-        write_history_csv_to_github(hist)
-    except Exception:
-        pass
-
-    try:
+        gh_hist, gh_diag = sync_history_with_github(local_hist, max_days=max_days)
         if st is not None:
+            st.session_state[GITHUB_DIAG_KEY] = gh_diag
+        hist = gh_hist if gh_hist is not None and not gh_hist.empty else local_hist
+    except Exception as e:
+        if st is not None:
+            st.session_state[GITHUB_DIAG_KEY] = {"ok": False, "message": f"GitHub 同步例外：{type(e).__name__}: {e}"}
+        hist = local_hist
+
+    hist = normalize_history_df(hist, max_days=max_days)
+
+    # 寫回本機與 /tmp；失敗就略過，不能影響主流程。
+    for p in [cache_path, ALT_CACHE_FILE]:
+        try:
+            if p:
+                os.makedirs(os.path.dirname(p), exist_ok=True) if os.path.dirname(p) else None
+                hist.to_csv(p, index=False, encoding="utf-8-sig")
+        except Exception:
+            pass
+
+    if st is not None:
+        try:
             st.session_state[SESSION_HISTORY_KEY] = hist.copy()
-    except Exception:
-        pass
-    return hist
+        except Exception:
+            pass
+
+    # summarize_holdings 期待日期可轉換，這裡保留字串也可以，後續會 pd.to_datetime。
+    return hist.reset_index(drop=True)
 
 
 def get_history_status(holdings_df: pd.DataFrame, lookback_days: int = 5) -> Dict[str, object]:
     if holdings_df is None or holdings_df.empty or "日期" not in holdings_df.columns:
-        return {"days": 0, "latest": "-", "oldest": "-", "ready": False, "message": "尚無歷史快照"}
-    dates = pd.to_datetime(holdings_df["日期"], errors="coerce").dropna().dt.normalize().drop_duplicates().sort_values()
-    days = len(dates)
-    latest = dates.iloc[-1].strftime("%Y-%m-%d") if days else "-"
-    oldest = dates.iloc[0].strftime("%Y-%m-%d") if days else "-"
-    ready = days >= 2
-    if days >= lookback_days:
-        msg = f"歷史快照已累積 {days} 個交易日，可看近 {lookback_days} 日變化。"
-    elif days >= 2:
-        msg = f"歷史快照目前 {days} 個交易日，可先看區間變化；累積到 {lookback_days} 日會更穩。"
+        base = {"days": 0, "latest": "-", "message": "尚無歷史快照。", "github": {}}
     else:
-        msg = "目前只有單日快照，近 5 日加減碼需等後續交易日累積。"
-    return {"days": days, "latest": latest, "oldest": oldest, "ready": ready, "message": msg}
+        dates = pd.to_datetime(holdings_df["日期"], errors="coerce").dropna()
+        days = int(dates.dt.normalize().nunique()) if not dates.empty else 0
+        latest = dates.max().strftime("%Y-%m-%d") if not dates.empty else "-"
+        if days >= max(2, int(lookback_days)):
+            msg = f"歷史快照已有 {days} 個交易日，可觀察近 {lookback_days} 日變化。"
+        elif days >= 2:
+            msg = f"歷史快照目前 {days} 個交易日，可先看區間變化；累積到 {lookback_days} 日會更穩。"
+        elif days == 1:
+            msg = "目前只有單日快照，需等後續交易日累積。"
+        else:
+            msg = "尚無有效快照。"
+        base = {"days": days, "latest": latest, "message": msg, "github": {}}
+    if st is not None:
+        try:
+            gh = st.session_state.get(GITHUB_DIAG_KEY, {}) or {}
+            if gh:
+                base["github"] = gh
+                gh_msg = gh.get("message") or gh.get("write", {}).get("message") or gh.get("read", {}).get("message")
+                if gh_msg:
+                    base["message"] = f"{base['message']}｜{gh_msg}"
+        except Exception:
+            pass
+    return base
+
+
+def get_github_history_diagnostics() -> Dict[str, object]:
+    """給前端顯示用的 GitHub 連線診斷，不包含 token。"""
+    return diagnose_github_history_connection()
+
 
 def _industry_of(code: str, industry_map: Dict[str, str]) -> str:
     return (industry_map or {}).get(str(code).strip(), "未分類")
@@ -663,24 +509,19 @@ def build_active_etf_manager_radar(
     if latest.empty:
         return {
             "ok": False,
-            "message": "自動來源未成功解析：MoneyDJ / Yahoo / Pocket 皆未取得持股表，請暫用 CSV 備援。",
+            "message": "自動持股來源目前抓不到資料，請使用 CSV 備援。",
             "candidates": pd.DataFrame(candidates),
             "holdings": pd.DataFrame(),
             "summary": summarize_holdings(pd.DataFrame(), industry_map, name_map, top_n=top_n, lookback_days=lookback_days),
-            "history_status": get_history_status(pd.DataFrame(), lookback_days=lookback_days),
         }
     hist = merge_holdings_history(latest, cache_path=cache_path, max_days=max(20, lookback_days + 10))
     summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days)
     history_status = get_history_status(hist, lookback_days=lookback_days)
-    gh_status = get_github_store_status()
-    gh_msg = str(gh_status.get("message", ""))
-    extra = f"｜{gh_msg}" if gh_msg else ""
     return {
         "ok": True,
-        "message": f"已自動更新 {latest['ETF代號'].nunique()} 檔主動 ETF 持股；{history_status.get('message', '')}{extra}",
+        "message": f"已自動更新 {latest['ETF代號'].nunique()} 檔主動 ETF 持股；歷史庫會自動同步，若 GitHub 失敗則先用本機快取。",
         "candidates": pd.DataFrame(candidates),
         "holdings": hist,
         "summary": summary,
         "history_status": history_status,
-        "github_status": gh_status,
     }

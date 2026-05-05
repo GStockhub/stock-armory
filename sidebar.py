@@ -44,19 +44,14 @@ def render_sidebar(auth_status="guest_auth"):
         if auth_status == "admin_auth":
             default_sheet_url = st.secrets.get("sheet_url", "")
             default_aar_url = st.secrets.get("aar_sheet_url", "")
-            default_etf_holdings_url = st.secrets.get("active_etf_holdings_url", "")
-            github_token = st.secrets.get("github_token", "")
-            github_repo = st.secrets.get("github_repo", "")
-            github_branch = st.secrets.get("github_branch", "")
-            github_history_path = st.secrets.get("github_etf_history_path", "")
-            github_history_ready = bool(github_token and github_repo and github_branch and github_history_path)
-            required_secret_count = sum(bool(x) for x in [default_sheet_url, default_aar_url, github_history_ready])
+            default_etf_holdings_url = st.secrets.get("active_etf_holdings_url", "")  # 選填：CSV 備援
+            gh_ready = all(bool(st.secrets.get(k, "")) for k in ["github_token", "github_repo", "github_branch", "github_etf_history_path"])
+            secret_count = sum(bool(x) for x in [default_sheet_url, default_aar_url, gh_ready])
         else:
             default_sheet_url = ""
             default_aar_url = ""
             default_etf_holdings_url = ""
-            github_history_ready = False
-            required_secret_count = 0
+            secret_count = 0
 
         # ===================================================
         # 📱 手機快查模式：第一順位
@@ -169,9 +164,9 @@ def render_sidebar(auth_status="guest_auth"):
         # ===================================================
         st.markdown("#### 🔗 資料連線")
         if auth_status == "admin_auth":
-            backup_msg = "ETF備援CSV：已設定" if default_etf_holdings_url else "ETF備援CSV：未設定（選填）"
-            st.caption(f"必要 secrets：{required_secret_count}/3（持股/AAR/GitHub歷史庫）")
-            st.caption(backup_msg)
+            st.caption(f"必要 secrets：{secret_count}/3（持股/AAR/GitHub歷史庫）")
+            if not default_etf_holdings_url:
+                st.caption("ETF持股CSV備援：未設定（選填）")
         else:
             st.caption("友軍模式：可手動貼 CSV")
 

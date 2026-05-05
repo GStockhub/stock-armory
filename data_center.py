@@ -7,6 +7,7 @@ import requests
 import streamlit as st
 import urllib3
 import yfinance as yf
+from price_provider import safe_download_price
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -273,68 +274,15 @@ def fetch_single_stock_batch(sid, fm_token=None, period="60d"):
     df = safe_download(sid, fm_token, period=period)
     return sid, df
 
-def _clean_ohlcv_df(df):
-    """標準化 yfinance / FinMind 回傳資料，避免最後一列空值造成沙盤顯示 nan。"""
-    if df is None or df.empty:
-        return pd.DataFrame()
-    out = df.copy()
-    if isinstance(out.columns, pd.MultiIndex):
-        out.columns = out.columns.get_level_values(0)
-    for col in ["Open", "High", "Low", "Close", "Volume"]:
-        if col not in out.columns:
-            out[col] = np.nan if col != "Volume" else 0
-        out[col] = pd.to_numeric(out[col], errors="coerce")
-    out = out.dropna(subset=["Open", "High", "Low", "Close"]).copy()
-    if out.empty:
-        return out
-    out = out[~out.index.duplicated(keep="last")].sort_index()
-    out["Volume"] = out["Volume"].replace(0, np.nan).ffill().fillna(1000)
-    return out
-
 def safe_download(sid, fm_token=None, period="60d"):
-    sid = str(sid).strip()
+    """多層價格備援下載：Yahoo(.TW/.TWO) → FinMind → TWSE官方 → 最近成功快取。
 
-    # 先試上市 (.TW)，再試上櫃 (.TWO)；回傳前統一清掉空 OHLC 列，避免沙盤顯示 nan。
-    for suffix in [".TW", ".TWO"]:
-        try:
-            ticker = f"{sid}{suffix}"
-            df = yf.download(ticker, period=period, threads=False, progress=False)
-            df = _clean_ohlcv_df(df)
-            if not df.empty and len(df.dropna(subset=["Close"])) > 10:
-                return df
-        except Exception:
-            pass
-
-    # yfinance 失敗才使用 FinMind 備援。
+    回傳前會做 OHLCV 清洗與最後一列有效檢查；若所有來源都失敗，回傳 None。
+    """
     try:
-        session = get_retry_session()
-        url = "https://api.finmindtrade.com/api/v4/data"
-        days_back = 365 if period == "1y" else 90
-        start_d = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
-        payload = {"dataset": "TaiwanStockPrice", "data_id": sid, "start_date": start_d}
-        if fm_token:
-            payload["token"] = fm_token
-
-        resp = session.get(url, params=payload, timeout=10)
-        if resp.status_code == 200:
-            try:
-                data = resp.json()
-            except Exception:
-                data = {}
-            if data.get("msg") == "success" and data.get("data"):
-                fm_df = pd.DataFrame(data["data"])
-                fm_df["date"] = pd.to_datetime(fm_df["date"])
-                fm_df = fm_df.set_index("date").rename(columns={
-                    "open": "Open",
-                    "max": "High",
-                    "min": "Low",
-                    "close": "Close",
-                    "Trading_Volume": "Volume",
-                })
-                fm_df = _clean_ohlcv_df(fm_df)
-                if not fm_df.empty and len(fm_df) > 10:
-                    return fm_df
-    except Exception:
-        pass
-
+        df = safe_download_price(str(sid).strip(), fm_token=fm_token, period=period, min_bars=20)
+        if df is not None and not df.empty:
+            return df
+    except Exception as e:
+        print(f"safe_download_price failed {sid}: {e}")
     return None
