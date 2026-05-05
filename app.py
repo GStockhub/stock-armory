@@ -1134,7 +1134,7 @@ with t_rank:
                             <tbody>{''.join(b_rows)}</tbody>
                         </table>
                     </div>
-                    """, height=min(760, 130 + len(b_rows) * 88), scrolling=True)
+                    """, height=min(420, max(170, 74 + len(b_rows) * 46)), scrolling=True)
 
                 st.markdown("#### 🔎 <span class='highlight-primary'>特殊關注 Top 3</span>", unsafe_allow_html=True)
                 st.caption("這裡不是買進清單，而是尚未進 S/A/B、但線型與籌碼接近可觀察區的候補股；隔天轉強再丟沙盤。")
