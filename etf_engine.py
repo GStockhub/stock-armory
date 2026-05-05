@@ -10,6 +10,7 @@ from data_center import read_remote_csv, safe_download
 
 
 DEFAULT_ETF_UNIVERSE = {
+    "00400A": {"名稱": "主動國泰動能高息", "類型": "主動ETF"},
     "0050": {"名稱": "元大台灣50", "類型": "被動ETF"},
     "0051": {"名稱": "元大中型100", "類型": "被動ETF"},
     "0052": {"名稱": "富邦科技", "類型": "被動ETF"},

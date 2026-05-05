@@ -129,20 +129,20 @@ def save_last_good_cache(sid: str, df: pd.DataFrame) -> None:
             pass
 
 
-def fetch_yfinance_price(sid: str, period: str = "60d") -> pd.DataFrame:
+def fetch_yfinance_price(sid: str, period: str = "60d", min_bars: int = 20) -> pd.DataFrame:
     for suffix in [".TW", ".TWO"]:
         try:
             ticker = f"{sid}{suffix}"
             raw = yf.download(ticker, period=period, threads=False, progress=False, auto_adjust=False)
-            df = normalize_price_df(raw, source=f"Yahoo{suffix}", min_bars=20)
-            if validate_price_df(df, min_bars=20):
+            df = normalize_price_df(raw, source=f"Yahoo{suffix}", min_bars=min_bars)
+            if validate_price_df(df, min_bars=min_bars):
                 return df
         except Exception:
             continue
     return pd.DataFrame()
 
 
-def fetch_finmind_price(sid: str, fm_token: Optional[str] = None, period: str = "60d") -> pd.DataFrame:
+def fetch_finmind_price(sid: str, fm_token: Optional[str] = None, period: str = "60d", min_bars: int = 20) -> pd.DataFrame:
     try:
         days = max(90, _period_to_days(period) + 30)
         start_d = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -156,8 +156,8 @@ def fetch_finmind_price(sid: str, fm_token: Optional[str] = None, period: str = 
         if data.get("msg") != "success" or not data.get("data"):
             return pd.DataFrame()
         raw = pd.DataFrame(data["data"])
-        df = normalize_price_df(raw, source="FinMind", min_bars=20)
-        if validate_price_df(df, min_bars=20):
+        df = normalize_price_df(raw, source="FinMind", min_bars=min_bars)
+        if validate_price_df(df, min_bars=min_bars):
             return df
     except Exception:
         pass
@@ -175,7 +175,7 @@ def _parse_twse_date(x: str) -> pd.Timestamp:
     return pd.to_datetime(s, errors="coerce")
 
 
-def fetch_twse_official_price(sid: str, period: str = "60d") -> pd.DataFrame:
+def fetch_twse_official_price(sid: str, period: str = "60d", min_bars: int = 20) -> pd.DataFrame:
     """TWSE 官方上市日線。上櫃通常會失敗，交給 FinMind / 快取。"""
     days = _period_to_days(period)
     months = max(2, min(12, int(np.ceil((days + 35) / 31))))
@@ -218,8 +218,8 @@ def fetch_twse_official_price(sid: str, period: str = "60d") -> pd.DataFrame:
     if not frames:
         return pd.DataFrame()
     raw_all = pd.concat(frames, ignore_index=True).dropna(subset=["date"])
-    df = normalize_price_df(raw_all, source="TWSE官方", min_bars=20)
-    if validate_price_df(df, min_bars=20):
+    df = normalize_price_df(raw_all, source="TWSE官方", min_bars=min_bars)
+    if validate_price_df(df, min_bars=min_bars):
         return df
     return pd.DataFrame()
 
@@ -227,9 +227,9 @@ def fetch_twse_official_price(sid: str, period: str = "60d") -> pd.DataFrame:
 def safe_download_price(sid: str, fm_token: Optional[str] = None, period: str = "60d", min_bars: int = 20) -> pd.DataFrame:
     sid = str(sid).strip()
     for fetcher in [
-        lambda: fetch_yfinance_price(sid, period=period),
-        lambda: fetch_finmind_price(sid, fm_token=fm_token, period=period),
-        lambda: fetch_twse_official_price(sid, period=period),
+        lambda: fetch_yfinance_price(sid, period=period, min_bars=min_bars),
+        lambda: fetch_finmind_price(sid, fm_token=fm_token, period=period, min_bars=min_bars),
+        lambda: fetch_twse_official_price(sid, period=period, min_bars=min_bars),
     ]:
         df = fetcher()
         if validate_price_df(df, min_bars=min_bars):

@@ -173,13 +173,23 @@ def fetch_single_stock_batch(sid, fm_token=None, period="60d"):
     df = safe_download(sid, fm_token, period=period)
     return sid, df
 
-def safe_download(sid, fm_token=None, period="60d"):
+def _is_etf_like_code(sid):
+    """台股 ETF/主動 ETF 多為 00 開頭，部分新 ETF 交易天數不足 20 根。"""
+    s = str(sid).strip().upper()
+    return s.startswith("00")
+
+
+def safe_download(sid, fm_token=None, period="60d", min_bars=None):
     """多層價格備援下載：Yahoo(.TW/.TWO) → FinMind → TWSE官方 → 最近成功快取。
 
-    回傳前會做 OHLCV 清洗與最後一列有效檢查；若所有來源都失敗，回傳 None。
+    ETF/新掛牌標的允許較少 K 棒也回傳，避免持股風控與沙盤只因未滿 20 日就顯示「抓取中」。
+    排名/回測需要的長週期指標會在 quant_engine 內再自行降級處理。
     """
+    sid_clean = str(sid).strip().upper()
+    if min_bars is None:
+        min_bars = 5 if _is_etf_like_code(sid_clean) else 20
     try:
-        df = safe_download_price(str(sid).strip(), fm_token=fm_token, period=period, min_bars=20)
+        df = safe_download_price(sid_clean, fm_token=fm_token, period=period, min_bars=int(min_bars))
         if df is not None and not df.empty:
             return df
     except Exception as e:

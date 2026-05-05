@@ -4,6 +4,23 @@ import streamlit as st
 import concurrent.futures
 from data_center import fetch_single_stock_batch, safe_download
 
+
+def _is_etf_like(sid):
+    return str(sid).strip().upper().startswith("00")
+
+
+def _last_roll(series, window, fallback=None):
+    s = pd.to_numeric(series, errors="coerce").dropna()
+    if s.empty:
+        return fallback
+    if len(s) >= window:
+        v = s.rolling(window).mean().iloc[-1]
+    else:
+        v = s.mean()
+    if pd.isna(v):
+        return fallback if fallback is not None else float(s.iloc[-1])
+    return float(v)
+
 def _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s, max_hold_bars=10):
     """用接近你真實SOP的方式估算：隔日開盤進、跳空>4.5%不追、+5.5%先出半、M5/M10控風險。"""
     df_bt = pd.DataFrame({"Close": close_s, "Open": open_s, "High": high_s, "Low": low_s, "Volume": vol_s}).dropna()
@@ -70,8 +87,8 @@ def _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s, max_hold_bars=1
 @st.cache_data(ttl=900, show_spinner=False)
 def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     sid = str(sid).strip()
-    df = safe_download(sid, fm_token)
-    if df is None or df.empty or len(df) < 20: return None
+    df = safe_download(sid, fm_token, min_bars=(5 if _is_etf_like(sid) else 20))
+    if df is None or df.empty or len(df) < (5 if _is_etf_like(sid) else 20): return None
     
     df = df[~df.index.duplicated(keep="last")].copy()
     if "Volume" not in df.columns: df["Volume"] = 0
@@ -84,18 +101,20 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     low_s = pd.to_numeric(df["Low"], errors="coerce")
     vol_s = pd.to_numeric(df["Volume"], errors="coerce")
 
-    if close_s.isna().all() or len(close_s.dropna()) < 20: return None
+    valid_close = close_s.dropna()
+    min_need = 5 if _is_etf_like(sid) else 20
+    if close_s.isna().all() or len(valid_close) < min_need: return None
 
-    p_now = float(close_s.iloc[-1])
-    m5 = float(close_s.rolling(5).mean().iloc[-1])
-    m10 = float(close_s.rolling(10).mean().iloc[-1])
-    m20 = float(close_s.rolling(20).mean().iloc[-1])
+    p_now = float(valid_close.iloc[-1])
+    m5 = _last_roll(close_s, 5, p_now)
+    m10 = _last_roll(close_s, 10, m5)
+    m20 = _last_roll(close_s, 20, m10)
     
-    if m20 == 0: return None
+    if not np.isfinite(m20) or m20 == 0: return None
     bias = ((p_now - m20) / m20) * 100
 
     vol_now = float(vol_s.iloc[-1])
-    vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1])
+    vol_ma5 = _last_roll(vol_s, 5, 1.0)
 
     is_strong_candle = p_now > open_s.iloc[-1] and (p_now - open_s.iloc[-1]) > (high_s.iloc[-1] - p_now) * 2
     tactic_a_strong = p_now > m5 > m10 and vol_now > vol_ma5 * 1.5
@@ -161,19 +180,21 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             low_s = pd.to_numeric(df["Low"], errors="coerce")
             vol_s = pd.to_numeric(df["Volume"], errors="coerce")
 
-            if close_s.isna().all() or len(close_s.dropna()) < 20: continue
+            valid_close = close_s.dropna()
+            min_need = 5 if _is_etf_like(sid) else 20
+            if close_s.isna().all() or len(valid_close) < min_need: continue
 
-            p_now = float(close_s.iloc[-1])
-            m5 = float(close_s.rolling(5).mean().iloc[-1])
-            m10 = float(close_s.rolling(10).mean().iloc[-1])
-            m20 = float(close_s.rolling(20).mean().iloc[-1])
+            p_now = float(valid_close.iloc[-1])
+            m5 = _last_roll(close_s, 5, p_now)
+            m10 = _last_roll(close_s, 10, m5)
+            m20 = _last_roll(close_s, 20, m10)
             
-            if m20 == 0: continue
+            if not np.isfinite(m20) or m20 == 0: continue
             bias = ((p_now - m20) / m20) * 100
 
             vol_now = float(vol_s.iloc[-1])
-            vol_ma5 = float(vol_s.rolling(5).mean().iloc[-1])
-            vol_ma20 = float(vol_s.rolling(20).mean().iloc[-1])
+            vol_ma5 = _last_roll(vol_s, 5, 1.0)
+            vol_ma20 = _last_roll(vol_s, 20, vol_ma5)
 
             vol_ratio = vol_now / vol_ma5 if vol_ma5 > 0 else 1
             close_position = (p_now - float(low_s.iloc[-1])) / (float(high_s.iloc[-1]) - float(low_s.iloc[-1])) if float(high_s.iloc[-1]) != float(low_s.iloc[-1]) else 0.5
@@ -193,7 +214,8 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             atr_percent = (atr_now / p_now) * 100
 
             # 🚀 V32.3 新增武器：布林通道 (BBAND)
-            std20 = float(close_s.rolling(20).std().iloc[-1])
+            std20 = float(close_s.dropna().tail(20).std()) if len(close_s.dropna()) >= 2 else 0.0
+            if pd.isna(std20): std20 = 0.0
             bb_upper = m20 + 2 * std20
 
             # 🚀 V32.3 新增武器：RSI(14)
