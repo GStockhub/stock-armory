@@ -1057,48 +1057,67 @@ with t_rank:
                     }}
                     .b-table {{
                         width: 100%;
-                        min-width: 1120px;
+                        min-width: 960px;
                         border-collapse: collapse;
-                        table-layout: fixed;
+                        table-layout: auto;
                         font-size: 13px;
                     }}
+                    .b-table col.b-col-code {{ width: 56px; }}
+                    .b-table col.b-col-name {{ width: 92px; }}
+                    .b-table col.b-col-summary {{ width: auto; }}
+                    .b-table col.b-col-small {{ width: 62px; }}
+                    .b-table col.b-col-mini {{ width: 46px; }}
+                    .b-table col.b-col-score {{ width: 54px; }}
                     .b-table th {{
                         background: rgba(128,128,128,.07);
                         color: {COLORS['subtext']} !important;
                         font-weight: 800;
-                        padding: 8px 8px;
+                        padding: 8px 6px;
                         border-bottom: 1px solid {COLORS['border']};
                         white-space: nowrap;
                         text-align: left;
                     }}
                     .b-table td {{
                         color: {COLORS['text']} !important;
-                        padding: 8px 8px;
+                        padding: 8px 6px;
                         border-bottom: 1px solid rgba(128,128,128,.18);
                         vertical-align: top;
                     }}
                     .b-table tr:last-child td {{ border-bottom: none; }}
-                    .b-code {{ width: 64px; white-space: nowrap; }}
-                    .b-name {{ width: 104px; white-space: nowrap; }}
+                    .b-code {{ white-space: nowrap; font-weight: 700; }}
+                    .b-name {{ white-space: nowrap; font-weight: 700; }}
                     .b-summary {{
-                        width: 610px;
                         white-space: normal;
                         overflow-wrap: anywhere;
                         word-break: break-word;
                         line-height: 1.55;
                         font-weight: 650;
                     }}
-                    .b-small {{ width: 70px; white-space: nowrap; text-align: right; }}
-                    .b-mini {{ width: 54px; white-space: nowrap; text-align: center; }}
-                    .b-score {{ width: 60px; white-space: nowrap; text-align: right; font-weight: 900; color: {COLORS['green']} !important; }}
+                    .b-small {{ white-space: nowrap; text-align: right; font-size: 12.5px; }}
+                    .b-mini {{ white-space: nowrap; text-align: center; font-size: 12.5px; }}
+                    .b-score {{ white-space: nowrap; text-align: right; font-weight: 900; color: {COLORS['green']} !important; }}
                     @media (max-width: 900px) {{
-                        .b-table {{ min-width: 980px; font-size: 12px; }}
-                        .b-summary {{ width: 520px; }}
-                        .b-name {{ width: 88px; }}
+                        .b-table {{ min-width: 900px; font-size: 12px; }}
+                        .b-table col.b-col-code {{ width: 50px; }}
+                        .b-table col.b-col-name {{ width: 78px; }}
+                        .b-table col.b-col-small {{ width: 54px; }}
+                        .b-table col.b-col-mini {{ width: 38px; }}
+                        .b-table col.b-col-score {{ width: 48px; }}
                     }}
                     </style>
                     <div class="b-table-wrap">
                         <table class="b-table">
+                            <colgroup>
+                                <col class="b-col-code">
+                                <col class="b-col-name">
+                                <col class="b-col-summary">
+                                <col class="b-col-small">
+                                <col class="b-col-small">
+                                <col class="b-col-small">
+                                <col class="b-col-mini">
+                                <col class="b-col-mini">
+                                <col class="b-col-score">
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th class="b-code">代號</th>
@@ -1115,7 +1134,7 @@ with t_rank:
                             <tbody>{''.join(b_rows)}</tbody>
                         </table>
                     </div>
-                    """, height=min(560, 105 + len(b_rows) * 58), scrolling=True)
+                    """, height=min(760, 130 + len(b_rows) * 88), scrolling=True)
 
                 st.markdown("#### 🔎 <span class='highlight-primary'>特殊關注 Top 3</span>", unsafe_allow_html=True)
                 st.caption("這裡不是買進清單，而是尚未進 S/A/B、但線型與籌碼接近可觀察區的候補股；隔天轉強再丟沙盤。")
