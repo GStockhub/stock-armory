@@ -1,4 +1,5 @@
 import io
+import os
 import time
 from datetime import datetime, timedelta
 import numpy as np
@@ -121,6 +122,36 @@ def get_macro_dashboard():
         return 5, pd.DataFrame([{"名稱": "系統", "現價": "0", "月線(M20)": "0", "乖離(%)": "0", "狀態": f"⚠️ {e}"}]), False
         
     return max(0, min(10, int(score))), macro_df, overheat_flag
+
+
+def _chips_cache_paths():
+    return [
+        os.path.join(".chips_cache", "chip_db.pkl"),
+        os.path.join("/tmp", "stock_armory_chip_db.pkl"),
+    ]
+
+
+def _save_chips_cache(chip_dict):
+    if not chip_dict:
+        return
+    for p in _chips_cache_paths():
+        try:
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            pd.to_pickle(chip_dict, p)
+        except Exception:
+            pass
+
+
+def _load_chips_cache():
+    for p in _chips_cache_paths():
+        try:
+            if os.path.exists(p):
+                obj = pd.read_pickle(p)
+                if isinstance(obj, dict) and len(obj) > 0:
+                    return obj
+        except Exception:
+            continue
+    return {}
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_chips_data(fm_token=None):
@@ -267,6 +298,14 @@ def fetch_chips_data(fm_token=None):
         date_ptr -= timedelta(days=1)
         attempts += 1
 
+    if chip_dict:
+        _save_chips_cache(chip_dict)
+        return chip_dict
+
+    # TWSE / FinMind 籌碼短暫中斷時，沿用最近成功快取，避免整個法人燈號失效。
+    cached = _load_chips_cache()
+    if cached:
+        return cached
     return chip_dict
 
 def fetch_single_stock_batch(sid, fm_token=None, period="60d"):

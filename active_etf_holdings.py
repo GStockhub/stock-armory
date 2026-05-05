@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import html as html_lib
 import io
 import os
 import re
@@ -175,16 +176,89 @@ def _source_urls_for(code: str, custom_sources: Optional[Dict[str, str]] = None)
     return urls
 
 
-def _read_html_tables(url: str, timeout: int = 18) -> List[pd.DataFrame]:
+def _fetch_html(url: str, timeout: int = 18) -> str:
     try:
         resp = _session().get(url, timeout=timeout, verify=False)
         resp.raise_for_status()
-        html = resp.text
-        if not html or len(html) < 100:
-            return []
-        return pd.read_html(io.StringIO(html))
+        text = resp.text or ""
+        return text if len(text) >= 100 else ""
+    except Exception:
+        return ""
+
+
+def _read_html_tables_from_text(html_text: str) -> List[pd.DataFrame]:
+    if not html_text:
+        return []
+    try:
+        return pd.read_html(io.StringIO(html_text))
     except Exception:
         return []
+
+
+def _strip_html_to_text(html_text: str) -> str:
+    text = re.sub(r"<script[\s\S]*?</script>", " ", html_text, flags=re.I)
+    text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html_lib.unescape(text)
+    text = re.sub(r"[\t\r\f\v]+", " ", text)
+    text = re.sub(r" +", " ", text)
+    return text
+
+
+def _parse_moneydj_text(html_text: str, etf_code: str, etf_name: str, name_map: Optional[Dict[str, str]], source_url: str) -> pd.DataFrame:
+    """MoneyDJ / 類似頁面文字備援解析。
+
+    有些網站表格不是 pandas.read_html 可解析的真正 table，
+    但頁面文字會出現：台積電(2330.TW) 8.99 10,039,000 這類格式。
+    """
+    if not html_text:
+        return pd.DataFrame()
+    text = _strip_html_to_text(html_text)
+    pos = text.find("持股明細")
+    segment = text[pos: pos + 8000] if pos >= 0 else text[:10000]
+
+    date = pd.Timestamp(datetime.now().date())
+    date_matches = re.findall(r"資料日期[:：]?\s*(\d{4})[/-](\d{1,2})[/-](\d{1,2})", segment)
+    if date_matches:
+        y, m, d = date_matches[-1]
+        try:
+            date = pd.Timestamp(f"{int(y):04d}-{int(m):02d}-{int(d):02d}")
+        except Exception:
+            pass
+
+    patterns = [
+        re.compile(r"([\u4e00-\u9fffA-Za-z0-9*\-]+)\((\d{4}[A-Z]?)\.TW\)\s*([0-9]+(?:\.[0-9]+)?)\s+([0-9,]+(?:\.[0-9]+)?)"),
+        re.compile(r"(\d{4}[A-Z]?)\s+([\u4e00-\u9fffA-Za-z0-9*\-]+)\s+([0-9]+(?:\.[0-9]+)?)%?"),
+    ]
+    rows = []
+    seen = set()
+    for idx, pattern in enumerate(patterns):
+        for m in pattern.findall(segment):
+            if idx == 0:
+                name, code, weight, shares = m
+            else:
+                code, name, weight = m
+                shares = 0
+            code = _clean_code(code)
+            if not code or code in seen:
+                continue
+            w = _to_float(weight)
+            if w <= 0 or w > 100:
+                continue
+            seen.add(code)
+            rows.append({
+                "日期": date,
+                "ETF代號": _clean_code(etf_code),
+                "ETF名稱": etf_name or etf_code,
+                "成分股代號": code,
+                "成分股名稱": (name_map or {}).get(code, str(name).strip()),
+                "權重": w,
+                "持有股數": _to_float(shares),
+                "來源": source_url,
+            })
+        if rows:
+            break
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
 def _standardize_holding_table(
@@ -255,14 +329,20 @@ def fetch_active_etf_holding_one(
     code = _clean_code(etf_code)
     name = etf_name or DEFAULT_ACTIVE_ETFS.get(code, {}).get("名稱", code)
     for url in _source_urls_for(code, custom_sources):
-        tables = _read_html_tables(url)
+        html_text = _fetch_html(url)
         best = pd.DataFrame()
-        for t in tables:
+
+        for t in _read_html_tables_from_text(html_text):
             std = _standardize_holding_table(t, code, name, name_map=name_map, source_url=url)
             if std.empty:
                 continue
             if len(std) > len(best):
                 best = std
+
+        # MoneyDJ / JS 文字備援：read_html 抓不到時仍可解析持股文字。
+        if best.empty:
+            best = _parse_moneydj_text(html_text, code, name, name_map=name_map, source_url=url)
+
         if not best.empty:
             return best
         time.sleep(0.25)
@@ -315,6 +395,15 @@ def merge_holdings_history(latest_df: pd.DataFrame, cache_path: str = CACHE_FILE
             pass
 
     if not frames:
+        try:
+            gh_hist, gh_diag = sync_history_with_github(pd.DataFrame(), max_days=max_days)
+            if st is not None:
+                st.session_state[GITHUB_DIAG_KEY] = gh_diag
+            if gh_hist is not None and not gh_hist.empty:
+                return normalize_history_df(gh_hist, max_days=max_days).reset_index(drop=True)
+        except Exception as e:
+            if st is not None:
+                st.session_state[GITHUB_DIAG_KEY] = {"ok": False, "message": f"GitHub 讀取例外：{type(e).__name__}: {e}"}
         return pd.DataFrame()
 
     local_hist = normalize_history_df(pd.concat(frames, ignore_index=True), max_days=max_days)
@@ -507,12 +596,25 @@ def build_active_etf_manager_radar(
     cand_tuple = tuple((c["ETF代號"], c["ETF名稱"]) for c in candidates)
     latest = fetch_active_etf_holdings_auto(cand_tuple, custom_sources=custom_sources, name_map=name_map)
     if latest.empty:
+        hist = merge_holdings_history(pd.DataFrame(), cache_path=cache_path, max_days=max(20, lookback_days + 10))
+        summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days)
+        history_status = get_history_status(hist, lookback_days=lookback_days)
+        if hist is not None and not hist.empty and summary.get("snapshot", pd.DataFrame()).empty is False:
+            return {
+                "ok": True,
+                "message": "今日自動持股來源抓不到；已沿用 GitHub / 本機最近成功快照。",
+                "candidates": pd.DataFrame(candidates),
+                "holdings": hist,
+                "summary": summary,
+                "history_status": history_status,
+            }
         return {
             "ok": False,
-            "message": "自動持股來源目前抓不到資料，請使用 CSV 備援。",
+            "message": "自動持股來源目前抓不到資料，且沒有可沿用的歷史快照；請使用 CSV 備援。",
             "candidates": pd.DataFrame(candidates),
             "holdings": pd.DataFrame(),
             "summary": summarize_holdings(pd.DataFrame(), industry_map, name_map, top_n=top_n, lookback_days=lookback_days),
+            "history_status": history_status,
         }
     hist = merge_holdings_history(latest, cache_path=cache_path, max_days=max(20, lookback_days + 10))
     summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days)
