@@ -21,6 +21,7 @@ from manual import QUICK_MANUAL_TEXT, MANUAL_TEXT, HISTORY_TEXT
 import aar
 import sidebar
 import etf_ui
+from fundamental_engine import get_fundamental_badge
 
 st.set_page_config(page_title="我要賺大錢", page_icon="💰️", layout="wide", initial_sidebar_state="expanded")
 
@@ -42,7 +43,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.5.2 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v36.0 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -91,7 +92,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 價格備援 ✕ ETF/個股分流 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 主流曝險 ✕ 沙盤基本面背景燈 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -603,6 +604,147 @@ render_top_status_panel()
 
 
 
+
+# =========================================================
+# 🔥 主流曝險警報 + 輪動建議
+# =========================================================
+def _theme_from_industry(industry, code="", name=""):
+    code = str(code or "").strip().upper()
+    text = f"{industry or ''} {name or ''} {code}"
+    if code == "0050":
+        return "長期存錢倉"
+    if code.startswith("00"):
+        if any(k in text for k in ["科技", "AI", "半導體", "電子"]):
+            return "科技ETF"
+        if any(k in text for k in ["高息", "股息", "動能高息"]):
+            return "高息ETF"
+        return "ETF"
+    rules = [("半導體", "半導體"), ("電子零組件", "電子零組件/PCB"), ("電腦及週邊", "AI伺服器/電腦週邊"), ("通信網路", "網通/通信"), ("其他電子", "設備/散熱/其他電子"), ("電機機械", "電機機械"), ("生技", "生技醫療"), ("金融", "金融"), ("航運", "航運"), ("觀光", "觀光/內需"), ("貿易百貨", "內需消費"), ("食品", "食品/內需"), ("化學", "化工"), ("塑膠", "塑化"), ("鋼鐵", "鋼鐵")]
+    for key, theme in rules:
+        if key in text:
+            return theme
+    if "電子" in text:
+        return "科技/電子"
+    return str(industry or "未分類") or "未分類"
+
+def _theme_group(theme):
+    t = str(theme)
+    if any(k in t for k in ["半導體", "電子", "AI", "電腦", "網通", "科技", "設備", "PCB"]):
+        return "科技電子"
+    if "ETF" in t:
+        return "ETF"
+    return t
+
+def _row_position_value(row):
+    def pick(keys):
+        for col in row.index:
+            if any(k in str(col) for k in keys):
+                v = row[col]
+                if pd.notna(v) and str(v).strip() not in ["", "nan", "None"]:
+                    try:
+                        return float(str(v).replace(",", ""))
+                    except Exception:
+                        pass
+        return 0.0
+    price = pick(["現價", "市價"])
+    qty = pick(["庫存張數", "張數", "庫存", "股數", "數量"])
+    return max(0.0, price * qty * 1000)
+
+def _build_rotation_suggestions(dominant_group, COLORS):
+    frames = []
+    for key in ["eod_master_list", "eod_special_watch", "eod_rank_sorted"]:
+        df = st.session_state.get(key)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            frames.append(df.copy())
+    if not frames:
+        return []
+    pool = pd.concat(frames, ignore_index=True)
+    if "代號" not in pool.columns:
+        return []
+    pool = pool.drop_duplicates(subset=["代號"], keep="first").copy()
+    pool = pool[~pool["代號"].astype(str).str.startswith("00")].copy()
+    if pool.empty:
+        return []
+    if "Quant_Score" not in pool.columns:
+        pool["Quant_Score"] = pd.to_numeric(pool.get("量化評分", 0), errors="coerce").fillna(0)
+    rows = []
+    for _, rr in pool.iterrows():
+        code = str(rr.get("代號", "")).strip()
+        name = str(rr.get("名稱", TWSE_NAME_MAP.get(code, code))).strip()
+        ind = str(rr.get("產業", TWSE_IND_MAP.get(code, "未分類"))).strip()
+        theme = _theme_from_industry(ind, code, name)
+        group = _theme_group(theme)
+        if group == dominant_group or theme in ["長期存錢倉", "未分類"]:
+            continue
+        score = float(pd.to_numeric(pd.Series([rr.get("Quant_Score", 0)]), errors="coerce").fillna(0).iloc[0])
+        rows.append({"theme": theme, "score": score, "code": code})
+    if not rows:
+        return []
+    x = pd.DataFrame(rows)
+    g = x.groupby("theme").agg(count=("code", "count"), avg_score=("score", "mean"), best_score=("score", "max"), examples=("code", lambda s: "、".join(list(s.astype(str).head(3))))).reset_index()
+    g["rotation_score"] = g["count"] * 10 + g["avg_score"]
+    g = g.sort_values(["rotation_score", "best_score"], ascending=False).head(3)
+    return [f"{r['theme']}（{int(r['count'])} 檔，均分 {r['avg_score']:.0f}，例：{r['examples']}）" for _, r in g.iterrows()]
+
+def render_mainstream_exposure_alert(hold_df, COLORS, industry_map, name_map):
+    if hold_df is None or hold_df.empty:
+        return
+    exposure, total_value = [], 0.0
+    for _, r in hold_df.iterrows():
+        code = str(r.get("代號", "")).strip().upper()
+        if not code or code == "0050":
+            continue
+        name = str(r.get("名稱", name_map.get(code, code))).strip()
+        value = _row_position_value(r)
+        if value <= 0:
+            continue
+        ind = str(r.get("產業", industry_map.get(code, ""))).strip()
+        theme = _theme_from_industry(ind, code, name)
+        group = _theme_group(theme)
+        exposure.append({"code": code, "name": name, "value": value, "theme": theme, "group": group})
+        total_value += value
+    if not exposure or total_value <= 0:
+        return
+    exp_df = pd.DataFrame(exposure)
+    grp = exp_df.groupby("group").agg(value=("value", "sum"), count=("code", "count"), themes=("theme", lambda s: "、".join(pd.Series(s).dropna().astype(str).unique()[:4]))).reset_index()
+    grp["pct"] = grp["value"] / total_value * 100
+    grp = grp.sort_values("pct", ascending=False)
+    top = grp.iloc[0]
+    pct = float(top["pct"]); dominant_group = str(top["group"])
+    color = COLORS["red"] if pct >= 75 else (COLORS["accent"] if pct >= 60 else COLORS["primary"])
+    if pct >= 75:
+        status = "⚠️ 主流曝險偏高"; command = "可抱強勢倉，但今日不建議再加同方向；若大盤跌破 M5，優先處理新倉與弱倉。"
+    elif pct >= 60:
+        status = "🟡 主流曝險集中"; command = "短波段可接受集中，但新倉需縮量；避免同族群連續加碼。"
+    else:
+        status = "🟢 曝險尚可"; command = "目前作戰倉未過度集中；仍以 S/A/B 與 ETF 動能決定是否出手。"
+    suggestions = _build_rotation_suggestions(dominant_group, COLORS)
+    sug_text = "<br>".join([f"{i+1}. {x}" for i, x in enumerate(suggestions)]) if suggestions else "目前沒有足夠強的替代族群；不為了分散而買弱勢股，寧可留現金。"
+    chips = "".join([f"<span style='display:inline-block; padding:4px 8px; border-radius:999px; background:{COLORS['bg']}; border:1px solid {COLORS['border']}; margin:2px 4px 2px 0; font-size:12px;'>{html.escape(str(r['group']))} {float(r['pct']):.0f}%</span>" for _, r in grp.head(4).iterrows()])
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:10px; padding:12px 14px; margin:8px 0 14px 0;">
+        <div style="font-size:17px; font-weight:900; color:{color};">🔥 {status}｜{html.escape(dominant_group)} {pct:.0f}%</div>
+        <div style="font-size:13px; color:{COLORS['subtext']}; margin-top:4px;">作戰倉估算，不含 0050 長期存錢倉。主要集中：{html.escape(str(top['themes']))}</div>
+        <div style="margin-top:8px;">{chips}</div>
+        <div style="font-size:13.5px; line-height:1.65; margin-top:8px; color:{COLORS['text']};"><b>策略：</b>{html.escape(command)}<br><b>輪動觀察：</b><br>{sug_text}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def _render_fundamental_badge_html(badge, COLORS):
+    level = str((badge or {}).get("level", "neutral"))
+    color_map = {"good": COLORS.get("green", "#22C55E"), "bad": COLORS.get("red", "#EF4444"), "warn": COLORS.get("accent", "#D1D5DB"), "etf": COLORS.get("primary", "#58A6FF"), "unknown": COLORS.get("subtext", "#9CA3AF"), "neutral": COLORS.get("primary", "#58A6FF")}
+    color = color_map.get(level, COLORS.get("primary", "#58A6FF"))
+    title = html.escape(str((badge or {}).get("title", "⚪ 基本面背景：暫無資料")))
+    detail = html.escape(str((badge or {}).get("detail", "")))
+    action = html.escape(str((badge or {}).get("action", "")))
+    return f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:8px; padding:10px 12px; margin-top:8px;">
+        <div style="font-size:14px; font-weight:900; color:{color};">{title}</div>
+        <div style="font-size:13px; color:{COLORS['text']}; line-height:1.55; margin-top:4px;">{detail}</div>
+        <div style="font-size:12.5px; color:{COLORS['subtext']}; line-height:1.5; margin-top:4px;"><b>用法：</b>{action}</div>
+    </div>
+    """
+
 @st.fragment
 def render_sandbox_panel():
     st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演</span>", unsafe_allow_html=True)
@@ -653,6 +795,11 @@ def render_sandbox_panel():
             </div>
             """
             st.markdown(html_block, unsafe_allow_html=True)
+            try:
+                badge = get_fundamental_badge(str(res.get("代號", "")), str(res.get("名稱", "")), FM_TOKEN)
+                st.markdown(_render_fundamental_badge_html(badge, COLORS), unsafe_allow_html=True)
+            except Exception:
+                pass
         elif sim_btn:
             st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
         else:
@@ -1241,6 +1388,8 @@ with t_cmd:
                     for code, info in rescue_residual_map.items():
                         rescue_names.append(f"{TWSE_NAME_MAP.get(code, code)}({code})")
                     st.warning(f"**救援殘倉模式啟動：{len(rescue_residual_map)} 檔**｜{ '、'.join(rescue_names[:5]) }。這些是已在 AAR 出現認賠/停損紀錄但目前仍持有的標的；反彈減碼優先，站回結構前不加碼。", icon="🚑")
+
+                render_mainstream_exposure_alert(m_df, COLORS, TWSE_IND_MAP, TWSE_NAME_MAP)
 
                 html_cards = '<div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">'
                 for _, r in m_df.iterrows():
