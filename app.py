@@ -219,7 +219,7 @@ def _render_sandbox_merged_html(res, badge, grade_color, grade_text, advice):
     """
 
 def render_quick_sandbox_panel():
-    st.markdown("### 🔮 <span class='highlight-primary'>📱｜沙盤推演</span>", unsafe_allow_html=True)
+    st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演</span>", unsafe_allow_html=True)
     sim_id = st.text_input("股票代號", placeholder="例：2330 / 0052 / 3033", key="quick_sandbox_stock_id")
     c1, c2 = st.columns([1, 1])
     with c1:
@@ -1192,7 +1192,7 @@ with t_rank:
                             f"{row.get('決策標籤','')}｜{row.get('法人狀態','')}",
                             f"{row.get('生命週期','')}｜{row.get('戰術型態','')}",
                             " ".join(tags),
-                            f"建議：{row.get('建議','')}"
+                            f"{row.get('建議','')}"
                         ]
                         return " ｜ ".join([str(x).strip() for x in parts if str(x).strip()])
 
@@ -1681,4 +1681,4 @@ with t_book:
         st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v35.0 ETF主體倉雷達版</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v35.0 </p>", unsafe_allow_html=True)
