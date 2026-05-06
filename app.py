@@ -91,7 +91,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 價格備援 ✕ GitHub診斷 ✕ ETF/個股分流 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 價格備援 ✕ ETF/個股分流 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -99,7 +99,7 @@ TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 # 📱 手機快查模式：避免手機重開時載入完整主系統
 # =========================================================
 def render_quick_sandbox_panel():
-    st.markdown("### 🔮 <span class='highlight-primary'>手機快查｜沙盤推演</span>", unsafe_allow_html=True)
+    st.markdown("### 🔮 <span class='highlight-primary'>📱｜沙盤推演</span>", unsafe_allow_html=True)
     sim_id = st.text_input("股票代號", placeholder="例：2330 / 0052 / 3033", key="quick_sandbox_stock_id")
     c1, c2 = st.columns([1, 1])
     with c1:
@@ -147,8 +147,8 @@ def render_quick_sandbox_panel():
         st.info("輸入代號後查詢。手機快查模式不載入 ETF / 法人 / AAR / 回測，速度會比較快。")
 
 if mobile_quick_mode:
-    st.markdown("<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢｜手機快查</h1>", unsafe_allow_html=True)
-    st.caption("若要回完整系統，關閉左側 Sidebar 的【📱 手機快查模式】。也可在網址加 `?quick=1` 固定快查入口。")
+    st.markdown("<h1 style='text-align: center;' class='highlight-primary'>📱手機模式</h1>", unsafe_allow_html=True)
+    st.caption("若要回完整系統，關閉左側 Sidebar 的【📱 手機模式】。也可在網址加 `?quick=1` 固定快查入口。")
     render_quick_sandbox_panel()
     with st.expander("⚡ 快速兵工廠", expanded=True):
         st.markdown(QUICK_MANUAL_TEXT, unsafe_allow_html=True)
