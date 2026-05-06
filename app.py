@@ -100,6 +100,124 @@ TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 # =========================================================
 # 📱 手機快查模式：避免手機重開時載入完整主系統
 # =========================================================
+def _get_sandbox_grade(res):
+    p_now, m5, m10 = res["現價"], res["M5"], res["M10"]
+    bias, win_rate, sl_price = res["乖離"], res["勝率"], res["停損價"]
+    if p_now < m10:
+        grade_color, grade_text = COLORS["red"], "🛑 嚴禁接刀 (D級)"
+        advice = f"現價跌破 M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"
+    elif p_now < m5:
+        grade_color, grade_text = COLORS["accent"], "⚠️ 等站回 M5"
+        advice = f"現價低於 M5 ({m5:.1f})。若 13:00 後站回 M5 且量能正常才觀察；站不回就等 M10。"
+    elif bias > 7:
+        grade_color, grade_text = COLORS["accent"], "⚠️ 追高警告 (C級)"
+        advice = f"乖離 {bias:.1f}% 偏高。除非小幅突破且量能強，否則等回踩 M5。"
+    elif p_now > m5 and win_rate >= 50:
+        grade_color, grade_text = COLORS["primary"], "👑 准許出兵 (S/A級)"
+        advice = f"多頭結構且回測勝率 {win_rate:.0f}%。防守底線 {sl_price:.1f}；跳空 >4.5% 不追。"
+    else:
+        grade_color, grade_text = COLORS["green"], "⚖️ 穩健觀察 (B級)"
+        advice = f"結構普通，勝率 {win_rate:.0f}%。可小量試單，防守底線 {sl_price:.1f}。"
+    return grade_color, grade_text, advice
+
+
+def _get_fundamental_badge_safe(res):
+    try:
+        return get_fundamental_badge(str(res.get("代號", "")), str(res.get("名稱", "")), FM_TOKEN)
+    except Exception:
+        return {
+            "level": "unknown",
+            "title": "⚪ 基本面背景：暫無資料",
+            "detail": "目前無法取得完整基本面資料，先以 M5 / M10、乖離與整體風險做判斷。",
+            "action": "基本面僅作輔助，不取代技術面與資金控管。",
+        }
+
+
+def _render_sandbox_merged_html(res, badge, grade_color, grade_text, advice):
+    p_now, m5, m10 = res["現價"], res["M5"], res["M10"]
+    bias, win_rate = res["乖離"], res["勝率"]
+    level = str((badge or {}).get("level", "neutral"))
+    color_map = {
+        "good": COLORS.get("green", "#22C55E"),
+        "bad": COLORS.get("red", "#EF4444"),
+        "warn": COLORS.get("accent", "#D1D5DB"),
+        "etf": COLORS.get("primary", "#58A6FF"),
+        "unknown": COLORS.get("subtext", "#9CA3AF"),
+        "neutral": COLORS.get("primary", "#58A6FF"),
+    }
+    funda_color = color_map.get(level, COLORS.get("primary", "#58A6FF"))
+    funda_title = html.escape(str((badge or {}).get("title", "⚪ 基本面背景：暫無資料")))
+    funda_detail = html.escape(str((badge or {}).get("detail", "")))
+    funda_action = html.escape(str((badge or {}).get("action", "")))
+    return f"""
+    <style>
+        .sandbox-merged-card {{
+            background-color:{COLORS['card']};
+            border-left:5px solid {grade_color};
+            padding:14px 15px;
+            border-radius:9px;
+            margin-bottom:10px;
+        }}
+        .sandbox-head {{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:12px;
+            margin-bottom:8px;
+            flex-wrap:wrap;
+        }}
+        .sandbox-title {{ margin:0; font-size:20px; color:{COLORS['text']}; line-height:1.25; }}
+        .sandbox-grade {{ font-weight:900; color:{grade_color}; font-size:18px; white-space:nowrap; }}
+        .sandbox-stats {{ font-size:14px; color:{COLORS['subtext']}; margin-bottom:9px; line-height:1.7; }}
+        .sandbox-advice {{ background-color:{COLORS['bg']}; padding:9px 10px; border-radius:7px; font-size:14px; color:{COLORS['text']}; margin-bottom:10px; line-height:1.55; }}
+        .funda-zone {{ border-top:1px solid {COLORS['border']}; padding-top:9px; }}
+        .funda-pill {{
+            display:inline-flex;
+            align-items:center;
+            gap:5px;
+            max-width:100%;
+            padding:4px 9px;
+            border-radius:999px;
+            border:1px solid {funda_color};
+            background:{COLORS['bg']};
+            color:{funda_color};
+            font-size:13px;
+            font-weight:900;
+            margin-bottom:6px;
+            line-height:1.35;
+        }}
+        .funda-detail {{ font-size:13px; color:{COLORS['text']}; line-height:1.55; }}
+        .funda-action {{ font-size:12.5px; color:{COLORS['subtext']}; line-height:1.5; margin-top:4px; }}
+        @media (max-width: 640px) {{
+            .sandbox-merged-card {{ padding:11px 12px; border-radius:8px; }}
+            .sandbox-head {{ gap:6px; margin-bottom:6px; }}
+            .sandbox-title {{ font-size:16px !important; line-height:1.25; }}
+            .sandbox-grade {{ font-size:14px !important; white-space:normal; }}
+            .sandbox-stats {{ font-size:12.5px !important; line-height:1.55; margin-bottom:7px; }}
+            .sandbox-advice {{ font-size:12.5px !important; padding:8px; margin-bottom:8px; }}
+            .funda-zone {{ padding-top:8px; }}
+            .funda-pill {{ font-size:12px !important; padding:3px 8px; line-height:1.3; }}
+            .funda-detail {{ font-size:12px !important; line-height:1.45; }}
+            .funda-action {{ font-size:11.5px !important; line-height:1.4; }}
+        }}
+    </style>
+    <div class="sandbox-merged-card">
+        <div class="sandbox-head">
+            <h4 class="sandbox-title">{html.escape(str(res['名稱']))} ({html.escape(str(res['代號']))})</h4>
+            <span class="sandbox-grade">{grade_text}</span>
+        </div>
+        <div class="sandbox-stats">
+            現價 <b style="color:{COLORS['text']};">{p_now:.2f}</b>｜M5 <b>{m5:.2f}</b>｜M10 <b>{m10:.2f}</b>｜乖離 <b>{bias:.1f}%</b>｜勝率 <b>{win_rate:.0f}%</b>
+        </div>
+        <div class="sandbox-advice">💡 <b>建議：</b>{html.escape(advice)}</div>
+        <div class="funda-zone">
+            <div class="funda-pill">🧱 {funda_title}</div>
+            <div class="funda-detail">{funda_detail}</div>
+            <div class="funda-action"><b>用法：</b>{funda_action}</div>
+        </div>
+    </div>
+    """
+
 def render_quick_sandbox_panel():
     st.markdown("### 🔮 <span class='highlight-primary'>📱｜沙盤推演</span>", unsafe_allow_html=True)
     sim_id = st.text_input("股票代號", placeholder="例：2330 / 0052 / 3033", key="quick_sandbox_stock_id")
@@ -119,32 +237,9 @@ def render_quick_sandbox_panel():
 
     res = st.session_state.get("quick_sandbox_last_result")
     if res:
-        p_now, m5, m10 = res["現價"], res["M5"], res["M10"]
-        bias, win_rate, sl_price = res["乖離"], res["勝率"], res["停損價"]
-        if p_now < m10:
-            color, title = COLORS["red"], "🛑 嚴禁接刀"
-            advice = f"跌破 M10 ({m10:.2f})，短線轉弱；站不回 M5 前不追。"
-        elif p_now < m5:
-            color, title = COLORS["accent"], "⚠️ 等站回 M5"
-            advice = f"低於 M5 ({m5:.2f})；13:00 後站回且量能正常才觀察。"
-        elif bias > 7:
-            color, title = COLORS["accent"], "⚠️ 乖離偏高"
-            advice = f"乖離 {bias:.1f}% 偏高；不追高，等回踩 M5。"
-        elif win_rate >= 50:
-            color, title = COLORS["primary"], "👑 可列入觀察"
-            advice = f"多頭結構，勝率 {win_rate:.0f}%；防守底線 {sl_price:.2f}，跳空 >4.5% 不追。"
-        else:
-            color, title = COLORS["green"], "⚖️ 穩健觀察"
-            advice = f"結構普通，勝率 {win_rate:.0f}%；小量且守防線。"
-        st.markdown(f"""
-        <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {color}; border-radius:10px; padding:14px 16px; margin:10px 0;">
-            <div style="font-size:18px; font-weight:900; color:{color};">{title}｜{res['名稱']} ({res['代號']})</div>
-            <div style="font-size:13px; color:{COLORS['text']}; margin-top:8px; line-height:1.65;">
-                現價 <b>{p_now:.2f}</b>｜M5 <b>{m5:.2f}</b>｜M10 <b>{m10:.2f}</b>｜乖離 <b>{bias:.1f}%</b>｜勝率 <b>{win_rate:.0f}%</b>
-            </div>
-            <div style="font-size:13px; color:{COLORS['text']}; background:{COLORS['bg']}; padding:10px; border-radius:8px; margin-top:8px;"><b>建議：</b>{advice}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        grade_color, grade_text, advice = _get_sandbox_grade(res)
+        badge = _get_fundamental_badge_safe(res)
+        st.markdown(_render_sandbox_merged_html(res, badge, grade_color, grade_text, advice), unsafe_allow_html=True)
     else:
         st.info("輸入代號後查詢。手機快查模式不載入 ETF / 法人 / AAR / 回測，速度會比較快。")
 
@@ -731,21 +826,6 @@ def render_mainstream_exposure_alert(hold_df, COLORS, industry_map, name_map):
     </div>
     """, unsafe_allow_html=True)
 
-def _render_fundamental_badge_html(badge, COLORS):
-    level = str((badge or {}).get("level", "neutral"))
-    color_map = {"good": COLORS.get("green", "#22C55E"), "bad": COLORS.get("red", "#EF4444"), "warn": COLORS.get("accent", "#D1D5DB"), "etf": COLORS.get("primary", "#58A6FF"), "unknown": COLORS.get("subtext", "#9CA3AF"), "neutral": COLORS.get("primary", "#58A6FF")}
-    color = color_map.get(level, COLORS.get("primary", "#58A6FF"))
-    title = html.escape(str((badge or {}).get("title", "⚪ 基本面背景：暫無資料")))
-    detail = html.escape(str((badge or {}).get("detail", "")))
-    action = html.escape(str((badge or {}).get("action", "")))
-    return f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:8px; padding:10px 12px; margin-top:8px;">
-        <div style="font-size:14px; font-weight:900; color:{color};">{title}</div>
-        <div style="font-size:13px; color:{COLORS['text']}; line-height:1.55; margin-top:4px;">{detail}</div>
-        <div style="font-size:12.5px; color:{COLORS['subtext']}; line-height:1.5; margin-top:4px;"><b>用法：</b>{action}</div>
-    </div>
-    """
-
 @st.fragment
 def render_sandbox_panel():
     st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演</span>", unsafe_allow_html=True)
@@ -766,41 +846,9 @@ def render_sandbox_panel():
 
         res = st.session_state.get("sandbox_last_result")
         if res:
-            p_now, m5, m10, bias, win_rate, sl_price = res["現價"], res["M5"], res["M10"], res["乖離"], res["勝率"], res["停損價"]
-            if p_now < m10:
-                grade_color, grade_text = COLORS["red"], "🛑 嚴禁接刀 (D級)"
-                advice = f"現價跌破 M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"
-            elif p_now < m5:
-                grade_color, grade_text = COLORS["accent"], "⚠️ 等站回 M5"
-                advice = f"現價低於 M5 ({m5:.1f})。若 13:00 後站回 M5 且量能正常才觀察；站不回就等 M10。"
-            elif bias > 7:
-                grade_color, grade_text = COLORS["accent"], "⚠️ 追高警告 (C級)"
-                advice = f"乖離 {bias:.1f}% 偏高。除非小幅突破且量能強，否則等回踩 M5。"
-            elif p_now > m5 and win_rate >= 50:
-                grade_color, grade_text = COLORS["primary"], "👑 准許出兵 (S/A級)"
-                advice = f"多頭結構且回測勝率 {win_rate:.0f}%。防守底線 {sl_price:.1f}；跳空 >4.5% 不追。"
-            else:
-                grade_color, grade_text = COLORS["green"], "⚖️ 穩健觀察 (B級)"
-                advice = f"結構普通，勝率 {win_rate:.0f}%。可小量試單，防守底線 {sl_price:.1f}。"
-
-            html_block = f"""
-            <div style="background-color:{COLORS['card']}; border-left:5px solid {grade_color}; padding:15px; border-radius:8px; margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:8px;">
-                    <h4 style="margin:0; font-size:20px; color:{COLORS['text']};">{res['名稱']} ({res['代號']})</h4>
-                    <span style="font-weight:bold; color:{grade_color}; font-size:18px; white-space:nowrap;">{grade_text}</span>
-                </div>
-                <div style="font-size:14px; color:{COLORS['subtext']}; margin-bottom:10px;">
-                    現價 <b style="color:{COLORS['text']};">{p_now:.2f}</b>｜M5 <b>{m5:.2f}</b>｜M10 <b>{m10:.2f}</b>｜乖離 <b>{bias:.1f}%</b>｜勝率 <b>{win_rate:.0f}%</b>
-                </div>
-                <div style="background-color:{COLORS['bg']}; padding:10px; border-radius:6px; font-size:14px; color:{COLORS['text']};">💡 <b>建議：</b>{advice}</div>
-            </div>
-            """
-            st.markdown(html_block, unsafe_allow_html=True)
-            try:
-                badge = get_fundamental_badge(str(res.get("代號", "")), str(res.get("名稱", "")), FM_TOKEN)
-                st.markdown(_render_fundamental_badge_html(badge, COLORS), unsafe_allow_html=True)
-            except Exception:
-                pass
+            grade_color, grade_text, advice = _get_sandbox_grade(res)
+            badge = _get_fundamental_badge_safe(res)
+            st.markdown(_render_sandbox_merged_html(res, badge, grade_color, grade_text, advice), unsafe_allow_html=True)
         elif sim_btn:
             st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
         else:
