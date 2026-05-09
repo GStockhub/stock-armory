@@ -44,7 +44,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v36.0 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.2 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -93,7 +93,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 主流曝險 ✕ 沙盤基本面背景燈 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— 產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -242,13 +242,8 @@ def render_quick_sandbox_panel():
         st.markdown(_render_sandbox_merged_html(res, badge, grade_color, grade_text, advice), unsafe_allow_html=True)
 
 
-if mobile_quick_mode:
-    st.markdown("<h1 style='text-align: center;' class='highlight-primary'>手機模式</h1>", unsafe_allow_html=True)
-    st.caption("若要回完整系統，關閉左側 Sidebar 的【📱 手機模式】。也可在網址加 `?quick=1` 固定快查入口。")
-    render_quick_sandbox_panel()
-    with st.expander("⚡ 快速兵工廠", expanded=True):
-        st.markdown(QUICK_MANUAL_TEXT, unsafe_allow_html=True)
-    st.stop()
+# V35.2：手機模式改為「持股戰情 + 沙盤推演」，不再於資料載入前提早 stop。
+# 這樣 admin 可看個人持股；guest 仍可使用沙盤與其餘功能，但看不到個人持股。
 
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
 
@@ -270,7 +265,7 @@ def render_data_health_panel():
     health.append(("產業地圖", len(TWSE_NAME_MAP) > 0, f"{len(TWSE_NAME_MAP):,} 筆" if TWSE_NAME_MAP else "未讀取"))
     health.append(("大盤儀表", not MACRO_DF.empty, f"{len(MACRO_DF)} 項" if not MACRO_DF.empty else "無資料"))
     health.append(("法人籌碼", chip_data_available, f"近 {len(chip_db)} 日｜{chips_data_source}" if chip_data_available else "暫缺/技術備援"))
-    health.append(("持股CSV", holding_read_ok, f"{holding_rows} 筆" if holding_read_ok else ("未設定" if not sheet_url else "讀取失敗/空表")))
+    health.append(("持股CSV", (auth_status != "admin_auth") or holding_read_ok, f"{holding_rows} 筆" if holding_read_ok else ("友軍隱藏" if auth_status != "admin_auth" else ("未設定" if not sheet_url else "讀取失敗/空表"))))
     health.append(("AAR日誌", aar_read_ok, f"{aar_rows} 筆" if aar_read_ok else ("未設定" if not aar_sheet_url else "讀取失敗/空表")))
     health.append(("FinMind Token", bool(str(FM_TOKEN).strip()), "已設定" if str(FM_TOKEN).strip() else "未設定"))
 
@@ -631,7 +626,7 @@ else:
     dates = ["TECH"]
     top_80_chips = today_df["代號"].head(120).tolist() if not today_df.empty else []
 
-if sheet_url:
+if sheet_url and auth_status == "admin_auth":
     try:
         sheet_df = read_remote_csv(sheet_url, dtype=str)
         holding_rows = len(sheet_df)
@@ -668,7 +663,7 @@ status_items = [
     ("產業", len(TWSE_NAME_MAP) > 0),
     ("大盤", not MACRO_DF.empty),
     ("法人", chip_data_available),
-    ("持股", holding_read_ok or not sheet_url),
+    ("持股", (auth_status != "admin_auth") or holding_read_ok or not sheet_url),
     ("AAR", aar_read_ok or not aar_sheet_url),
     ("Token", bool(str(FM_TOKEN).strip())),
 ]
@@ -850,8 +845,250 @@ def render_sandbox_panel():
             st.markdown(_render_sandbox_merged_html(res, badge, grade_color, grade_text, advice), unsafe_allow_html=True)
         elif sim_btn:
             st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
+
         else:
             st.info("輸入代號後執行體檢；結果會暫存在本頁，不會因切換分頁立刻消失。")
+
+
+def _fmt_money0(x):
+    try:
+        return f"{float(x):,.0f}"
+    except Exception:
+        return str(x)
+
+
+def _extract_hold_qty_cost(row):
+    qty = 0.0
+    cost = 0.0
+    for col in row.index:
+        c = str(col)
+        v = row[col]
+        if pd.isna(v) or str(v).strip() in ["", "nan", "None"]:
+            continue
+        raw = str(v).replace(",", "").strip()
+        try:
+            num = float(raw)
+        except Exception:
+            continue
+        if qty <= 0 and any(k in c for k in ["庫存張數", "張數", "庫存", "股數", "數量"]):
+            qty = num
+        if cost <= 0 and any(k in c for k in ["成本價", "買進均價", "平均成本", "成本", "買價"]):
+            cost = num
+    return qty, cost
+
+
+def build_mobile_holdings_view(hold_df):
+    """V35.2：手機持股摘要，只給 admin 使用；guest 不會讀/顯示個人持股。"""
+    if hold_df is None or hold_df.empty:
+        return pd.DataFrame(), 0.0
+    rows = []
+    fee_rate = 0.001425 * fee_discount
+    for _, r in hold_df.iterrows():
+        code = str(r.get("代號", "")).strip()
+        if not code:
+            continue
+        name = str(r.get("名稱", TWSE_NAME_MAP.get(code, code))).strip()
+        qty, cost = _extract_hold_qty_cost(r)
+        now = _to_float_safe(r.get("現價", 0), 0.0)
+        m5 = _to_float_safe(r.get("M5", 0), 0.0)
+        m10 = _to_float_safe(r.get("M10", 0), 0.0)
+        stop = _to_float_safe(r.get("停損價", 0), 0.0)
+        if now <= 0 or qty <= 0 or cost <= 0:
+            pnl, ret = 0.0, 0.0
+        else:
+            buy_cost_total = (cost * qty * 1000) + int((cost * qty * 1000) * fee_rate)
+            sell_net = (now * qty * 1000) - int((now * qty * 1000) * fee_rate) - int((now * qty * 1000) * 0.003)
+            pnl = sell_net - buy_cost_total
+            ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0.0
+        if now <= 0:
+            status, action, risk_rank = "⚪ 報價待確認", "先手動確認報價", 3
+        elif m10 > 0 and now < m10:
+            status, action, risk_rank = "🔴 跌破M10", "優先處理/反彈減碼", 1
+        elif stop > 0 and now < stop:
+            status, action, risk_rank = "🔴 破防線", "減碼/停損", 1
+        elif m5 > 0 and now < m5:
+            status, action, risk_rank = "🟡 跌破M5", "等站回；站不回降碼", 2
+        elif ret >= 5.5:
+            status, action, risk_rank = "🟢 有獲利", "可出半，剩下守M5", 4
+        else:
+            status, action, risk_rank = "🟢 可觀察", "守M5/ATR，不追不攤", 5
+        rows.append({
+            "代號": code, "名稱": name, "現價": now, "成本": cost, "張數": qty,
+            "損益": pnl, "報酬%": ret, "狀態": status, "今日指令": action, "風險排序": risk_rank,
+        })
+    out = pd.DataFrame(rows)
+    total = float(out["損益"].sum()) if not out.empty else 0.0
+    if not out.empty:
+        out = out.sort_values(["風險排序", "報酬%"], ascending=[True, True])
+    return out, total
+
+
+def render_mobile_holdings_panel():
+    st.markdown("### 💼 <span class='highlight-primary'>我的持股戰情</span>", unsafe_allow_html=True)
+    if auth_status != "admin_auth":
+        st.info("友軍模式不顯示個人持股、成本與損益；沙盤推演與其他功能仍可使用。")
+        return
+    hold_view, total_pnl = build_mobile_holdings_view(m_df)
+    if hold_view.empty:
+        st.info("目前沒有讀到有效持股資料，請確認 secrets / CSV 網址。")
+        return
+    pnl_color = COLORS["red"] if total_pnl > 0 else (COLORS["green"] if total_pnl < 0 else COLORS["text"])
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("總淨損益", f"{total_pnl:,.0f} 元")
+    with c2:
+        st.metric("持股檔數", f"{len(hold_view)} 檔")
+    with c3:
+        weakest = hold_view.iloc[0]
+        st.metric("最需處理", f"{weakest['名稱']}({weakest['代號']})", f"{weakest['報酬%']:.2f}%")
+    cards = ""
+    for _, r in hold_view.iterrows():
+        col = COLORS["red"] if float(r["損益"]) > 0 else (COLORS["green"] if float(r["損益"]) < 0 else COLORS["text"])
+        border = COLORS["red"] if int(r["風險排序"]) <= 2 else COLORS["primary"]
+        cards += f"""
+        <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {border}; border-radius:10px; padding:11px 12px; margin-bottom:9px;">
+            <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
+                <div><b style="font-size:16px; color:{COLORS['text']};">{html.escape(str(r['名稱']))} ({html.escape(str(r['代號']))})</b><br>
+                <span style="font-size:12.5px; color:{COLORS['subtext']};">現價 {float(r['現價']):.2f}｜成本 {float(r['成本']):.2f}｜{float(r['張數']):g} 張/股單位</span></div>
+                <div style="text-align:right; color:{col}; font-weight:900; white-space:nowrap;">{float(r['報酬%']):+.2f}%<br>{float(r['損益']):+,.0f}</div>
+            </div>
+            <div style="margin-top:8px; background:{COLORS['bg']}; border-radius:8px; padding:7px 9px; font-size:13px; color:{COLORS['text']}; line-height:1.45;">
+                <b>{html.escape(str(r['狀態']))}</b>｜{html.escape(str(r['今日指令']))}
+            </div>
+        </div>
+        """
+    st.markdown(cards, unsafe_allow_html=True)
+
+
+def build_industry_rotation_table(source_df, macro_df=None):
+    """V35.2 情報局：依產業聚合熱度與輪動升溫訊號。"""
+    if source_df is None or source_df.empty or "代號" not in source_df.columns:
+        return pd.DataFrame()
+    df = source_df.copy()
+    if "產業" not in df.columns:
+        df["產業"] = df["代號"].astype(str).map(lambda x: TWSE_IND_MAP.get(x, "未分類"))
+    df["產業"] = df["產業"].replace("", "未分類").fillna("未分類")
+    for c in ["日漲幅(%)", "3日漲幅(%)", "5日漲幅(%)", "vol_ratio", "安全指數", "三大法人合計", "投信(張)", "現價", "M5", "M10", "乖離(%)"]:
+        if c not in df.columns:
+            df[c] = 0
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    df = df[~df["代號"].astype(str).str.startswith("00")].copy()
+    if df.empty:
+        return pd.DataFrame()
+    rows = []
+    for ind, g in df.groupby("產業"):
+        if len(g) < 2:
+            continue
+        avg_day = float(g["日漲幅(%)"].mean())
+        avg_3d = float(g["3日漲幅(%)"].mean())
+        avg_5d = float(g["5日漲幅(%)"].mean())
+        up_ratio = float((g["日漲幅(%)"] > 0).mean())
+        avg_vol = float(g["vol_ratio"].replace([np.inf, -np.inf], np.nan).fillna(1).clip(0, 5).mean())
+        strong_count = int(((g["現價"] > g["M5"]) & (g["M5"] >= g["M10"]) & (g["vol_ratio"] >= 1.2)).sum())
+        breakout_count = int((g["戰術型態"].astype(str).str.contains("爆量|多頭", na=False)).sum()) if "戰術型態" in g.columns else strong_count
+        inst = float(g["三大法人合計"].sum())
+        trust = float(g["投信(張)"].sum())
+        # 熱度看「現在」，輪動看「變熱速度 + 抗跌 + 量先行」
+        hot_score = 0
+        hot_score += min(max(avg_day, -2), 4) * 8
+        hot_score += up_ratio * 22
+        hot_score += min(avg_vol, 3) * 12
+        hot_score += min(strong_count, 5) * 5
+        hot_score += min(breakout_count, 4) * 5
+        if inst > 0: hot_score += 6
+        if trust > 0: hot_score += 5
+        hot_score = max(0, min(100, hot_score))
+        rotation_delta = (avg_3d - avg_5d) + max(avg_day, 0) + max(avg_vol - 1, 0) * 2 + up_ratio * 3
+        if avg_day >= 0 and avg_vol >= 1.2 and up_ratio >= 0.5:
+            rotation_delta += 3
+        if hot_score >= 75 and rotation_delta >= 0:
+            state, advice = "🔥 主戰場", "只做龍頭回測，不追第三根"
+        elif 45 <= hot_score < 75 and rotation_delta >= 4 and up_ratio >= 0.5:
+            state, advice = "🟠 資金升溫", "可找族群強股小倉試單"
+        elif hot_score < 55 and rotation_delta >= 5 and avg_vol >= 1.2:
+            state, advice = "🟡 潛伏觀察", "加入雷達，等突破確認"
+        elif hot_score >= 55 and rotation_delta <= -3:
+            state, advice = "⚠️ 退潮警戒", "反彈不追，持股偏降碼"
+        else:
+            state, advice = "⚪ 普通", "不優先"
+        leaders = g.sort_values(["安全指數", "vol_ratio"], ascending=[False, False]).head(3)
+        leader_txt = "、".join((leaders["名稱"].astype(str) + "(" + leaders["代號"].astype(str) + ")").tolist())
+        reasons = []
+        if avg_day > 0: reasons.append(f"均漲{avg_day:.2f}%")
+        if up_ratio >= 0.6: reasons.append(f"上漲家數{up_ratio*100:.0f}%")
+        if avg_vol >= 1.2: reasons.append(f"量比{avg_vol:.2f}x")
+        if strong_count >= 2: reasons.append(f"強勢{strong_count}檔")
+        if inst > 0: reasons.append("法人買超")
+        rows.append({
+            "產業": ind, "輪動狀態": state, "今日熱度": round(hot_score, 0), "5日升溫": round(rotation_delta, 1),
+            "平均漲幅%": round(avg_day, 2), "3日均幅%": round(avg_3d, 2), "5日均幅%": round(avg_5d, 2),
+            "上漲家數%": round(up_ratio * 100, 1), "平均量比": round(avg_vol, 2), "強勢股數": strong_count,
+            "法人合計": round(inst, 0), "代表股": leader_txt, "熱度原因": "、".join(reasons) if reasons else "尚未明顯發動", "操作建議": advice,
+        })
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    state_order = {"🔥 主戰場": 0, "🟠 資金升溫": 1, "🟡 潛伏觀察": 2, "⚠️ 退潮警戒": 3, "⚪ 普通": 4}
+    out["_ord"] = out["輪動狀態"].map(state_order).fillna(9)
+    return out.sort_values(["_ord", "今日熱度", "5日升溫"], ascending=[True, False, False]).drop(columns=["_ord"])
+
+
+def render_industry_rotation_radar():
+    st.markdown("### 🔥 <span class='highlight-primary'>產業輪動雷達 V35.2</span>", unsafe_allow_html=True)
+    st.caption("用個股引擎已掃出的價量、均線與法人資料，判斷每日/近5日誰是主戰場、誰正在升溫、誰可能退潮。")
+    frames = []
+    chip_intel = st.session_state.get("eod_intel_df", None)
+    if chip_intel is not None and isinstance(chip_intel, pd.DataFrame) and not chip_intel.empty:
+        base = chip_intel.copy()
+        if today_df is not None and not today_df.empty:
+            chip_cols = [c for c in ["代號", "三大法人合計", "投信(張)", "外資(張)"] if c in today_df.columns]
+            base = pd.merge(base, today_df[chip_cols], on="代號", how="left")
+        frames.append(base)
+    for key in ["eod_master_list", "eod_special_watch", "eod_rank_sorted"]:
+        df = st.session_state.get(key)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            frames.append(df.copy())
+    if not frames:
+        st.info("尚未有足夠掃描資料。請先到【個股游擊】按一次「重新掃描明日清單」，情報局就會整理產業輪動。")
+        return
+    pool = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["代號"], keep="first")
+    table = build_industry_rotation_table(pool, MACRO_DF)
+    if table.empty:
+        st.info("產業輪動資料不足，可能是今日掃描樣本太少或價量欄位不足。")
+        return
+    hot = table[table["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫", "🟡 潛伏觀察"])].head(8)
+    cols = st.columns(min(3, max(1, len(hot)))) if not hot.empty else []
+    for idx, (_, r) in enumerate(hot.iterrows()):
+        color = COLORS["red"] if "主戰場" in r["輪動狀態"] else (COLORS["accent"] if "升溫" in r["輪動狀態"] else COLORS["primary"])
+        with cols[idx % len(cols)]:
+            st.markdown(f"""
+            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-top:5px solid {color}; border-radius:10px; padding:12px 13px; min-height:178px; margin-bottom:10px;">
+                <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">{html.escape(str(r['輪動狀態']))}</div>
+                <div style="font-size:18px; color:{color}; font-weight:900; line-height:1.25; margin:4px 0;">{html.escape(str(r['產業']))}</div>
+                <div style="font-size:13px; color:{COLORS['text']}; line-height:1.55;">熱度 <b>{float(r['今日熱度']):.0f}</b>｜升溫 <b>{float(r['5日升溫']):+.1f}</b><br>漲幅 {float(r['平均漲幅%']):+.2f}%｜量比 {float(r['平均量比']):.2f}x｜上漲 {float(r['上漲家數%']):.0f}%</div>
+                <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:7px; line-height:1.45;">{html.escape(str(r['熱度原因']))}<br><b>代表：</b>{html.escape(str(r['代表股']))}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    show_cols = ["產業", "輪動狀態", "今日熱度", "5日升溫", "平均漲幅%", "上漲家數%", "平均量比", "強勢股數", "法人合計", "代表股", "操作建議"]
+    st.dataframe(table[[c for c in show_cols if c in table.columns]].style.set_properties(**table_style), use_container_width=True, hide_index=True, height=420)
+
+
+def render_mobile_battle_room():
+    st.markdown("<h1 style='text-align: center;' class='highlight-primary'>📱 手機戰情室 V35.2</h1>", unsafe_allow_html=True)
+    st.caption("手機版已移除快速兵工廠；保留沙盤推演。guest 可用沙盤與其餘功能，但不顯示個人持股。")
+    render_mobile_holdings_panel()
+    st.markdown("<hr style='margin: 10px 0 18px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
+    render_quick_sandbox_panel()
+    with st.expander("🔥 產業輪動摘要", expanded=False):
+        render_industry_rotation_radar()
+    with st.expander("🚦 大盤風險燈號", expanded=False):
+        render_top_status_panel()
+
+
+if mobile_quick_mode:
+    render_mobile_battle_room()
+    st.stop()
+
 
 t_rank, t_etf, t_chip, t_cmd, t_book = st.tabs(["🎯 個股游擊", "📈 ETF 主體倉", "📡 情報局", "🏦 總司令部", "📖 兵工廠與軍史館"])
 
@@ -1362,6 +1599,8 @@ with t_etf:
     etf_ui.render_etf_tab(COLORS, FM_TOKEN, TWSE_IND_MAP, TWSE_NAME_MAP, etf_holdings_url, table_style)
 
 with t_chip:
+    render_industry_rotation_radar()
+    st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     if not today_df.empty:
         st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：法人動向</span>", unsafe_allow_html=True)
         st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
@@ -1397,7 +1636,9 @@ with t_cmd:
     with cmd_hold_tab:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
 
-        if not sheet_url:
+        if auth_status != "admin_auth":
+            st.info("友軍模式不顯示個人持股、成本與損益；沙盤推演、情報局、ETF、AAR 與回測仍可使用。")
+        elif not sheet_url:
             st.info("請在左側邊欄輸入您的【持股部位】CSV 網址以啟用風控檢查。")
         else:
             if not m_df.empty:

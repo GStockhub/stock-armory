@@ -185,6 +185,12 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             if close_s.isna().all() or len(valid_close) < min_need: continue
 
             p_now = float(valid_close.iloc[-1])
+            prev_close = float(valid_close.iloc[-2]) if len(valid_close) >= 2 else p_now
+            close_3_base = float(valid_close.iloc[-4]) if len(valid_close) >= 4 else p_now
+            close_5_base = float(valid_close.iloc[-6]) if len(valid_close) >= 6 else p_now
+            day_return = (p_now / prev_close - 1) * 100 if prev_close > 0 else 0.0
+            ret_3d = (p_now / close_3_base - 1) * 100 if close_3_base > 0 else 0.0
+            ret_5d = (p_now / close_5_base - 1) * 100 if close_5_base > 0 else 0.0
             m5 = _last_roll(close_s, 5, p_now)
             m10 = _last_roll(close_s, 10, m5)
             m20 = _last_roll(close_s, 20, m10)
@@ -275,6 +281,7 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
 
             intel_results.append({
                 "代號": sid, "名稱": TWSE_NAME_MAP.get(sid, sid), "產業": ind, "現價": p_now, "成交量": vol_now, "今日放量": (vol_now > vol_ma5 * 1.4),
+                "日漲幅(%)": day_return, "3日漲幅(%)": ret_3d, "5日漲幅(%)": ret_5d,
                 "乖離(%)": bias, "M5": m5, "M10": m10, "勝率(%)": win_rate, "均報(%)": avg_ret, "戰術型態": tactic,
                 "停損價": stop_price, "原始風險差額": raw_risk, "基本達標": (s_score >= 6 and bias <= 8), "安全指數": s_score,
                 "vol_ratio": vol_ratio, "close_position": close_position,

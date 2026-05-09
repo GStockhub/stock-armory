@@ -67,9 +67,9 @@ def render_sidebar(auth_status="guest_auth"):
         mobile_quick_mode = st.toggle(
             "📱 手機快查模式",
             value=default_quick,
-            help="手機快查只載入沙盤推演與快速兵工廠；網址加 ?quick=1 可固定進入。",
+            help="手機戰情室會顯示沙盤推演、產業輪動摘要；admin 可看個人持股，guest 不顯示持股。網址加 ?quick=1 可固定進入。",
         )
-        st.caption("快查：只跑沙盤與快速兵工廠" if mobile_quick_mode else "完整：載入 ETF / 法人 / AAR / 回測")
+        st.caption("手機：持股戰情 + 沙盤推演 + 輪動摘要" if mobile_quick_mode else "完整：載入 ETF / 法人 / AAR / 回測")
 
         _compact_divider()
 
