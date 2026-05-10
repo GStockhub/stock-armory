@@ -695,9 +695,9 @@ def render_sandbox_panel():
 
         res = st.session_state.get("sandbox_last_result")
         if res:
-            grade_color, grade_text, advice = _get_sandbox_grade(res)
-            badge = _get_fundamental_badge_safe(res)
-            st.markdown(_render_sandbox_merged_html(res, badge, grade_color, grade_text, advice), unsafe_allow_html=True)
+            grade_color, grade_text, advice = mobile_ui._get_sandbox_grade(res, COLORS)
+            badge = mobile_ui._get_fundamental_badge_safe(res, FM_TOKEN, get_fundamental_badge)
+            st.markdown(mobile_ui._render_sandbox_merged_html(res, badge, grade_color, grade_text, advice, COLORS), unsafe_allow_html=True)
         elif sim_btn:
             st.error("❌ 查無此股票或歷史資料不足，請確認代碼是否正確。")
 
