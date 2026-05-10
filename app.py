@@ -1126,7 +1126,7 @@ def build_industry_rotation_table(source_df, macro_df=None):
 
 
 def render_industry_rotation_radar():
-    st.markdown("#### 🔥 <span class='highlight-primary'>產業輪動雷達 V36</span>", unsafe_allow_html=True)
+    st.markdown("#### 🔥 <span class='highlight-primary'>產業輪動雷達</span>", unsafe_allow_html=True)
     st.caption("用個股引擎已掃出的價量、均線與法人資料，判斷每日/近5日誰是主戰場、誰正在升溫、誰可能退潮。")
     frames = []
     chip_intel = st.session_state.get("eod_intel_df", None)
