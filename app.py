@@ -22,6 +22,8 @@ from manual import QUICK_MANUAL_TEXT, MANUAL_TEXT, HISTORY_TEXT
 import aar
 import sidebar
 import etf_ui
+import mobile_ui
+import rotation_radar
 from fundamental_engine import get_fundamental_badge
 
 st.set_page_config(page_title="我要賺大錢", page_icon="💰️", layout="wide", initial_sidebar_state="expanded")
@@ -93,157 +95,14 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— V36 瘦身模組版｜產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
 # =========================================================
 # 📱 手機快查模式：避免手機重開時載入完整主系統
 # =========================================================
-def _get_sandbox_grade(res):
-    p_now, m5, m10 = res["現價"], res["M5"], res["M10"]
-    bias, win_rate, sl_price = res["乖離"], res["勝率"], res["停損價"]
-    if p_now < m10:
-        grade_color, grade_text = COLORS["red"], "🛑 嚴禁接刀 (D級)"
-        advice = f"現價跌破 M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"
-    elif p_now < m5:
-        grade_color, grade_text = COLORS["accent"], "⚠️ 等站回 M5"
-        advice = f"現價低於 M5 ({m5:.1f})。若 13:00 後站回 M5 且量能正常才觀察；站不回就等 M10。"
-    elif bias > 7:
-        grade_color, grade_text = COLORS["accent"], "⚠️ 追高警告 (C級)"
-        advice = f"乖離 {bias:.1f}% 偏高。除非小幅突破且量能強，否則等回踩 M5。"
-    elif p_now > m5 and win_rate >= 50:
-        grade_color, grade_text = COLORS["primary"], "👑 准許出兵 (S/A級)"
-        advice = f"多頭結構且回測勝率 {win_rate:.0f}%。防守底線 {sl_price:.1f}；跳空 >4.5% 不追。"
-    else:
-        grade_color, grade_text = COLORS["green"], "⚖️ 穩健觀察 (B級)"
-        advice = f"結構普通，勝率 {win_rate:.0f}%。可小量試單，防守底線 {sl_price:.1f}。"
-    return grade_color, grade_text, advice
 
-
-def _get_fundamental_badge_safe(res):
-    try:
-        return get_fundamental_badge(str(res.get("代號", "")), str(res.get("名稱", "")), FM_TOKEN)
-    except Exception:
-        return {
-            "level": "unknown",
-            "title": "⚪ 基本面背景：暫無資料",
-            "detail": "目前無法取得完整基本面資料，先以 M5 / M10、乖離與整體風險做判斷。",
-            "action": "基本面僅作輔助，不取代技術面與資金控管。",
-        }
-
-
-def _render_sandbox_merged_html(res, badge, grade_color, grade_text, advice):
-    p_now, m5, m10 = res["現價"], res["M5"], res["M10"]
-    bias, win_rate = res["乖離"], res["勝率"]
-    level = str((badge or {}).get("level", "neutral"))
-    color_map = {
-        "good": COLORS.get("green", "#22C55E"),
-        "bad": COLORS.get("red", "#EF4444"),
-        "warn": COLORS.get("accent", "#D1D5DB"),
-        "etf": COLORS.get("primary", "#58A6FF"),
-        "unknown": COLORS.get("subtext", "#9CA3AF"),
-        "neutral": COLORS.get("primary", "#58A6FF"),
-    }
-    funda_color = color_map.get(level, COLORS.get("primary", "#58A6FF"))
-    funda_title = html.escape(str((badge or {}).get("title", "⚪ 基本面背景：暫無資料")))
-    funda_detail = html.escape(str((badge or {}).get("detail", "")))
-    funda_action = html.escape(str((badge or {}).get("action", "")))
-    return f"""
-    <style>
-        .sandbox-merged-card {{
-            background-color:{COLORS['card']};
-            border-left:5px solid {grade_color};
-            padding:14px 15px;
-            border-radius:9px;
-            margin-bottom:10px;
-        }}
-        .sandbox-head {{
-            display:flex;
-            justify-content:space-between;
-            align-items:flex-start;
-            gap:12px;
-            margin-bottom:8px;
-            flex-wrap:wrap;
-        }}
-        .sandbox-title {{ margin:0; font-size:20px; color:{COLORS['text']}; line-height:1.25; }}
-        .sandbox-grade {{ font-weight:900; color:{grade_color}; font-size:18px; white-space:nowrap; }}
-        .sandbox-stats {{ font-size:14px; color:{COLORS['subtext']}; margin-bottom:9px; line-height:1.7; }}
-        .sandbox-advice {{ background-color:{COLORS['bg']}; padding:9px 10px; border-radius:7px; font-size:14px; color:{COLORS['text']}; margin-bottom:10px; line-height:1.55; }}
-        .funda-zone {{ border-top:1px solid {COLORS['border']}; padding-top:9px; }}
-        .funda-pill {{
-            display:inline-flex;
-            align-items:center;
-            gap:5px;
-            max-width:100%;
-            padding:4px 9px;
-            border-radius:999px;
-            border:1px solid {funda_color};
-            background:{COLORS['bg']};
-            color:{funda_color};
-            font-size:13px;
-            font-weight:900;
-            margin-bottom:6px;
-            line-height:1.35;
-        }}
-        .funda-detail {{ font-size:13px; color:{COLORS['text']}; line-height:1.55; }}
-        .funda-action {{ font-size:12.5px; color:{COLORS['subtext']}; line-height:1.5; margin-top:4px; }}
-        @media (max-width: 640px) {{
-            .sandbox-merged-card {{ padding:11px 12px; border-radius:8px; }}
-            .sandbox-head {{ gap:6px; margin-bottom:6px; }}
-            .sandbox-title {{ font-size:16px !important; line-height:1.25; }}
-            .sandbox-grade {{ font-size:14px !important; white-space:normal; }}
-            .sandbox-stats {{ font-size:12.5px !important; line-height:1.55; margin-bottom:7px; }}
-            .sandbox-advice {{ font-size:12.5px !important; padding:8px; margin-bottom:8px; }}
-            .funda-zone {{ padding-top:8px; }}
-            .funda-pill {{ font-size:12px !important; padding:3px 8px; line-height:1.3; }}
-            .funda-detail {{ font-size:12px !important; line-height:1.45; }}
-            .funda-action {{ font-size:11.5px !important; line-height:1.4; }}
-        }}
-    </style>
-    <div class="sandbox-merged-card">
-        <div class="sandbox-head">
-            <h4 class="sandbox-title">{html.escape(str(res['名稱']))} ({html.escape(str(res['代號']))})</h4>
-            <span class="sandbox-grade">{grade_text}</span>
-        </div>
-        <div class="sandbox-stats">
-            現價 <b style="color:{COLORS['text']};">{p_now:.2f}</b>｜M5 <b>{m5:.2f}</b>｜M10 <b>{m10:.2f}</b>｜乖離 <b>{bias:.1f}%</b>｜勝率 <b>{win_rate:.0f}%</b>
-        </div>
-        <div class="sandbox-advice">💡 <b>建議：</b>{html.escape(advice)}</div>
-        <div class="funda-zone">
-            <div class="funda-pill">🧱 {funda_title}</div>
-            <div class="funda-detail">{funda_detail}</div>
-            <div class="funda-action"><b>用法：</b>{funda_action}</div>
-        </div>
-    </div>
-    """
-
-def render_quick_sandbox_panel():
-    st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演</span>", unsafe_allow_html=True)
-    sim_id = st.text_input("股票代號", placeholder="例：2330 / 0052 / 3033", key="quick_sandbox_stock_id")
-    c1, c2 = st.columns([1, 1])
-    with c1:
-        sim_btn = st.button("⚡ 執行體檢", use_container_width=True, key="quick_sandbox_btn")
-    with c2:
-        if st.button("🧹 清除", use_container_width=True, key="quick_sandbox_clear_btn"):
-            st.session_state.pop("quick_sandbox_last_result", None)
-            st.session_state.pop("quick_sandbox_last_id", None)
-
-    if sim_btn and sim_id:
-        with st.spinner("正在查詢，不載入完整主系統..."):
-            res = run_sandbox_sim(str(sim_id).strip(), TWSE_NAME_MAP, FM_TOKEN)
-            st.session_state["quick_sandbox_last_result"] = res
-            st.session_state["quick_sandbox_last_id"] = str(sim_id).strip()
-
-    res = st.session_state.get("quick_sandbox_last_result")
-    if res:
-        grade_color, grade_text, advice = _get_sandbox_grade(res)
-        badge = _get_fundamental_badge_safe(res)
-        st.markdown(_render_sandbox_merged_html(res, badge, grade_color, grade_text, advice), unsafe_allow_html=True)
-
-
-# V35.2：手機模式改為「持股戰情 + 沙盤推演」，不再於資料載入前提早 stop。
-# 這樣 admin 可看個人持股；guest 仍可使用沙盤與其餘功能，但看不到個人持股。
 
 MACRO_SCORE, MACRO_DF, OVERHEAT_FLAG = get_macro_dashboard()
 
@@ -302,7 +161,6 @@ def render_data_status_bar():
     </div>
     """
     st.markdown(html_block, unsafe_allow_html=True)
-
 
 
 def _row_text(row, possible_keys, exclude_keys=None, default=""):
@@ -854,7 +712,6 @@ def _fmt_money0(x):
         return str(x)
 
 
-
 def render_aar_auto_correction_card():
     """V36：AAR 自動糾錯摘要。只抓最近交易紀錄的常見壞習慣，不取代完整 AAR。"""
     if not aar_sheet_url:
@@ -932,262 +789,11 @@ def render_aar_auto_correction_card():
     """, unsafe_allow_html=True)
 
 
-def _extract_hold_qty_cost(row):
-    qty = 0.0
-    cost = 0.0
-    for col in row.index:
-        c = str(col)
-        v = row[col]
-        if pd.isna(v) or str(v).strip() in ["", "nan", "None"]:
-            continue
-        raw = str(v).replace(",", "").strip()
-        try:
-            num = float(raw)
-        except Exception:
-            continue
-        if qty <= 0 and any(k in c for k in ["庫存張數", "張數", "庫存", "股數", "數量"]):
-            qty = num
-        if cost <= 0 and any(k in c for k in ["成本價", "買進均價", "平均成本", "成本", "買價"]):
-            cost = num
-    return qty, cost
-
-
-def build_mobile_holdings_view(hold_df):
-    """V35.2：手機持股摘要，只給 admin 使用；guest 不會讀/顯示個人持股。"""
-    if hold_df is None or hold_df.empty:
-        return pd.DataFrame(), 0.0
-    rows = []
-    fee_rate = 0.001425 * fee_discount
-    for _, r in hold_df.iterrows():
-        code = str(r.get("代號", "")).strip()
-        if not code:
-            continue
-        name = str(r.get("名稱", TWSE_NAME_MAP.get(code, code))).strip()
-        qty, cost = _extract_hold_qty_cost(r)
-        now = _to_float_safe(r.get("現價", 0), 0.0)
-        m5 = _to_float_safe(r.get("M5", 0), 0.0)
-        m10 = _to_float_safe(r.get("M10", 0), 0.0)
-        stop = _to_float_safe(r.get("停損價", 0), 0.0)
-        if now <= 0 or qty <= 0 or cost <= 0:
-            pnl, ret = 0.0, 0.0
-        else:
-            buy_cost_total = (cost * qty * 1000) + int((cost * qty * 1000) * fee_rate)
-            sell_net = (now * qty * 1000) - int((now * qty * 1000) * fee_rate) - int((now * qty * 1000) * 0.003)
-            pnl = sell_net - buy_cost_total
-            ret = (pnl / buy_cost_total) * 100 if buy_cost_total > 0 else 0.0
-        if now <= 0:
-            status, action, risk_rank = "⚪ 報價待確認", "先手動確認報價", 3
-        elif m10 > 0 and now < m10:
-            status, action, risk_rank = "🔴 跌破M10", "優先處理/反彈減碼", 1
-        elif stop > 0 and now < stop:
-            status, action, risk_rank = "🔴 破防線", "減碼/停損", 1
-        elif m5 > 0 and now < m5:
-            status, action, risk_rank = "🟡 跌破M5", "等站回；站不回降碼", 2
-        elif ret >= 5.5:
-            status, action, risk_rank = "🟢 有獲利", "可出半，剩下守M5", 4
-        else:
-            status, action, risk_rank = "🟢 可觀察", "守M5/ATR，不追不攤", 5
-        rows.append({
-            "代號": code, "名稱": name, "現價": now, "成本": cost, "張數": qty,
-            "損益": pnl, "報酬%": ret, "狀態": status, "今日指令": action, "風險排序": risk_rank,
-        })
-    out = pd.DataFrame(rows)
-    total = float(out["損益"].sum()) if not out.empty else 0.0
-    if not out.empty:
-        out = out.sort_values(["風險排序", "報酬%"], ascending=[True, True])
-    return out, total
-
-
-def render_mobile_holdings_panel():
-    st.markdown("### 💼 <span class='highlight-primary'>我的持股戰情</span>", unsafe_allow_html=True)
-    if auth_status != "admin_auth":
-        st.info("友軍模式不顯示個人持股、成本與損益；沙盤推演與其他功能仍可使用。")
-        return
-    hold_view, total_pnl = build_mobile_holdings_view(m_df)
-    if hold_view.empty:
-        st.info("目前沒有讀到有效持股資料，請確認 secrets / CSV 網址。")
-        return
-    pnl_color = COLORS["red"] if total_pnl > 0 else (COLORS["green"] if total_pnl < 0 else COLORS["text"])
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.metric("總淨損益", f"{total_pnl:,.0f} 元")
-    with c2:
-        st.metric("持股檔數", f"{len(hold_view)} 檔")
-    with c3:
-        weakest = hold_view.iloc[0]
-        st.metric("最需處理", f"{weakest['名稱']}({weakest['代號']})", f"{weakest['報酬%']:.2f}%")
-    cards = ""
-    for _, r in hold_view.iterrows():
-        col = COLORS["red"] if float(r["損益"]) > 0 else (COLORS["green"] if float(r["損益"]) < 0 else COLORS["text"])
-        border = COLORS["red"] if int(r["風險排序"]) <= 2 else COLORS["primary"]
-        cards += f"""
-        <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {border}; border-radius:10px; padding:11px 12px; margin-bottom:9px;">
-            <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
-                <div><b style="font-size:16px; color:{COLORS['text']};">{html.escape(str(r['名稱']))} ({html.escape(str(r['代號']))})</b><br>
-                <span style="font-size:12.5px; color:{COLORS['subtext']};">現價 {float(r['現價']):.2f}｜成本 {float(r['成本']):.2f}｜{float(r['張數']):g} 張/股單位</span></div>
-                <div style="text-align:right; color:{col}; font-weight:900; white-space:nowrap;">{float(r['報酬%']):+.2f}%<br>{float(r['損益']):+,.0f}</div>
-            </div>
-            <div style="margin-top:8px; background:{COLORS['bg']}; border-radius:8px; padding:7px 9px; font-size:13px; color:{COLORS['text']}; line-height:1.45;">
-                <b>{html.escape(str(r['狀態']))}</b>｜{html.escape(str(r['今日指令']))}
-            </div>
-        </div>
-        """
-    st.markdown(cards, unsafe_allow_html=True)
-
-
-def build_industry_rotation_table(source_df, macro_df=None):
-    """V35.2 情報局：依產業聚合熱度與輪動升溫訊號。"""
-    if source_df is None or source_df.empty or "代號" not in source_df.columns:
-        return pd.DataFrame()
-    df = source_df.copy()
-    if "產業" not in df.columns:
-        df["產業"] = df["代號"].astype(str).map(lambda x: TWSE_IND_MAP.get(x, "未分類"))
-    df["產業"] = df["產業"].replace("", "未分類").fillna("未分類")
-    for c in ["日漲幅(%)", "3日漲幅(%)", "5日漲幅(%)", "vol_ratio", "安全指數", "三大法人合計", "投信(張)", "現價", "M5", "M10", "乖離(%)"]:
-        if c not in df.columns:
-            df[c] = 0
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-    df = df[~df["代號"].astype(str).str.startswith("00")].copy()
-    if df.empty:
-        return pd.DataFrame()
-    rows = []
-    for ind, g in df.groupby("產業"):
-        sample_n = int(len(g))
-        if sample_n < 2:
-            continue
-        avg_day = float(g["日漲幅(%)"].mean())
-        avg_3d = float(g["3日漲幅(%)"].mean())
-        avg_5d = float(g["5日漲幅(%)"].mean())
-        up_ratio = float((g["日漲幅(%)"] > 0).mean())
-        avg_vol = float(g["vol_ratio"].replace([np.inf, -np.inf], np.nan).fillna(1).clip(0, 5).mean())
-        strong_count = int(((g["現價"] > g["M5"]) & (g["M5"] >= g["M10"]) & (g["vol_ratio"] >= 1.2)).sum())
-        breakout_count = int((g["戰術型態"].astype(str).str.contains("爆量|多頭", na=False)).sum()) if "戰術型態" in g.columns else strong_count
-        inst = float(g["三大法人合計"].sum())
-        trust = float(g["投信(張)"].sum())
-        # 熱度看「現在」，輪動看「變熱速度 + 抗跌 + 量先行」
-        hot_raw = 0
-        hot_raw += min(max(avg_day, -2), 4) * 8
-        hot_raw += up_ratio * 22
-        hot_raw += min(avg_vol, 3) * 12
-        hot_raw += min(strong_count, 5) * 5
-        hot_raw += min(breakout_count, 4) * 5
-        if inst > 0: hot_raw += 6
-        if trust > 0: hot_raw += 5
-
-        # V36：樣本數校正，避免 2~3 檔小族群被誤判成主戰場。
-        if sample_n >= 10:
-            confidence, confidence_note, sample_weight = "高", "樣本充足", 1.00
-        elif sample_n >= 5:
-            confidence, confidence_note, sample_weight = "中", "樣本普通", 0.90
-        elif sample_n >= 3:
-            confidence, confidence_note, sample_weight = "低", "樣本偏少，降權觀察", 0.76
-        else:
-            confidence, confidence_note, sample_weight = "低", "樣本過少，只列觀察", 0.62
-
-        hot_score = max(0, min(100, hot_raw * sample_weight))
-        rotation_delta = (avg_3d - avg_5d) + max(avg_day, 0) + max(avg_vol - 1, 0) * 2 + up_ratio * 3
-        if avg_day >= 0 and avg_vol >= 1.2 and up_ratio >= 0.5:
-            rotation_delta += 3
-
-        if sample_n < 3 and hot_score >= 55:
-            state, advice = "🟡 潛伏觀察", "樣本太少，不升主戰場；只加入雷達"
-        elif hot_score >= 75 and rotation_delta >= 0 and sample_n >= 5:
-            state, advice = "🔥 主戰場", "只做龍頭回測，不追第三根"
-        elif 45 <= hot_score < 75 and rotation_delta >= 4 and up_ratio >= 0.5:
-            state, advice = "🟠 資金升溫", "可找族群強股小倉試單"
-        elif hot_score < 55 and rotation_delta >= 5 and avg_vol >= 1.2:
-            state, advice = "🟡 潛伏觀察", "加入雷達，等突破確認"
-        elif hot_score >= 55 and rotation_delta <= -3:
-            state, advice = "⚠️ 退潮警戒", "反彈不追，持股偏降碼"
-        else:
-            state, advice = "⚪ 普通", "不優先"
-        leaders = g.sort_values(["安全指數", "vol_ratio"], ascending=[False, False]).head(3)
-        leader_txt = "、".join((leaders["名稱"].astype(str) + "(" + leaders["代號"].astype(str) + ")").tolist())
-        reasons = []
-        if avg_day > 0: reasons.append(f"均漲{avg_day:.2f}%")
-        if up_ratio >= 0.6: reasons.append(f"上漲家數{up_ratio*100:.0f}%")
-        if avg_vol >= 1.2: reasons.append(f"量比{avg_vol:.2f}x")
-        if strong_count >= 2: reasons.append(f"強勢{strong_count}檔")
-        if inst > 0: reasons.append("法人買超")
-        if confidence != "高": reasons.append(confidence_note)
-        rows.append({
-            "產業": ind, "輪動狀態": state, "可信度": confidence, "樣本數": sample_n,
-            "今日熱度": int(round(hot_score, 0)), "5日升溫": round(rotation_delta, 1),
-            "平均漲幅%": round(avg_day, 2), "3日均幅%": round(avg_3d, 2), "5日均幅%": round(avg_5d, 2),
-            "上漲家數%": round(up_ratio * 100, 1), "平均量比": round(avg_vol, 2), "強勢股數": int(strong_count),
-            "法人合計": int(round(inst, 0)), "代表股": leader_txt, "熱度原因": "、".join(reasons) if reasons else "尚未明顯發動", "操作建議": advice,
-        })
-    out = pd.DataFrame(rows)
-    if out.empty:
-        return out
-    state_order = {"🔥 主戰場": 0, "🟠 資金升溫": 1, "🟡 潛伏觀察": 2, "⚠️ 退潮警戒": 3, "⚪ 普通": 4}
-    out["_ord"] = out["輪動狀態"].map(state_order).fillna(9)
-    return out.sort_values(["_ord", "今日熱度", "5日升溫"], ascending=[True, False, False]).drop(columns=["_ord"])
-
-
-def render_industry_rotation_radar():
-    st.markdown("#### 🔥 <span class='highlight-primary'>產業輪動雷達</span>", unsafe_allow_html=True)
-    st.caption("用個股引擎已掃出的價量、均線與法人資料，判斷每日/近5日誰是主戰場、誰正在升溫、誰可能退潮。")
-    frames = []
-    chip_intel = st.session_state.get("eod_intel_df", None)
-    if chip_intel is not None and isinstance(chip_intel, pd.DataFrame) and not chip_intel.empty:
-        base = chip_intel.copy()
-        if today_df is not None and not today_df.empty:
-            chip_cols = [c for c in ["代號", "三大法人合計", "投信(張)", "外資(張)"] if c in today_df.columns]
-            base = pd.merge(base, today_df[chip_cols], on="代號", how="left")
-        frames.append(base)
-    for key in ["eod_master_list", "eod_special_watch", "eod_rank_sorted"]:
-        df = st.session_state.get(key)
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            frames.append(df.copy())
-    if not frames:
-        st.info("尚未有足夠掃描資料。請先到【個股游擊】按一次「重新掃描明日清單」，情報局就會整理產業輪動。")
-        return
-    pool = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["代號"], keep="first")
-    table = build_industry_rotation_table(pool, MACRO_DF)
-    if table.empty:
-        st.info("產業輪動資料不足，可能是今日掃描樣本太少或價量欄位不足。")
-        return
-    hot = table[table["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫", "🟡 潛伏觀察"])].head(8)
-    cols = st.columns(min(3, max(1, len(hot)))) if not hot.empty else []
-    for idx, (_, r) in enumerate(hot.iterrows()):
-        color = COLORS["red"] if "主戰場" in r["輪動狀態"] else (COLORS["accent"] if "升溫" in r["輪動狀態"] else COLORS["primary"])
-        with cols[idx % len(cols)]:
-            st.markdown(f"""
-            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-top:5px solid {color}; border-radius:10px; padding:12px 13px; min-height:178px; margin-bottom:10px;">
-                <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">{html.escape(str(r['輪動狀態']))}</div>
-                <div style="font-size:18px; color:{color}; font-weight:900; line-height:1.25; margin:4px 0;">{html.escape(str(r['產業']))}</div>
-                <div style="font-size:13px; color:{COLORS['text']}; line-height:1.55;">熱度 <b>{float(r['今日熱度']):.0f}</b>｜升溫 <b>{float(r['5日升溫']):+.1f}</b>｜可信 <b>{html.escape(str(r.get('可信度', '-')))}</b><br>樣本 {int(float(r.get('樣本數', 0) or 0))} 檔｜漲幅 {float(r['平均漲幅%']):+.2f}%｜量比 {float(r['平均量比']):.2f}x｜上漲 {float(r['上漲家數%']):.0f}%</div>
-                <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:7px; line-height:1.45;">{html.escape(str(r['熱度原因']))}<br><b>代表：</b>{html.escape(str(r['代表股']))}</div>
-            </div>
-            """, unsafe_allow_html=True)
-    show_cols = ["產業", "輪動狀態", "可信度", "樣本數", "今日熱度", "5日升溫", "平均漲幅%", "上漲家數%", "平均量比", "強勢股數", "法人合計", "代表股", "操作建議"]
-    view_df = table[[c for c in show_cols if c in table.columns]].copy()
-    fmt_map = {
-        "今日熱度": "{:.0f}",
-        "5日升溫": "{:+.1f}",
-        "平均漲幅%": "{:+.2f}",
-        "上漲家數%": "{:.1f}",
-        "平均量比": "{:.2f}",
-        "強勢股數": "{:.0f}",
-        "樣本數": "{:.0f}",
-        "法人合計": "{:,.0f}",
-    }
-    styled_rotation = view_df.style.set_properties(**table_style).format({k: v for k, v in fmt_map.items() if k in view_df.columns}, na_rep="-")
-    st.dataframe(styled_rotation, use_container_width=True, hide_index=True, height=420)
-
-
-
-def render_mobile_battle_room():
-    st.markdown("<h1 style='text-align: center;' class='highlight-primary'>📱 手機模式/h1>", unsafe_allow_html=True)
-    st.caption("手機版只保留沙盤推演與持股戰情；沙盤放最上方，方便臨場快速查單檔。")
-    render_quick_sandbox_panel()
-    st.markdown("<hr style='margin: 10px 0 18px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
-    render_mobile_holdings_panel()
-
-
 if mobile_quick_mode:
-    render_mobile_battle_room()
+    mobile_ui.render_mobile_battle_room(
+        COLORS, TWSE_NAME_MAP, FM_TOKEN, run_sandbox_sim, get_fundamental_badge,
+        auth_status, m_df, fee_discount
+    )
     st.stop()
 
 
@@ -1700,7 +1306,7 @@ with t_etf:
     etf_ui.render_etf_tab(COLORS, FM_TOKEN, TWSE_IND_MAP, TWSE_NAME_MAP, etf_holdings_url, table_style)
 
 with t_chip:
-    render_industry_rotation_radar()
+    rotation_radar.render_industry_rotation_radar(COLORS, table_style, TWSE_IND_MAP, today_df, MACRO_DF)
     st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     if not today_df.empty:
         st.markdown("#### 🛳️ <span class='highlight-accent'>法人建倉觀察雷達</span>", unsafe_allow_html=True)
