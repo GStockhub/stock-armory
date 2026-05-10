@@ -1179,7 +1179,7 @@ def render_industry_rotation_radar():
 
 
 def render_mobile_battle_room():
-    st.markdown("<h1 style='text-align: center;' class='highlight-primary'>📱 手機戰情室 V36</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;' class='highlight-primary'>📱 手機模式</h1>", unsafe_allow_html=True)
     st.caption("手機版只保留沙盤推演與持股戰情；沙盤放最上方，方便臨場快速查單檔。")
     render_quick_sandbox_panel()
     st.markdown("<hr style='margin: 10px 0 18px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
