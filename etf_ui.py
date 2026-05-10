@@ -241,31 +241,99 @@ def _render_bar_list(df, COLORS, label_col, value_col, subtitle_col=None, max_ro
     components.html(html_doc, height=height, scrolling=False)
 
 
-def _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=None):
+def _render_manager_header_compact(summary, holdings, COLORS, history_status=None, auto_note=""):
     history_status = history_status or get_history_status(holdings, lookback_days=5)
-    msg = history_status.get("message", "")
-    days = history_status.get("days", 0)
-    latest = history_status.get("latest", "-")
+    days = int(history_status.get("days", 0) or 0)
+    latest = str(history_status.get("latest", "-") or "-")
+    msg = str(history_status.get("message", "") or "")
+    gh_diag = {}
+    try:
+        gh_diag = get_github_history_diagnostics() or {}
+    except Exception:
+        gh_diag = {}
+    gh_summary = str(gh_diag.get("summary", "GitHub 診斷暫時無法取得") or "GitHub 診斷暫時無法取得")
+    snapshot = summary.get("snapshot", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    etf_count = int(snapshot["ETF"].nunique()) if snapshot is not None and not snapshot.empty and "ETF" in snapshot.columns else 0
+    changes = summary.get("changes", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    event_count = int(len(changes)) if changes is not None and not changes.empty else 0
+    auto_text = _safe_text(auto_note or "自動持股來源正常；若 GitHub 寫入失敗則先沿用本機快取。")
     st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:10px 12px; border-radius:8px; margin:6px 0 12px 0;">
-        <b>📦 歷史快照：</b>{days} 個交易日　<span style="color:{COLORS['subtext']};">最新：{_safe_text(latest)}｜{_safe_text(msg)}</span>
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:12px 14px; border-radius:10px; margin:6px 0 14px 0;">
+        <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start;">
+            <div style="flex:1 1 260px; min-width:220px;">
+                <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">⚙️ 自動更新狀態</div>
+                <div style="font-size:14px; color:{COLORS['text']}; line-height:1.55; margin-top:4px;">{auto_text}</div>
+            </div>
+            <div style="flex:1 1 220px; min-width:200px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
+                <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">📦 歷史快照</div>
+                <div style="font-size:14px; color:{COLORS['text']}; line-height:1.55; margin-top:4px;">{days} 個交易日｜最新 { _safe_text(latest) }<br>涵蓋 {etf_count} 檔主動 ETF｜事件 {event_count} 筆</div>
+                <div style="font-size:12px; color:{COLORS['subtext']}; margin-top:4px;">{_safe_text(msg)}</div>
+            </div>
+            <div style="flex:1 1 220px; min-width:200px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
+                <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">🧪 GitHub 歷史庫</div>
+                <div style="font-size:14px; color:{COLORS['text']}; line-height:1.55; margin-top:4px;">{_safe_text(gh_summary)}</div>
+                <div style="font-size:12px; color:{COLORS['subtext']}; margin-top:4px;">只顯示 repo / branch / path / HTTP 狀態，不顯示 token。</div>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
+    if gh_diag:
+        with st.expander("🧪 查看 GitHub 歷史庫診斷細節", expanded=False):
+            checks = gh_diag.get("checks", [])
+            if checks:
+                st.dataframe(pd.DataFrame(checks), use_container_width=True, hide_index=True)
+            else:
+                st.json({k: v for k, v in gh_diag.items() if k != "checks"})
 
-    gh = history_status.get("github", {}) if isinstance(history_status, dict) else {}
-    if gh:
-        with st.expander("🧪 GitHub 歷史庫診斷", expanded=False):
-            st.caption("此區只顯示 repo / branch / path / HTTP 狀態，不會顯示 token。")
-            try:
-                diag = get_github_history_diagnostics()
-                st.write(f"**{diag.get('summary', '診斷完成')}**")
-                checks = diag.get("checks", [])
-                if checks:
-                    st.dataframe(pd.DataFrame(checks), use_container_width=True, hide_index=True)
-                else:
-                    st.json({k: v for k, v in diag.items() if k != 'checks'})
-            except Exception as e:
-                st.warning(f"GitHub 診斷無法執行：{e}")
+
+def _render_etfedge_like_changes(summary, COLORS, table_style):
+    changes = summary.get("changes", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    snapshot = summary.get("snapshot", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    st.markdown("##### 📋 ETF 持股事件總覽（濃縮版）")
+    if changes is None or changes.empty:
+        counts = {"新增": 0, "刪除": 0, "加碼": 0, "減碼": 0}
+    else:
+        counts = {k: int((changes["狀態"] == k).sum()) for k in ["新增", "刪除", "加碼", "減碼"]}
+    cc = st.columns(4)
+    metric_specs = [("🆕 新增", counts.get("新增", 0)), ("➕ 加碼", counts.get("加碼", 0)), ("➖ 減碼", counts.get("減碼", 0)), ("❌ 刪除", counts.get("刪除", 0))]
+    for col, (label, val) in zip(cc, metric_specs):
+        with col:
+            st.metric(label, f"{val} 筆")
+
+    tabs = st.tabs(["📦 快照總覽", "🆕 新增", "➕ 加碼", "➖ 減碼", "❌ 刪除"])
+    with tabs[0]:
+        if snapshot is None or snapshot.empty:
+            st.info("目前沒有可顯示的持股快照。")
+        else:
+            show_cols = ["ETF", "名稱", "持股數", "前十集中度", "前十大產業", "前十大個股"]
+            disp = snapshot[[c for c in show_cols if c in snapshot.columns]].copy()
+            st.dataframe(disp.style.set_properties(**table_style).format({"前十集中度":"{:.2f}%"}), use_container_width=True, hide_index=True, height=280)
+
+    for tab, status in zip(tabs[1:], ["新增", "加碼", "減碼", "刪除"]):
+        with tab:
+            if changes is None or changes.empty:
+                st.info("近 5 日沒有明顯持股變化，或資料只有單一日期。")
+                continue
+            sub = changes[changes["狀態"].eq(status)].copy()
+            if sub.empty:
+                st.info(f"目前沒有『{status}』事件。")
+                continue
+            if status == "新增":
+                sub = sub.sort_values(["權重_新", "變化"], ascending=[False, False])
+            elif status == "刪除":
+                sub = sub.sort_values(["權重_舊", "變化"], ascending=[False, True])
+            elif status == "加碼":
+                sub = sub.sort_values("變化", ascending=False)
+            else:
+                sub = sub.sort_values("變化", ascending=True)
+            show_cols = ["比較基準", "ETF代號", "成分股代號", "成分股名稱", "產業", "狀態", "權重_舊", "權重_新", "變化"]
+            disp = sub[[c for c in show_cols if c in sub.columns]].head(120).copy()
+            st.dataframe(disp.style.set_properties(**table_style).format({"權重_舊":"{:.2f}%", "權重_新":"{:.2f}%", "變化":"{:+.2f}%"}), use_container_width=True, hide_index=True, height=420)
+
+
+def _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=None, auto_note=""):
+    history_status = history_status or get_history_status(holdings, lookback_days=5)
+    _render_manager_header_compact(summary, holdings, COLORS, history_status=history_status, auto_note=auto_note)
 
     st.markdown("##### Top 主動 ETF 產業占比")
     _render_industry_donut_cards(summary, COLORS, top_n=5)
@@ -304,22 +372,7 @@ def _render_manager_visuals(summary, holdings, COLORS, table_style, history_stat
                     st.markdown("<div style='font-size:13px;font-weight:800;margin:12px 0 4px 0;'>🔴 共同減碼族群</div>", unsafe_allow_html=True)
                     _render_bar_list(dec, COLORS, "產業", "變化", max_rows=6, signed=True)
 
-    with st.expander("📋 查看持股快照與新增 / 刪除 / 加碼 / 減碼明細", expanded=False):
-        snapshot = summary.get("snapshot", pd.DataFrame())
-        if snapshot is not None and not snapshot.empty:
-            st.markdown("###### 持股快照摘要")
-            show_cols = ["ETF", "名稱", "持股數", "前十集中度", "前十大產業", "前十大個股"]
-            disp = snapshot[[c for c in show_cols if c in snapshot.columns]].copy()
-            st.dataframe(disp.style.set_properties(**table_style).format({"前十集中度":"{:.2f}%"}), use_container_width=True, hide_index=True, height=260)
-
-        changes = summary.get("changes", pd.DataFrame())
-        if changes is None or changes.empty:
-            st.info("近 5 日沒有明顯持股變化，或資料只有單一日期。")
-        else:
-            st.markdown("###### 變化明細")
-            show_cols = ["比較基準", "ETF代號", "成分股代號", "成分股名稱", "產業", "狀態", "權重_舊", "權重_新", "變化"]
-            disp = changes[[c for c in show_cols if c in changes.columns]].copy().head(100)
-            st.dataframe(disp.style.set_properties(**table_style).format({"權重_舊":"{:.2f}%", "權重_新":"{:.2f}%", "變化":"{:+.2f}%"}), use_container_width=True, hide_index=True, height=430)
+    _render_etfedge_like_changes(summary, COLORS, table_style)
 
 
 # =========================
@@ -379,7 +432,7 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
     else:
         if auto_note:
             st.success(auto_note)
-        _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=history_status)
+        _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=history_status, auto_note=auto_note)
 
     with st.expander("📌 ETF 雷達使用說明", expanded=False):
         st.markdown("""

@@ -93,7 +93,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— V35.3 決策濃縮版｜產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -522,6 +522,65 @@ def render_macro_brief(macro_df, macro_score, overheat_flag):
     """, unsafe_allow_html=True)
 
 
+def build_decision_digest_table():
+    frames = []
+    chip_intel = st.session_state.get("eod_intel_df", None)
+    if chip_intel is not None and isinstance(chip_intel, pd.DataFrame) and not chip_intel.empty:
+        base = chip_intel.copy()
+        if today_df is not None and not today_df.empty:
+            chip_cols = [c for c in ["代號", "三大法人合計", "投信(張)", "外資(張)"] if c in today_df.columns]
+            if chip_cols:
+                base = pd.merge(base, today_df[chip_cols], on="代號", how="left")
+        frames.append(base)
+    for key in ["eod_master_list", "eod_special_watch", "eod_rank_sorted"]:
+        df = st.session_state.get(key)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            frames.append(df.copy())
+    if not frames:
+        return pd.DataFrame()
+    pool = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["代號"], keep="first")
+    return build_industry_rotation_table(pool, MACRO_DF) if "build_industry_rotation_table" in globals() else pd.DataFrame()
+
+
+def render_decision_digest_panel():
+    brief = build_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
+    try:
+        table = build_decision_digest_table()
+    except Exception:
+        table = pd.DataFrame()
+    hot = "、".join(table[table["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫"])]["產業"].astype(str).head(3).tolist()) if not table.empty else "待掃描"
+    warming = "、".join(table[table["輪動狀態"].eq("🟠 資金升溫")]["產業"].astype(str).head(3).tolist()) if not table.empty else "待掃描"
+    fading = "、".join(table[table["輪動狀態"].eq("⚠️ 退潮警戒")]["產業"].astype(str).head(3).tolist()) if not table.empty else "暫無明顯退潮"
+
+    hold_note = ""
+    if auth_status == "admin_auth" and isinstance(globals().get("m_df", pd.DataFrame()), pd.DataFrame) and not globals().get("m_df", pd.DataFrame()).empty and "build_mobile_holdings_view" in globals():
+        try:
+            hv, _ = build_mobile_holdings_view(m_df)
+            weak = hv.sort_values(["風險排序", "報酬%"], ascending=[True, True]).head(3)
+            weak_txt = "、".join((weak["名稱"].astype(str) + "(" + weak["代號"].astype(str) + ")").tolist()) if not weak.empty else "無"
+            hold_note = f"弱持股優先：{weak_txt}"
+        except Exception:
+            hold_note = "先處理弱持股，再決定是否開新倉"
+    else:
+        hold_note = "先看主戰場與沙盤推演，再決定是否出手"
+
+    lines = [
+        ("① 今日模式", brief["title"]),
+        ("② 今日主戰場", hot or "待掃描"),
+        ("③ 正在升溫", warming or "暫無"),
+        ("④ 退潮警戒", fading or "暫無明顯退潮"),
+        ("⑤ 今日動作", f"{brief['strategy']}｜{hold_note}"),
+    ]
+    items = "".join([f"<div style='padding:9px 0; border-top:1px dashed {COLORS['border'] if i else 'transparent'};'><b style='color:{COLORS['primary']};'>{k}</b>：{html.escape(v)}</div>" for i, (k, v) in enumerate(lines)])
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {brief['color']}; border-radius:10px; padding:12px 16px; margin:8px 0 18px 0;">
+        <div style="font-size:19px; font-weight:900; color:{COLORS['text']}; margin-bottom:4px;">🧭 今日 5 句決策摘要</div>
+        <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-bottom:6px;">V35.3 決策濃縮版：先看結論，再決定要不要展開細節。</div>
+        <div style="font-size:13.5px; color:{COLORS['text']}; line-height:1.6;">{items}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def render_top_status_panel():
     """市場警戒燈 + 大盤綜合判斷。資料健康移到 Sidebar，不佔主畫面。"""
     if MACRO_SCORE <= 3:
@@ -690,10 +749,6 @@ except Exception:
         st.markdown(health_html, unsafe_allow_html=True)
 
 render_top_status_panel()
-
-
-
-
 
 # =========================================================
 # 🔥 主流曝險警報 + 輪動建議
@@ -1082,6 +1137,62 @@ def render_industry_rotation_radar():
     }
     styled_rotation = view_df.style.set_properties(**table_style).format({k: v for k, v in fmt_map.items() if k in view_df.columns}, na_rep="-")
     st.dataframe(styled_rotation, use_container_width=True, hide_index=True, height=420)
+
+
+def build_decision_digest_table():
+    frames = []
+    chip_intel = st.session_state.get("eod_intel_df", None)
+    if chip_intel is not None and isinstance(chip_intel, pd.DataFrame) and not chip_intel.empty:
+        base = chip_intel.copy()
+        if today_df is not None and not today_df.empty:
+            chip_cols = [c for c in ["代號", "三大法人合計", "投信(張)", "外資(張)"] if c in today_df.columns]
+            if chip_cols:
+                base = pd.merge(base, today_df[chip_cols], on="代號", how="left")
+        frames.append(base)
+    for key in ["eod_master_list", "eod_special_watch", "eod_rank_sorted"]:
+        df = st.session_state.get(key)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            frames.append(df.copy())
+    if not frames:
+        return pd.DataFrame()
+    pool = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["代號"], keep="first")
+    return build_industry_rotation_table(pool, MACRO_DF)
+
+
+def render_decision_digest_panel():
+    brief = build_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
+    table = build_decision_digest_table()
+    hot = "、".join(table[table["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫"])]["產業"].astype(str).head(3).tolist()) if not table.empty else "待掃描"
+    warming = "、".join(table[table["輪動狀態"].eq("🟠 資金升溫")]["產業"].astype(str).head(3).tolist()) if not table.empty else "待掃描"
+    fading = "、".join(table[table["輪動狀態"].eq("⚠️ 退潮警戒")]["產業"].astype(str).head(3).tolist()) if not table.empty else "暫無明顯退潮"
+
+    hold_note = ""
+    if auth_status == "admin_auth" and m_df is not None and not m_df.empty:
+        try:
+            hv, _ = build_mobile_holdings_view(m_df)
+            weak = hv.sort_values(["風險排序", "報酬%"], ascending=[True, True]).head(3)
+            weak_txt = "、".join((weak["名稱"].astype(str) + "(" + weak["代號"].astype(str) + ")").tolist()) if not weak.empty else "無"
+            hold_note = f"弱持股優先：{weak_txt}"
+        except Exception:
+            hold_note = "先處理弱持股，再決定是否開新倉"
+    else:
+        hold_note = "guest 模式不顯示個人持股；先看主戰場與沙盤推演"
+
+    lines = [
+        ("① 今日模式", brief["title"]),
+        ("② 今日主戰場", hot or "待掃描"),
+        ("③ 正在升溫", warming or "暫無"),
+        ("④ 退潮警戒", fading or "暫無明顯退潮"),
+        ("⑤ 今日動作", f"{brief['strategy']}｜{hold_note}"),
+    ]
+    items = "".join([f"<div style='padding:9px 0; border-top:1px dashed {COLORS['border'] if i else 'transparent'};'><b style='color:{COLORS['primary']};'>{k}</b>：{html.escape(v)}</div>" for i, (k, v) in enumerate(lines)])
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {brief['color']}; border-radius:10px; padding:12px 16px; margin:8px 0 18px 0;">
+        <div style="font-size:19px; font-weight:900; color:{COLORS['text']}; margin-bottom:4px;">🧭 今日 5 句決策摘要</div>
+        <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-bottom:6px;">V35.3 決策濃縮版：先看結論，再決定要不要展開細節。</div>
+        <div style="font-size:13.5px; color:{COLORS['text']}; line-height:1.6;">{items}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def render_mobile_battle_room():
@@ -1643,6 +1754,7 @@ with t_chip:
         st.info("法人籌碼暫時無法取得，情報局暫停；個股游擊已改用技術面備援，沙盤、ETF、司令部仍可使用。")
 
 with t_cmd:
+    render_decision_digest_panel()
     cmd_hold_tab, cmd_aar_tab, cmd_bt_tab = st.tabs(["🛡️ 持股風控", "📊 AAR 戰術教練", "🧪 司令官回測室"])
     with cmd_hold_tab:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
