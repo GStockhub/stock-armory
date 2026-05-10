@@ -1031,7 +1031,7 @@ def build_industry_rotation_table(source_df, macro_df=None):
 
 
 def render_industry_rotation_radar():
-    st.markdown("### 🔥 <span class='highlight-primary'>產業輪動雷達 V35.2</span>", unsafe_allow_html=True)
+    st.markdown("#### 🔥 <span class='highlight-primary'>產業輪動雷達</span>", unsafe_allow_html=True)
     st.caption("用個股引擎已掃出的價量、均線與法人資料，判斷每日/近5日誰是主戰場、誰正在升溫、誰可能退潮。")
     frames = []
     chip_intel = st.session_state.get("eod_intel_df", None)
@@ -1646,9 +1646,7 @@ with t_chip:
     render_industry_rotation_radar()
     st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     if not today_df.empty:
-        st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：法人動向</span>", unsafe_allow_html=True)
-        st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
-        st.markdown("#### 🛳️ <span class='highlight-accent'>法人建倉觀察雷達</span>", unsafe_allow_html=True)
+        st.markdown("#### 🛳️ <span class='highlight-accent'>法人觀察雷達</span>", unsafe_allow_html=True)
         st.caption("只保留：安全指數≥7、三大法人合計買超、法人偏建倉，並排除已進入 S/A/B 主清單的標的。")
         main_chips = today_df.copy()
         chip_intel = st.session_state.get("eod_intel_df", None)
