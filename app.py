@@ -1020,10 +1020,10 @@ def build_industry_rotation_table(source_df, macro_df=None):
         if strong_count >= 2: reasons.append(f"強勢{strong_count}檔")
         if inst > 0: reasons.append("法人買超")
         rows.append({
-            "產業": ind, "輪動狀態": state, "今日熱度": round(hot_score, 0), "5日升溫": round(rotation_delta, 1),
+            "產業": ind, "輪動狀態": state, "今日熱度": int(round(hot_score, 0)), "5日升溫": round(rotation_delta, 1),
             "平均漲幅%": round(avg_day, 2), "3日均幅%": round(avg_3d, 2), "5日均幅%": round(avg_5d, 2),
-            "上漲家數%": round(up_ratio * 100, 1), "平均量比": round(avg_vol, 2), "強勢股數": strong_count,
-            "法人合計": round(inst, 0), "代表股": leader_txt, "熱度原因": "、".join(reasons) if reasons else "尚未明顯發動", "操作建議": advice,
+            "上漲家數%": round(up_ratio * 100, 1), "平均量比": round(avg_vol, 2), "強勢股數": int(strong_count),
+            "法人合計": int(round(inst, 0)), "代表股": leader_txt, "熱度原因": "、".join(reasons) if reasons else "尚未明顯發動", "操作建議": advice,
         })
     out = pd.DataFrame(rows)
     if out.empty:
@@ -1070,7 +1070,18 @@ def render_industry_rotation_radar():
             </div>
             """, unsafe_allow_html=True)
     show_cols = ["產業", "輪動狀態", "今日熱度", "5日升溫", "平均漲幅%", "上漲家數%", "平均量比", "強勢股數", "法人合計", "代表股", "操作建議"]
-    st.dataframe(table[[c for c in show_cols if c in table.columns]].style.set_properties(**table_style), use_container_width=True, hide_index=True, height=420)
+    view_df = table[[c for c in show_cols if c in table.columns]].copy()
+    fmt_map = {
+        "今日熱度": "{:.0f}",
+        "5日升溫": "{:+.1f}",
+        "平均漲幅%": "{:+.2f}",
+        "上漲家數%": "{:.1f}",
+        "平均量比": "{:.2f}",
+        "強勢股數": "{:.0f}",
+        "法人合計": "{:,.0f}",
+    }
+    styled_rotation = view_df.style.set_properties(**table_style).format({k: v for k, v in fmt_map.items() if k in view_df.columns}, na_rep="-")
+    st.dataframe(styled_rotation, use_container_width=True, hide_index=True, height=420)
 
 
 def render_mobile_battle_room():
