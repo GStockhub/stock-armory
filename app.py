@@ -93,7 +93,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— V36 穩定瘦身版｜產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -523,7 +523,7 @@ def render_macro_brief(macro_df, macro_score, overheat_flag):
 
 
 def render_top_status_panel():
-    """市場警戒燈 + 今日 5 句決策摘要；V35.3.2 起整合在最上方，不再另外佔一張卡。"""
+    """市場警戒燈 + 大盤綜合判斷。資料健康移到 Sidebar，不佔主畫面。"""
     if MACRO_SCORE <= 3:
         market_title = f"🔴 紅色警戒 ({MACRO_SCORE}/10)"
         market_msg = "市場偏弱，保留現金，不主動開新倉。"
@@ -854,6 +854,84 @@ def _fmt_money0(x):
         return str(x)
 
 
+
+def render_aar_auto_correction_card():
+    """V36：AAR 自動糾錯摘要。只抓最近交易紀錄的常見壞習慣，不取代完整 AAR。"""
+    if not aar_sheet_url:
+        return
+    try:
+        raw = read_remote_csv(aar_sheet_url, dtype=str)
+    except Exception:
+        raw = pd.DataFrame()
+    if raw is None or raw.empty:
+        return
+
+    df = raw.copy()
+    df.columns = [str(c).replace("\ufeff", "").strip() for c in df.columns]
+
+    def pick_col(keys):
+        for c in df.columns:
+            cs = str(c)
+            if any(k in cs for k in keys):
+                return c
+        return None
+
+    roi_col = pick_col(["報酬", "ROI", "損益率", "獲利率"])
+    demon_col = pick_col(["心魔", "錯誤", "問題", "檢討", "標籤"])
+    held_col = pick_col(["持有天", "天數", "持倉"])
+    detail_col = pick_col(["備註", "心得", "復盤", "說明", "原因"])
+    date_col = pick_col(["日期", "賣出日", "出場日", "交易日"])
+
+    work = df.copy()
+    if date_col:
+        work["_date"] = pd.to_datetime(work[date_col], errors="coerce")
+        work = work.sort_values("_date", ascending=False)
+    work = work.head(30).copy()
+
+    def to_num(v):
+        try:
+            return float(str(v).replace(",", "").replace("%", "").strip())
+        except Exception:
+            return 0.0
+
+    roi = work[roi_col].map(to_num) if roi_col else pd.Series([0] * len(work))
+    held = work[held_col].map(to_num) if held_col else pd.Series([0] * len(work))
+    demon_text = work[demon_col].astype(str) if demon_col else pd.Series([""] * len(work))
+    detail_text = work[detail_col].astype(str) if detail_col else pd.Series([""] * len(work))
+    all_text = (demon_text + " " + detail_text).str.lower()
+
+    loss_bad = int(((roi <= -3) | all_text.str.contains("凹|死抱|破線|未砍|停損", regex=True, na=False)).sum())
+    early_exit = int((all_text.str.contains("恐高|賣飛|早退|提早", regex=True, na=False)).sum())
+    impatience = int((all_text.str.contains("沒耐心|失去耐心|盤整", regex=True, na=False)).sum())
+    chase_high = int((all_text.str.contains("追高|開高|跳空|急拉", regex=True, na=False)).sum())
+
+    bullets = []
+    if loss_bad >= 3:
+        bullets.append(("🔴 破線/凹單偏多", f"近 30 筆約 {loss_bad} 筆有虧損擴大或破線未砍跡象；明日先守 M5/M10，不攤平弱股。"))
+    if early_exit >= 3:
+        bullets.append(("🟡 強股早退偏多", f"近 30 筆約 {early_exit} 筆有賣飛/恐高早退跡象；S/A 股獲利後可出半，剩半守 M5。"))
+    if impatience >= 3:
+        bullets.append(("🟠 盤整耐心不足", f"近 30 筆約 {impatience} 筆和盤整耐心有關；B 級只在 13:00 後確認，不要盤中亂切。"))
+    if chase_high >= 2:
+        bullets.append(("⚠️ 追高警訊", f"近 30 筆約 {chase_high} 筆有追高/跳空急拉跡象；跳空 >4.5% 直接列禁追。"))
+
+    if not bullets:
+        bullets.append(("🟢 暫無單一心魔過熱", "近期 AAR 沒有明顯集中錯誤；維持小量、照 SOP 執行。"))
+
+    html_bits = "".join([
+        f"<div style='padding:7px 0; border-top:1px dashed {COLORS['border'] if i else 'transparent'};'><b>{html.escape(title)}</b><br><span style='color:{COLORS['subtext']};'>{html.escape(body)}</span></div>"
+        for i, (title, body) in enumerate(bullets[:3])
+    ])
+
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['accent']}; border-radius:10px; padding:12px 14px; margin:8px 0 14px 0;">
+        <div style="font-size:17px; font-weight:900; color:{COLORS['text']};">🧠 V36 AAR 自動糾錯</div>
+        <div style="font-size:12.5px; color:{COLORS['subtext']}; margin:3px 0 6px 0;">只顯示最近紀錄的主要心魔，不新增一堆表格。</div>
+        <div style="font-size:13px; line-height:1.55; color:{COLORS['text']};">{html_bits}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def _extract_hold_qty_cost(row):
     qty = 0.0
     cost = 0.0
@@ -974,7 +1052,8 @@ def build_industry_rotation_table(source_df, macro_df=None):
         return pd.DataFrame()
     rows = []
     for ind, g in df.groupby("產業"):
-        if len(g) < 2:
+        sample_n = int(len(g))
+        if sample_n < 2:
             continue
         avg_day = float(g["日漲幅(%)"].mean())
         avg_3d = float(g["3日漲幅(%)"].mean())
@@ -986,19 +1065,33 @@ def build_industry_rotation_table(source_df, macro_df=None):
         inst = float(g["三大法人合計"].sum())
         trust = float(g["投信(張)"].sum())
         # 熱度看「現在」，輪動看「變熱速度 + 抗跌 + 量先行」
-        hot_score = 0
-        hot_score += min(max(avg_day, -2), 4) * 8
-        hot_score += up_ratio * 22
-        hot_score += min(avg_vol, 3) * 12
-        hot_score += min(strong_count, 5) * 5
-        hot_score += min(breakout_count, 4) * 5
-        if inst > 0: hot_score += 6
-        if trust > 0: hot_score += 5
-        hot_score = max(0, min(100, hot_score))
+        hot_raw = 0
+        hot_raw += min(max(avg_day, -2), 4) * 8
+        hot_raw += up_ratio * 22
+        hot_raw += min(avg_vol, 3) * 12
+        hot_raw += min(strong_count, 5) * 5
+        hot_raw += min(breakout_count, 4) * 5
+        if inst > 0: hot_raw += 6
+        if trust > 0: hot_raw += 5
+
+        # V36：樣本數校正，避免 2~3 檔小族群被誤判成主戰場。
+        if sample_n >= 10:
+            confidence, confidence_note, sample_weight = "高", "樣本充足", 1.00
+        elif sample_n >= 5:
+            confidence, confidence_note, sample_weight = "中", "樣本普通", 0.90
+        elif sample_n >= 3:
+            confidence, confidence_note, sample_weight = "低", "樣本偏少，降權觀察", 0.76
+        else:
+            confidence, confidence_note, sample_weight = "低", "樣本過少，只列觀察", 0.62
+
+        hot_score = max(0, min(100, hot_raw * sample_weight))
         rotation_delta = (avg_3d - avg_5d) + max(avg_day, 0) + max(avg_vol - 1, 0) * 2 + up_ratio * 3
         if avg_day >= 0 and avg_vol >= 1.2 and up_ratio >= 0.5:
             rotation_delta += 3
-        if hot_score >= 75 and rotation_delta >= 0:
+
+        if sample_n < 3 and hot_score >= 55:
+            state, advice = "🟡 潛伏觀察", "樣本太少，不升主戰場；只加入雷達"
+        elif hot_score >= 75 and rotation_delta >= 0 and sample_n >= 5:
             state, advice = "🔥 主戰場", "只做龍頭回測，不追第三根"
         elif 45 <= hot_score < 75 and rotation_delta >= 4 and up_ratio >= 0.5:
             state, advice = "🟠 資金升溫", "可找族群強股小倉試單"
@@ -1016,8 +1109,10 @@ def build_industry_rotation_table(source_df, macro_df=None):
         if avg_vol >= 1.2: reasons.append(f"量比{avg_vol:.2f}x")
         if strong_count >= 2: reasons.append(f"強勢{strong_count}檔")
         if inst > 0: reasons.append("法人買超")
+        if confidence != "高": reasons.append(confidence_note)
         rows.append({
-            "產業": ind, "輪動狀態": state, "今日熱度": int(round(hot_score, 0)), "5日升溫": round(rotation_delta, 1),
+            "產業": ind, "輪動狀態": state, "可信度": confidence, "樣本數": sample_n,
+            "今日熱度": int(round(hot_score, 0)), "5日升溫": round(rotation_delta, 1),
             "平均漲幅%": round(avg_day, 2), "3日均幅%": round(avg_3d, 2), "5日均幅%": round(avg_5d, 2),
             "上漲家數%": round(up_ratio * 100, 1), "平均量比": round(avg_vol, 2), "強勢股數": int(strong_count),
             "法人合計": int(round(inst, 0)), "代表股": leader_txt, "熱度原因": "、".join(reasons) if reasons else "尚未明顯發動", "操作建議": advice,
@@ -1031,7 +1126,7 @@ def build_industry_rotation_table(source_df, macro_df=None):
 
 
 def render_industry_rotation_radar():
-    st.markdown("#### 🔥 <span class='highlight-primary'>產業輪動雷達</span>", unsafe_allow_html=True)
+    st.markdown("### 🔥 <span class='highlight-primary'>產業輪動雷達 V36</span>", unsafe_allow_html=True)
     st.caption("用個股引擎已掃出的價量、均線與法人資料，判斷每日/近5日誰是主戰場、誰正在升溫、誰可能退潮。")
     frames = []
     chip_intel = st.session_state.get("eod_intel_df", None)
@@ -1062,11 +1157,11 @@ def render_industry_rotation_radar():
             <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-top:5px solid {color}; border-radius:10px; padding:12px 13px; min-height:178px; margin-bottom:10px;">
                 <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">{html.escape(str(r['輪動狀態']))}</div>
                 <div style="font-size:18px; color:{color}; font-weight:900; line-height:1.25; margin:4px 0;">{html.escape(str(r['產業']))}</div>
-                <div style="font-size:13px; color:{COLORS['text']}; line-height:1.55;">熱度 <b>{float(r['今日熱度']):.0f}</b>｜升溫 <b>{float(r['5日升溫']):+.1f}</b><br>漲幅 {float(r['平均漲幅%']):+.2f}%｜量比 {float(r['平均量比']):.2f}x｜上漲 {float(r['上漲家數%']):.0f}%</div>
+                <div style="font-size:13px; color:{COLORS['text']}; line-height:1.55;">熱度 <b>{float(r['今日熱度']):.0f}</b>｜升溫 <b>{float(r['5日升溫']):+.1f}</b>｜可信 <b>{html.escape(str(r.get('可信度', '-')))}</b><br>樣本 {int(float(r.get('樣本數', 0) or 0))} 檔｜漲幅 {float(r['平均漲幅%']):+.2f}%｜量比 {float(r['平均量比']):.2f}x｜上漲 {float(r['上漲家數%']):.0f}%</div>
                 <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-top:7px; line-height:1.45;">{html.escape(str(r['熱度原因']))}<br><b>代表：</b>{html.escape(str(r['代表股']))}</div>
             </div>
             """, unsafe_allow_html=True)
-    show_cols = ["產業", "輪動狀態", "今日熱度", "5日升溫", "平均漲幅%", "上漲家數%", "平均量比", "強勢股數", "法人合計", "代表股", "操作建議"]
+    show_cols = ["產業", "輪動狀態", "可信度", "樣本數", "今日熱度", "5日升溫", "平均漲幅%", "上漲家數%", "平均量比", "強勢股數", "法人合計", "代表股", "操作建議"]
     view_df = table[[c for c in show_cols if c in table.columns]].copy()
     fmt_map = {
         "今日熱度": "{:.0f}",
@@ -1075,46 +1170,12 @@ def render_industry_rotation_radar():
         "上漲家數%": "{:.1f}",
         "平均量比": "{:.2f}",
         "強勢股數": "{:.0f}",
+        "樣本數": "{:.0f}",
         "法人合計": "{:,.0f}",
     }
     styled_rotation = view_df.style.set_properties(**table_style).format({k: v for k, v in fmt_map.items() if k in view_df.columns}, na_rep="-")
     st.dataframe(styled_rotation, use_container_width=True, hide_index=True, height=420)
 
-
-def render_decision_digest_panel():
-    brief = build_macro_brief(MACRO_DF, MACRO_SCORE, OVERHEAT_FLAG)
-    table = build_decision_digest_table()
-    hot = "、".join(table[table["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫"])]["產業"].astype(str).head(3).tolist()) if not table.empty else "待掃描"
-    warming = "、".join(table[table["輪動狀態"].eq("🟠 資金升溫")]["產業"].astype(str).head(3).tolist()) if not table.empty else "待掃描"
-    fading = "、".join(table[table["輪動狀態"].eq("⚠️ 退潮警戒")]["產業"].astype(str).head(3).tolist()) if not table.empty else "暫無明顯退潮"
-
-    hold_note = ""
-    if auth_status == "admin_auth" and m_df is not None and not m_df.empty:
-        try:
-            hv, _ = build_mobile_holdings_view(m_df)
-            weak = hv.sort_values(["風險排序", "報酬%"], ascending=[True, True]).head(3)
-            weak_txt = "、".join((weak["名稱"].astype(str) + "(" + weak["代號"].astype(str) + ")").tolist()) if not weak.empty else "無"
-            hold_note = f"弱持股優先：{weak_txt}"
-        except Exception:
-            hold_note = "先處理弱持股，再決定是否開新倉"
-    else:
-        hold_note = "guest 模式不顯示個人持股；先看主戰場與沙盤推演"
-
-    lines = [
-        ("① 今日模式", brief["title"]),
-        ("② 今日主戰場", hot or "待掃描"),
-        ("③ 正在升溫", warming or "暫無"),
-        ("④ 退潮警戒", fading or "暫無明顯退潮"),
-        ("⑤ 今日動作", f"{brief['strategy']}｜{hold_note}"),
-    ]
-    items = "".join([f"<div style='padding:9px 0; border-top:1px dashed {COLORS['border'] if i else 'transparent'};'><b style='color:{COLORS['primary']};'>{k}</b>：{html.escape(v)}</div>" for i, (k, v) in enumerate(lines)])
-    st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:6px solid {brief['color']}; border-radius:10px; padding:12px 16px; margin:8px 0 18px 0;">
-        <div style="font-size:19px; font-weight:900; color:{COLORS['text']}; margin-bottom:4px;">🧭 今日 5 句決策摘要</div>
-        <div style="font-size:12.5px; color:{COLORS['subtext']}; margin-bottom:6px;">V35.3 決策濃縮版：先看結論，再決定要不要展開細節。</div>
-        <div style="font-size:13.5px; color:{COLORS['text']}; line-height:1.6;">{items}</div>
-    </div>
-    """, unsafe_allow_html=True)
 
 
 def render_mobile_battle_room():
@@ -1646,7 +1707,9 @@ with t_chip:
     render_industry_rotation_radar()
     st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     if not today_df.empty:
-        st.markdown("#### 🛳️ <span class='highlight-accent'>法人觀察雷達</span>", unsafe_allow_html=True)
+        st.markdown("### 📡 <span class='highlight-primary'>聯合作戰情報：法人動向</span>", unsafe_allow_html=True)
+        st.caption("💡 **籌碼流向**：當日全台股外資、投信、自營商買賣超Top 200。")
+        st.markdown("#### 🛳️ <span class='highlight-accent'>法人建倉觀察雷達</span>", unsafe_allow_html=True)
         st.caption("只保留：安全指數≥7、三大法人合計買超、法人偏建倉，並排除已進入 S/A/B 主清單的標的。")
         main_chips = today_df.copy()
         chip_intel = st.session_state.get("eod_intel_df", None)
@@ -1868,6 +1931,7 @@ with t_cmd:
 
     with cmd_aar_tab:
         st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
+        render_aar_auto_correction_card()
         aar.render_aar_tab(aar_sheet_url, fee_discount, FM_TOKEN, COLORS)
 
     with cmd_bt_tab:
