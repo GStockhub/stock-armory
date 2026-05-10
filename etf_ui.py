@@ -384,14 +384,14 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
         st.warning("ETF 動能資料暫時不足。")
         active_df = passive_df = pd.DataFrame()
     else:
-        active_df = radar[radar["類型"].eq("主動")].head(3).copy()
-        passive_df = radar[radar["類型"].eq("被動")].head(3).copy()
+        active_df = radar[radar["類型"].eq("主動ETF")].head(3).copy()
+        passive_df = radar[radar["類型"].eq("被動ETF")].head(3).copy()
 
     st.markdown("#### 🧭 主動 ETF 動能 Top 3")
-    _render_etf_cards(active_df, COLORS, "主動")
+    _render_etf_cards(active_df, COLORS, "主動ETF")
 
     st.markdown("#### ⚙️ 被動 ETF 動能 Top 3")
-    _render_etf_cards(passive_df, COLORS, "被動")
+    _render_etf_cards(passive_df, COLORS, "被動ETF")
 
     st.markdown("#### 📋 ETF 綜合動能 Top 10")
     if radar.empty:
