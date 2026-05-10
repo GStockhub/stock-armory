@@ -242,6 +242,7 @@ def _render_bar_list(df, COLORS, label_col, value_col, subtitle_col=None, max_ro
 
 
 def _render_manager_header_compact(summary, holdings, COLORS, history_status=None, auto_note=""):
+    """V35.3.1：把自動更新、歷史快照、GitHub 狀態壓成同一張單行摘要卡。"""
     history_status = history_status or get_history_status(holdings, lookback_days=5)
     days = int(history_status.get("days", 0) or 0)
     latest = str(history_status.get("latest", "-") or "-")
@@ -256,29 +257,23 @@ def _render_manager_header_compact(summary, holdings, COLORS, history_status=Non
     etf_count = int(snapshot["ETF"].nunique()) if snapshot is not None and not snapshot.empty and "ETF" in snapshot.columns else 0
     changes = summary.get("changes", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
     event_count = int(len(changes)) if changes is not None and not changes.empty else 0
-    auto_text = _safe_text(auto_note or "自動持股來源正常；若 GitHub 寫入失敗則先沿用本機快取。")
+    auto_text = str(auto_note or "自動持股來源正常；若 GitHub 寫入失敗則先沿用本機快取。")
+    compact_msg = msg.replace("｜", "；")
+
     st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:12px 14px; border-radius:10px; margin:6px 0 14px 0;">
-        <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start;">
-            <div style="flex:1 1 260px; min-width:220px;">
-                <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">⚙️ 自動更新狀態</div>
-                <div style="font-size:14px; color:{COLORS['text']}; line-height:1.55; margin-top:4px;">{auto_text}</div>
-            </div>
-            <div style="flex:1 1 220px; min-width:200px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
-                <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">📦 歷史快照</div>
-                <div style="font-size:14px; color:{COLORS['text']}; line-height:1.55; margin-top:4px;">{days} 個交易日｜最新 { _safe_text(latest) }<br>涵蓋 {etf_count} 檔主動 ETF｜事件 {event_count} 筆</div>
-                <div style="font-size:12px; color:{COLORS['subtext']}; margin-top:4px;">{_safe_text(msg)}</div>
-            </div>
-            <div style="flex:1 1 220px; min-width:200px; border-left:1px solid {COLORS['border']}; padding-left:12px;">
-                <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:800;">🧪 GitHub 歷史庫</div>
-                <div style="font-size:14px; color:{COLORS['text']}; line-height:1.55; margin-top:4px;">{_safe_text(gh_summary)}</div>
-                <div style="font-size:12px; color:{COLORS['subtext']}; margin-top:4px;">只顯示 repo / branch / path / HTTP 狀態，不顯示 token。</div>
-            </div>
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:10px 13px; border-radius:10px; margin:6px 0 14px 0;">
+        <div style="font-size:14px; color:{COLORS['text']}; line-height:1.65;">
+            <b>🧭 主動 ETF 風向狀態：</b>{_safe_text(auto_text)}
+            <span style="color:{COLORS['subtext']};">｜</span>
+            <b>📦 快照</b> {days} 日，最新 {_safe_text(latest)}，涵蓋 {etf_count} 檔，事件 {event_count} 筆
+            <span style="color:{COLORS['subtext']};">｜</span>
+            <b>🧪 GitHub</b> {_safe_text(gh_summary)}
         </div>
+        <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">{_safe_text(compact_msg)}</div>
     </div>
     """, unsafe_allow_html=True)
     if gh_diag:
-        with st.expander("🧪 查看 GitHub 歷史庫診斷細節", expanded=False):
+        with st.expander("🧪 GitHub 診斷細節", expanded=False):
             checks = gh_diag.get("checks", [])
             if checks:
                 st.dataframe(pd.DataFrame(checks), use_container_width=True, hide_index=True)
@@ -430,8 +425,6 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
     if holdings.empty or summary is None or summary.get("snapshot", pd.DataFrame()).empty:
         st.info(f"{auto_note or '自動持股來源目前抓不到資料。'} ETF 動能排行仍可正常使用；若要啟用經理人風向，請使用側邊欄 CSV 備援。")
     else:
-        if auto_note:
-            st.success(auto_note)
         _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=history_status, auto_note=auto_note)
 
     with st.expander("📌 ETF 雷達使用說明", expanded=False):
