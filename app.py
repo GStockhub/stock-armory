@@ -47,7 +47,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.2 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -96,7 +96,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— 產業雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— V36 瘦身模組版｜產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -712,82 +712,6 @@ def _fmt_money0(x):
     except Exception:
         return str(x)
 
-
-def render_aar_auto_correction_card():
-    """V36：AAR 自動糾錯摘要。只抓最近交易紀錄的常見壞習慣，不取代完整 AAR。"""
-    if not aar_sheet_url:
-        return
-    try:
-        raw = read_remote_csv(aar_sheet_url, dtype=str)
-    except Exception:
-        raw = pd.DataFrame()
-    if raw is None or raw.empty:
-        return
-
-    df = raw.copy()
-    df.columns = [str(c).replace("\ufeff", "").strip() for c in df.columns]
-
-    def pick_col(keys):
-        for c in df.columns:
-            cs = str(c)
-            if any(k in cs for k in keys):
-                return c
-        return None
-
-    roi_col = pick_col(["報酬", "ROI", "損益率", "獲利率"])
-    demon_col = pick_col(["心魔", "錯誤", "問題", "檢討", "標籤"])
-    held_col = pick_col(["持有天", "天數", "持倉"])
-    detail_col = pick_col(["備註", "心得", "復盤", "說明", "原因"])
-    date_col = pick_col(["日期", "賣出日", "出場日", "交易日"])
-
-    work = df.copy()
-    if date_col:
-        work["_date"] = pd.to_datetime(work[date_col], errors="coerce")
-        work = work.sort_values("_date", ascending=False)
-    work = work.head(30).copy()
-
-    def to_num(v):
-        try:
-            return float(str(v).replace(",", "").replace("%", "").strip())
-        except Exception:
-            return 0.0
-
-    roi = work[roi_col].map(to_num) if roi_col else pd.Series([0] * len(work))
-    held = work[held_col].map(to_num) if held_col else pd.Series([0] * len(work))
-    demon_text = work[demon_col].astype(str) if demon_col else pd.Series([""] * len(work))
-    detail_text = work[detail_col].astype(str) if detail_col else pd.Series([""] * len(work))
-    all_text = (demon_text + " " + detail_text).str.lower()
-
-    loss_bad = int(((roi <= -3) | all_text.str.contains("凹|死抱|破線|未砍|停損", regex=True, na=False)).sum())
-    early_exit = int((all_text.str.contains("恐高|賣飛|早退|提早", regex=True, na=False)).sum())
-    impatience = int((all_text.str.contains("沒耐心|失去耐心|盤整", regex=True, na=False)).sum())
-    chase_high = int((all_text.str.contains("追高|開高|跳空|急拉", regex=True, na=False)).sum())
-
-    bullets = []
-    if loss_bad >= 3:
-        bullets.append(("🔴 破線/凹單偏多", f"近 30 筆約 {loss_bad} 筆有虧損擴大或破線未砍跡象；明日先守 M5/M10，不攤平弱股。"))
-    if early_exit >= 3:
-        bullets.append(("🟡 強股早退偏多", f"近 30 筆約 {early_exit} 筆有賣飛/恐高早退跡象；S/A 股獲利後可出半，剩半守 M5。"))
-    if impatience >= 3:
-        bullets.append(("🟠 盤整耐心不足", f"近 30 筆約 {impatience} 筆和盤整耐心有關；B 級只在 13:00 後確認，不要盤中亂切。"))
-    if chase_high >= 2:
-        bullets.append(("⚠️ 追高警訊", f"近 30 筆約 {chase_high} 筆有追高/跳空急拉跡象；跳空 >4.5% 直接列禁追。"))
-
-    if not bullets:
-        bullets.append(("🟢 暫無單一心魔過熱", "近期 AAR 沒有明顯集中錯誤；維持小量、照 SOP 執行。"))
-
-    html_bits = "".join([
-        f"<div style='padding:7px 0; border-top:1px dashed {COLORS['border'] if i else 'transparent'};'><b>{html.escape(title)}</b><br><span style='color:{COLORS['subtext']};'>{html.escape(body)}</span></div>"
-        for i, (title, body) in enumerate(bullets[:3])
-    ])
-
-    st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['accent']}; border-radius:10px; padding:12px 14px; margin:8px 0 14px 0;">
-        <div style="font-size:17px; font-weight:900; color:{COLORS['text']};">🧠 V36 AAR 自動糾錯</div>
-        <div style="font-size:12.5px; color:{COLORS['subtext']}; margin:3px 0 6px 0;">只顯示最近紀錄的主要心魔，不新增一堆表格。</div>
-        <div style="font-size:13px; line-height:1.55; color:{COLORS['text']};">{html_bits}</div>
-    </div>
-    """, unsafe_allow_html=True)
 
 
 if mobile_quick_mode:
@@ -1532,7 +1456,6 @@ with t_cmd:
 
     with cmd_aar_tab:
         st.markdown("### 📊 <span class='highlight-primary'>AAR 戰術覆盤室</span>", unsafe_allow_html=True)
-        render_aar_auto_correction_card()
         aar.render_aar_tab(aar_sheet_url, fee_discount, FM_TOKEN, COLORS)
 
     with cmd_bt_tab:
