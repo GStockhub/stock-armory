@@ -431,7 +431,7 @@ def _summary_stats(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro_score, overheat_flag, operation_mode):
-    st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室 V37</span>", unsafe_allow_html=True)
+    st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室</span>", unsafe_allow_html=True)
     st.caption("取代原回測室：每天保存 S/A/B、特殊關注、產業輪動、主動 ETF 前五，之後檢查隔日 / 3 日 / 5 日命中率。")
 
     history, msg = load_signal_history()
