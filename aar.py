@@ -501,29 +501,54 @@ def render_aar_tab(aar_sheet_url, fee_discount, fm_token, COLORS):
     _render_metric_grid(cards, COLORS)
 
     # ===================================================
-    # 🧭 AAR 行為建議：把統計變成下一步動作
+    # 🧠 AAR 戰術糾錯中心：融合「自動糾錯」與「行為建議」
+    # 只保留一張卡，避免 AAR 區重複提示同一件事。
     # ===================================================
     avg_missed_k = float(np.mean(missed_k_records)) if missed_k_records else 0
     avg_missed_money = float(np.mean(missed_money_records)) if missed_money_records else 0
-    if god_total_pnl > 0 and capture_rate < 30:
-        behavior_title = "主要問題：出場太早，獲利捕捉率偏低"
-        behavior_detail = "建議獲利單不要一口氣清空；達 +5～6% 先出一半，剩餘部位用 M5 守，跌破 M5 且站不回才出。"
-    elif "賣飛" in str(top_demon) or missed_k_records:
-        behavior_title = "主要問題：賣飛仍是最大改善空間"
-        behavior_detail = "你的選股有肉，但需要把一部分倉位留給趨勢。把『全部停利』改成『半倉停利＋半倉追蹤』。"
-    elif "恐慌" in str(top_demon):
-        behavior_title = "主要問題：回檔時容易恐慌出場"
-        behavior_detail = "虧損單請守紀律，但獲利單回測 M5 不等於轉弱；真正破 M10 或 ATR 底線再執行撤退。"
-    else:
-        behavior_title = "目前行為穩定：維持紀律，避免新增太多規則"
-        behavior_detail = "這版 AAR 顯示你的交易沒有明顯單一心魔，下一步重點是穩定照 SOP 執行。"
+    demon_text = " ".join([str(x) for x in demons])
+    loss_hint_count = sum(1 for x in demons if any(k in str(x) for k in ["凹", "停損", "認賠", "破線", "死抱", "虧"]))
+    chase_hint_count = sum(1 for x in demons if any(k in str(x) for k in ["追高", "開高", "跳空", "急拉"]))
+    panic_hint_count = sum(1 for x in demons if any(k in str(x) for k in ["恐慌", "恐高", "怕", "洗出去"]))
 
-    k_hint = f"賣飛高點平均出現在賣後第 {avg_missed_k:.1f} 根K，平均少賺約 {avg_missed_money:,.0f} 元。" if missed_k_records else "目前賣飛樣本不足，先累積更多平倉紀錄。"
+    if god_total_pnl > 0 and capture_rate < 30:
+        correction_title = "主要問題：出場太早，獲利捕捉率偏低"
+        evidence = f"獲利捕捉率僅 {capture_rate:.1f}%，實際淨利 {_money(total_pnl)}，神仙模式理論可達 {_money(god_total_pnl)}。"
+        command = "S/A 級獲利單不要一次清空；達 +5～6% 先出半，剩餘部位守 M5，跌破 M5 且站不回再撤。"
+        card_color = COLORS["primary"]
+    elif "賣飛" in str(top_demon) or missed_k_records:
+        correction_title = "主要問題：賣飛仍是最大改善空間"
+        evidence = f"{top_demon} 是目前最明顯標籤；{('賣飛高點平均出現在賣後第 %.1f 根K，平均少賺約 %,.0f 元。' % (avg_missed_k, avg_missed_money)) if missed_k_records else '賣飛樣本仍在累積中。'}"
+        command = "把『全部停利』改成『半倉停利＋半倉追蹤』；只要趨勢未破 M5 / M10，就讓剩餘部位繼續跑。"
+        card_color = COLORS["accent"]
+    elif chase_hint_count >= 2:
+        correction_title = "主要問題：追高 / 跳空急拉風險偏高"
+        evidence = f"近期 AAR 約 {chase_hint_count} 筆帶有追高、開高或急拉相關標籤。"
+        command = "跳空 >4.5% 直接列禁追；若真的想做，只允許等回踩 M5 或 13:00 後重新站穩。"
+        card_color = COLORS["red"]
+    elif loss_hint_count >= 2:
+        correction_title = "主要問題：虧損擴大或破線處理偏慢"
+        evidence = f"近期 AAR 約 {loss_hint_count} 筆帶有凹單、停損、認賠或破線相關標籤。"
+        command = "跌破 M10 或原定停損線先降倉，不攤平弱股；救援單只能等反抽，不再追加風險。"
+        card_color = COLORS["red"]
+    elif panic_hint_count >= 2 or "恐慌" in str(top_demon):
+        correction_title = "主要問題：回檔時容易情緒出場"
+        evidence = f"近期 AAR 約 {panic_hint_count} 筆帶有恐慌、恐高或洗出場相關標籤。"
+        command = "虧損單守紀律，但獲利單回測 M5 不等於轉弱；真正破 M10 或 ATR 底線再執行撤退。"
+        card_color = COLORS["accent"]
+    else:
+        correction_title = "目前行為穩定：維持紀律，避免新增太多規則"
+        evidence = f"已平倉 {total_closed_trades} 筆、勝率 {win_rate:.1f}%，目前沒有單一心魔明顯過熱。"
+        command = "下一步不是加規則，而是固定照 SOP：S/A 分批停利、B 級低接、弱股破線處理。"
+        card_color = COLORS["green"]
+
+    # 用 Streamlit 原生標題先固定顯示，避免 HTML 標題被主題或舊快取吃掉。
+    st.markdown("#### 🧠 AAR 戰術糾錯中心")
     st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; border-radius:10px; padding:14px 16px; margin: 8px 0 16px 0;">
-        <div style="font-size:15px; font-weight:800; color:{COLORS['text']}; margin-bottom:6px;">🧭 AAR 行為建議｜{behavior_title}</div>
-        <div style="font-size:13.5px; line-height:1.55; color:{COLORS['text']};">{behavior_detail}</div>
-        <div style="font-size:12.5px; margin-top:6px; color:{COLORS['subtext']};">{k_hint}</div>
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {card_color}; border-radius:10px; padding:14px 16px; margin: 8px 0 16px 0;">
+        <div style="font-size:15px; font-weight:900; color:{COLORS['text']}; margin-bottom:6px;">{correction_title}</div>
+        <div style="font-size:13px; line-height:1.6; color:{COLORS['subtext']}; margin-bottom:5px;"><b>證據：</b>{evidence}</div>
+        <div style="font-size:13.5px; line-height:1.65; color:{COLORS['text']};"><b>下一次修正指令：</b>{command}</div>
     </div>
     """, unsafe_allow_html=True)
 

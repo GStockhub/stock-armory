@@ -112,7 +112,7 @@ def _format_group(df, key_name):
 
 
 def render_context_insights(res_df, COLORS):
-    """AAR 進階：產業 × 戰術 × 心魔。只做行為覆盤，不參與選股評分。"""
+    """AAR 進階：產業 × 戰術 × 心魔。只做情境歸因，不取代上方戰術糾錯中心。"""
     if res_df is None or res_df.empty:
         return
     df = res_df.copy()
@@ -122,7 +122,7 @@ def render_context_insights(res_df, COLORS):
         st.info("AAR 產業 × 戰術 × 心魔分析至少需要 5 筆平倉資料。")
         return
 
-    st.caption("此區把三張表收斂成一張情境總表；詳細明細放在下方展開，避免心魔欄位重複出現太多次。")
+    st.caption("此區是情境歸因表；真正的下一次修正指令以上方「AAR 戰術糾錯中心」為準。")
 
     industry_df = _build_group(df, "產業")
     tactic_df = _build_group(df, "戰術推定")
