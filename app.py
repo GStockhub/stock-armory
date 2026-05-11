@@ -24,6 +24,7 @@ import sidebar
 import etf_ui
 import mobile_ui
 import rotation_radar
+import signal_tracker
 from fundamental_engine import get_fundamental_badge
 
 st.set_page_config(page_title="我要賺大錢", page_icon="💰️", layout="wide", initial_sidebar_state="expanded")
@@ -1337,7 +1338,7 @@ with t_chip:
         st.info("法人籌碼暫時無法取得，情報局暫停；個股游擊已改用技術面備援，沙盤、ETF、司令部仍可使用。")
 
 with t_cmd:
-    cmd_hold_tab, cmd_aar_tab, cmd_bt_tab = st.tabs(["🛡️ 持股風控", "📊 AAR 戰術教練", "🧪 司令官回測室"])
+    cmd_hold_tab, cmd_aar_tab, cmd_bt_tab = st.tabs(["🛡️ 持股風控", "📊 AAR 戰術教練", "🧪 訊號追蹤室"])
     with cmd_hold_tab:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
 
@@ -1535,87 +1536,15 @@ with t_cmd:
         aar.render_aar_tab(aar_sheet_url, fee_discount, FM_TOKEN, COLORS)
 
     with cmd_bt_tab:
-        st.markdown("### 📊 <span class='highlight-primary'>司令官回測室：資金限制版</span>", unsafe_allow_html=True)
-        st.caption("用歷史日K模擬：本金、總曝險、整張/零股、跳空不追、+5.5%出半、M5/M10/ATR出場。這是驗證系統期望值，不是預測未來。")
-
-        default_symbols = []
-        if "eod_master_list" in st.session_state and isinstance(st.session_state["eod_master_list"], pd.DataFrame) and not st.session_state["eod_master_list"].empty:
-            default_symbols = st.session_state["eod_master_list"]["代號"].astype(str).head(20).tolist()
-        elif "eod_rank_sorted" in st.session_state and isinstance(st.session_state["eod_rank_sorted"], pd.DataFrame) and not st.session_state["eod_rank_sorted"].empty:
-            default_symbols = st.session_state["eod_rank_sorted"]["代號"].astype(str).head(30).tolist()
-        elif not today_df.empty and "代號" in today_df.columns:
-            default_symbols = today_df.sort_values("三大法人合計", ascending=False).head(30)["代號"].astype(str).tolist()
-
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            bt_capital = st.number_input("回測本金", min_value=50000, max_value=2000000, value=int(total_capital), step=10000)
-            bt_period = st.selectbox("歷史期間", ["6mo", "1y", "2y"], index=1)
-        with c2:
-            bt_total_exp = st.slider("總曝險上限", 0.2, 1.0, 0.60, 0.05)
-            bt_single = st.slider("單檔上限", 0.05, 0.30, 0.15, 0.01)
-        with c3:
-            bt_max_pos = st.slider("最多持股檔數", 1, 8, 4, 1)
-            bt_new_per_day = st.slider("每日最多新買", 1, 3, 2, 1)
-        with c4:
-            bt_slip = st.slider("滑價估計", 0.0, 0.005, 0.0015, 0.0005, format="%.4f")
-            bt_odd = st.checkbox("允許零股", value=True)
-
-        default_text = ",".join(default_symbols[:30])
-        symbol_text = st.text_area("回測股票池（逗號分隔；預設取目前主清單/法人買超前排）", value=default_text, height=90)
-        run_bt = st.button("🚀 執行資金回測", type="primary", use_container_width=True)
-
-        if run_bt:
-            symbols = [x.strip() for x in symbol_text.replace("，", ",").replace("\n", ",").split(",") if x.strip()]
-            cfg = BacktestConfig(
-                initial_capital=float(bt_capital),
-                total_exposure_pct=float(bt_total_exp),
-                single_position_pct=float(bt_single),
-                max_positions=int(bt_max_pos),
-                max_new_positions_per_day=int(bt_new_per_day),
-                fee_discount=float(fee_discount),
-                slippage_pct=float(bt_slip),
-                allow_odd_lot=bool(bt_odd),
-            )
-            with st.spinner("📡 正在執行資金限制回測，請稍候..."):
-                result = run_portfolio_backtest(symbols, TWSE_NAME_MAP, FM_TOKEN, period=bt_period, config=cfg)
-            st.session_state["commander_backtest_result"] = result
-
-        result = st.session_state.get("commander_backtest_result")
-        if result:
-            if not result.get("ok"):
-                st.warning(result.get("message", "回測無結果"))
-            else:
-                summary = result["summary"]
-                m1, m2, m3, m4 = st.columns(4)
-                metrics = [
-                    ("最終資金", f"{summary['最終資金']:,.0f}", COLORS['primary']),
-                    ("總報酬", f"{summary['總報酬(%)']:.2f}%", COLORS['green'] if summary['總報酬(%)'] >= 0 else COLORS['red']),
-                    ("最大回撤", f"{summary['最大回撤(%)']:.2f}%", COLORS['red']),
-                    ("勝率", f"{summary['勝率(%)']:.1f}%", COLORS['accent']),
-                ]
-                for col, (title, val, color) in zip([m1, m2, m3, m4], metrics):
-                    with col:
-                        st.markdown(f"""
-                        <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:10px; padding:12px 14px;">
-                            <div style="font-size:13px; color:{COLORS['subtext']};">{title}</div>
-                            <div style="font-size:24px; font-weight:800; color:{COLORS['text']};">{val}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                st.info(f"交易筆數：{summary['交易筆數']}｜平均單筆報酬：{summary['平均單筆報酬(%)']:.2f}%｜平均持有：{summary['平均持有天數']:.1f}天｜回測股票數：{summary['回測股票數']}")
-                curve = result.get("equity_curve", pd.DataFrame())
-                if not curve.empty:
-                    st.line_chart(curve.set_index("日期")[["總資產"]])
-                tabs_bt = st.tabs(["分級績效", "交易明細"])
-                with tabs_bt[0]:
-                    tier_stats = result.get("tier_stats", pd.DataFrame())
-                    if not tier_stats.empty:
-                        st.dataframe(tier_stats.style.format({"勝率": "{:.1f}%", "平均報酬": "{:.2f}%", "總損益": "{:,.0f}"}), use_container_width=True, hide_index=True)
-                    else:
-                        st.info("尚無足夠分級統計。")
-                with tabs_bt[1]:
-                    trades = result.get("trades", pd.DataFrame())
-                    if not trades.empty:
-                        st.dataframe(trades, use_container_width=True, hide_index=True, height=420)
+        signal_tracker.render_signal_tracker_tab(
+            COLORS=COLORS,
+            table_style=table_style,
+            fm_token=FM_TOKEN,
+            twse_ind_map=TWSE_IND_MAP,
+            macro_score=MACRO_SCORE,
+            overheat_flag=OVERHEAT_FLAG,
+            operation_mode=operation_mode,
+        )
 
 with t_book:
     st.markdown("### 📖 <span class='highlight-primary'>游擊兵工廠與軍史館</span>", unsafe_allow_html=True)

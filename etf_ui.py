@@ -328,7 +328,6 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
 
 def _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=None, auto_note=""):
     history_status = history_status or get_history_status(holdings, lookback_days=5)
-    _render_manager_header_compact(summary, holdings, COLORS, history_status=history_status, auto_note=auto_note)
 
     st.markdown("##### Top 主動 ETF 產業占比")
     _render_industry_donut_cards(summary, COLORS, top_n=5)
@@ -369,6 +368,9 @@ def _render_manager_visuals(summary, holdings, COLORS, table_style, history_stat
 
     _render_etfedge_like_changes(summary, COLORS, table_style)
 
+    st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
+    _render_manager_header_compact(summary, holdings, COLORS, history_status=history_status, auto_note=auto_note)
+
 
 # =========================
 # 主頁籤
@@ -382,9 +384,10 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
     radar = run_etf_momentum_radar(fm_token)
     if radar.empty:
         st.warning("ETF 動能資料暫時不足。")
-        active_df = passive_df = pd.DataFrame()
+        active_pool = active_df = passive_df = pd.DataFrame()
     else:
-        active_df = radar[radar["類型"].eq("主動ETF")].head(3).copy()
+        active_pool = radar[radar["類型"].eq("主動ETF")].head(5).copy()
+        active_df = active_pool.head(3).copy()
         passive_df = radar[radar["類型"].eq("被動ETF")].head(3).copy()
 
     st.markdown("#### 🧭 主動 ETF 動能 Top 3")
@@ -409,8 +412,9 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
     auto_note = ""
     history_status = None
     if holdings.empty:
+        manager_radar = active_pool if isinstance(active_pool, pd.DataFrame) and not active_pool.empty else radar
         auto_result = build_active_etf_manager_radar(
-            radar, industry_map, name_map, top_n=5, lookback_days=5,
+            manager_radar, industry_map, name_map, top_n=5, lookback_days=5,
             cache_path="active_etf_holdings_history.csv"
         )
         summary = auto_result.get("summary")
@@ -426,11 +430,3 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
         st.info(f"{auto_note or '自動持股來源目前抓不到資料。'} ETF 動能排行仍可正常使用；若要啟用經理人風向，請使用側邊欄 CSV 備援。")
     else:
         _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=history_status, auto_note=auto_note)
-
-    with st.expander("📌 ETF 雷達使用說明", expanded=False):
-        st.markdown("""
-        * **主動 / 被動 Top 3**：直接同屏比較，不再切換下拉，避免手機與 Streamlit 重跑卡頓。  
-        * **ETF 綜合 Top 10**：主動與被動混合排序，實際主體倉只挑 1～3 檔，不是 Top 10 全買。  
-        * **主動 ETF 經理人風向**：看產業占比、共同重倉與加減碼族群，不代表直接照抄成分股。  
-        * **歷史快照**：自動快照會寫入本機與 session；若 Streamlit Cloud 重新部署導致歷史遺失，可用側邊欄 CSV 做持久化備援。  
-        """)
