@@ -96,7 +96,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— V36 瘦身模組版｜產業輪動雷達 ✕ 手機持股戰情 ——</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— V37.7 ETF經理人雷達瘦身版｜燈號不擋掃描 ✕ 主動ETF完整度防呆 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
