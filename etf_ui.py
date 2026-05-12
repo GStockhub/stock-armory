@@ -448,7 +448,7 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
         manager_radar = active_pool if isinstance(active_pool, pd.DataFrame) and not active_pool.empty else radar
         auto_result = build_active_etf_manager_radar(
             manager_radar, industry_map, name_map, top_n=10, lookback_days=20,
-            cache_path="active_etf_holdings_history.csv"
+            cache_path="data/active_etf_holdings_history.csv"
         )
         summary = auto_result.get("summary")
         holdings = auto_result.get("holdings", pd.DataFrame())

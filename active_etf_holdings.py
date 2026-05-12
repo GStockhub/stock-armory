@@ -74,8 +74,10 @@ DEFAULT_ACTIVE_ETFS: Dict[str, Dict[str, str]] = {
 
 # Generic sources. 這些網頁格式可能變動，所以 fetch 會自動 fail-soft。
 GENERIC_SOURCE_TEMPLATES = [
-    "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code}.tw",
+    # V37.8：ETL 會優先跑 fundholding 級別頁面，不再只抓概覽頁。
+    "https://www.cmoney.tw/etf/tw/{code}/fundholding",
     "https://www.pocket.tw/etf//tw/{code}/fundholding",
+    "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code}.tw",
 ]
 
 CACHE_FILE = "active_etf_holdings_history.csv"

@@ -28,7 +28,7 @@ try:
 except Exception:
     st = None
 
-REQUIRED_COLUMNS = ["日期", "ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "產業"]
+REQUIRED_COLUMNS = ["日期", "ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "持有股數", "收盤價", "產業", "來源"]
 API_ROOT = "https://api.github.com"
 
 
@@ -72,7 +72,7 @@ def _empty_history() -> pd.DataFrame:
     return pd.DataFrame(columns=REQUIRED_COLUMNS)
 
 
-def normalize_history_df(df: pd.DataFrame, max_days: int = 30) -> pd.DataFrame:
+def normalize_history_df(df: pd.DataFrame, max_days: int = 60) -> pd.DataFrame:
     if df is None or df.empty:
         return _empty_history()
     out = df.copy()
@@ -87,7 +87,10 @@ def normalize_history_df(df: pd.DataFrame, max_days: int = 30) -> pd.DataFrame:
     out["成分股代號"] = out["成分股代號"].astype(str).str.strip().str.upper()
     out["成分股名稱"] = out["成分股名稱"].astype(str).str.strip()
     out["產業"] = out["產業"].astype(str).str.strip()
+    out["來源"] = out["來源"].astype(str).str.strip()
     out["權重"] = pd.to_numeric(out["權重"].astype(str).str.replace("%", "", regex=False).str.replace(",", "", regex=False), errors="coerce").fillna(0.0)
+    out["持有股數"] = pd.to_numeric(out["持有股數"].astype(str).str.replace(",", "", regex=False), errors="coerce").fillna(0.0)
+    out["收盤價"] = pd.to_numeric(out["收盤價"].astype(str).str.replace(",", "", regex=False), errors="coerce").fillna(0.0)
     out = out.dropna(subset=["日期"])
     out = out[(out["ETF代號"] != "") & (out["成分股代號"] != "")]
     if out.empty:
@@ -226,7 +229,7 @@ def write_github_history(df: pd.DataFrame, commit_message: Optional[str] = None)
         return diag
 
 
-def sync_history_with_github(local_df: pd.DataFrame, max_days: int = 30) -> Tuple[pd.DataFrame, Dict[str, object]]:
+def sync_history_with_github(local_df: pd.DataFrame, max_days: int = 60) -> Tuple[pd.DataFrame, Dict[str, object]]:
     """讀取 GitHub 歷史，與本機最新資料合併，再嘗試寫回 GitHub。"""
     remote_df, read_diag = read_github_history()
     frames = []
