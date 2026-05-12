@@ -1,10 +1,11 @@
 """active_etf_etl.py
 
-V37.8 主動 ETF 自動 ETL
-----------------------
+V37.9 主動 ETF 官方公告自動 ETL
+------------------------------
 用途：
 - 由 GitHub Actions 每天自動執行
-- 抓取主動 ETF 持股快照
+- 優先追蹤投信官網每日 PCF / 投資組合明細
+- 抓不到官方完整資料時才退回第三方備援
 - 檢查完整度，不完整資料不覆蓋歷史
 - 合併既有 active_etf_holdings_history.csv
 - 只保留近 60 天快照
@@ -14,6 +15,7 @@ V37.8 主動 ETF 自動 ETL
 
 注意：
 這是 ETFedge-lite 的 CSV 資料層，不把 Streamlit 本體變成大型爬蟲。
+V37.8.1：ETL 預設不抓個股收盤價，避免對每個成分股逐一打 Yahoo；收盤價只在明確指定 --with-prices 時補值。
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ from active_etf_holdings import (
     get_active_etf_candidates,
 )
 from github_history_store import normalize_history_df
+from active_etf_official_sources import fetch_official_holdings_auto
 
 OUTPUT_COLUMNS = ["日期", "ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "持有股數", "收盤價", "產業", "來源"]
 
@@ -143,14 +146,32 @@ def merge_with_history(latest: pd.DataFrame, output_path: str, keep_days: int = 
     return norm[OUTPUT_COLUMNS]
 
 
-def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_prices: bool = False) -> int:
+def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_prices: bool = True) -> int:
     industry_map, name_map = load_industry_map()
     candidates = get_active_etf_candidates(None, top_n=top_n)
     cand_tuple = tuple((c["ETF代號"], c["ETF名稱"]) for c in candidates)
     print(f"[INFO] 開始抓取主動 ETF：{len(cand_tuple)} 檔")
 
-    raw = fetch_active_etf_holdings_auto(cand_tuple, name_map=name_map)
+    # V37.9：官方公告優先。先抓投信官網每日 PCF / 投資組合明細，
+    # 只有官方來源抓不到完整快照的 ETF，才退回第三方備援。
+    official_raw, official_report = fetch_official_holdings_auto(cand_tuple)
+    official_codes = set()
+    if official_raw is not None and not official_raw.empty and "ETF代號" in official_raw.columns:
+        official_codes = set(official_raw["ETF代號"].dropna().astype(str).str.upper())
+    missing_tuple = tuple((c, n) for c, n in cand_tuple if str(c).upper() not in official_codes)
+    print(f"[INFO] 官方來源完整 ETF：{len(official_codes)} 檔；需第三方備援：{len(missing_tuple)} 檔")
+
+    fallback_raw = fetch_active_etf_holdings_auto(missing_tuple, name_map=name_map) if missing_tuple else pd.DataFrame()
+    raw_frames = []
+    if official_raw is not None and not official_raw.empty:
+        raw_frames.append(official_raw)
+    if fallback_raw is not None and not fallback_raw.empty:
+        raw_frames.append(fallback_raw)
+    raw = pd.concat(raw_frames, ignore_index=True) if raw_frames else pd.DataFrame()
+
     complete_raw, quality = _filter_complete_holdings(raw, industry_map=industry_map)
+    if no_prices:
+        print("[INFO] 跳過個股收盤價補值：收盤價欄保留 0，避免逐檔訪問 Yahoo。")
     latest = standardize_latest(complete_raw, industry_map=industry_map, with_prices=not no_prices)
     merged = merge_with_history(latest, output_path, keep_days=keep_days)
 
@@ -170,6 +191,9 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         "raw_rows": 0 if raw is None else int(len(raw)),
         "complete_rows": int(len(latest)) if latest is not None else 0,
         "history_rows": int(len(merged)) if merged is not None else 0,
+        "source_mode": "official_first_then_fallback",
+        "official_source_report": [] if official_report is None or official_report.empty else official_report.to_dict(orient="records"),
+        "price_mode": "skipped" if no_prices else "fetched",
         "complete_etfs": [] if latest is None or latest.empty else sorted(latest["ETF代號"].dropna().astype(str).unique().tolist()),
         "quality": [] if quality is None or quality.empty else quality.to_dict(orient="records"),
     }
@@ -187,9 +211,9 @@ def main() -> int:
     ap.add_argument("--report", default=os.environ.get("ACTIVE_ETF_REPORT_PATH", "data/active_etf_etl_report.json"))
     ap.add_argument("--top-n", type=int, default=int(os.environ.get("ACTIVE_ETF_TOP_N", ACTIVE_ETF_TOP_N)))
     ap.add_argument("--keep-days", type=int, default=int(os.environ.get("ACTIVE_ETF_KEEP_DAYS", HOLDINGS_KEEP_DAYS)))
-    ap.add_argument("--no-prices", action="store_true", help="不抓個股收盤價，只更新持股與權重")
+    ap.add_argument("--with-prices", action="store_true", help="補抓個股收盤價；預設關閉，避免逐檔訪問 Yahoo")
     args = ap.parse_args()
-    return run_etl(args.output, args.report, args.top_n, args.keep_days, no_prices=args.no_prices)
+    return run_etl(args.output, args.report, args.top_n, args.keep_days, no_prices=not args.with_prices)
 
 
 if __name__ == "__main__":

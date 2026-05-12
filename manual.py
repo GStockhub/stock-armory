@@ -220,7 +220,21 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
-### 🔥 v37.8（主動 ETF 自動 ETL ✕ ETFedge-lite 資料層版）- 本次改版
+### 🔥 v37.9（主動 ETF 官方公告追蹤 ✕ 投信官網 PCF 優先版）- 本次改版
+
+* **【官方公告優先】** 新增 `active_etf_official_sources.py`，優先追蹤投信官網每日揭露的 PCF / 投資組合明細，不再把第三方頁面當主來源。
+* **【來源適配器】** 已先接入統一投信 ezmoney（00981A / 00403A / 00988A）與群益投信 buyback（00982A / 00992A / 00997A），野村 PCF 入口列為官方候選，成功解析才採用。
+* **【資料完整度防呆】** 每檔 ETF 仍需持股數 ≥10 且權重合計 ≥20% 才寫入 history，避免半套資料污染經理人風向。
+* **【ETL 報告升級】** `data/active_etf_etl_report.json` 會列出官方來源每檔抓到幾筆、權重合計與失敗原因。
+* **【Streamlit 降負載】** ETF 區優先讀 `data/active_etf_holdings_history.csv`，有 GitHub Actions 產物就不在開頁時即時爬網站。
+
+### 🛠 v37.8.1（主動 ETF ETL 降噪修正版）
+
+* **【停止逐檔抓價】** `active_etf_etl.py` 預設不再補抓每個成分股收盤價，避免 GitHub Actions / Streamlit log 被 Yahoo 逐檔 404 洗版。
+* **【價格改選配】** 若未來真的要補 `收盤價`，需手動指定 `--with-prices`；平常主動 ETF 經理人風向只用持股、權重與股數即可。
+* **【Yahoo log 靜音】** `price_provider.py` 對 yfinance 404 / delisted 訊息降噪，不再讓非致命錯誤淹沒部署紀錄。
+
+### 🔥 v37.8（主動 ETF 自動 ETL ✕ ETFedge-lite 資料層版）
 
 * **【自動資料管線】** 新增 `active_etf_etl.py`，把主動 ETF 持股抓取、完整度檢查、歷史合併從 Streamlit 主程式拆出去。
 * **【GitHub Actions 每日更新】** 新增 `.github/workflows/update_active_etf_holdings.yml`，台灣時間晚間自動更新 `data/active_etf_holdings_history.csv` 與 `data/active_etf_etl_report.json`。

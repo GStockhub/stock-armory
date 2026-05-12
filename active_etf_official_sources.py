@@ -1,0 +1,398 @@
+"""active_etf_official_sources.py
+
+V37.9 主動 ETF 官方持股公告來源層
+----------------------------------
+目的：
+- 優先追蹤投信官網每日揭露的 PCF / 投資組合明細。
+- 將各投信不同格式統一成 active_etf_holdings_history.csv 欄位。
+- 只在 ETL / GitHub Actions 使用；Streamlit 主畫面不需要每次即時爬官方站。
+
+設計：
+- 每檔 ETF 可設定多個官方 URL。
+- 解析器採「表格優先、文字序列備援」。
+- 只接受 >=10 檔、權重合計 >=20% 的完整快照，避免假資料污染歷史。
+"""
+
+from __future__ import annotations
+
+import html as html_lib
+import io
+import re
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, Iterable, List, Optional, Tuple
+
+import pandas as pd
+import requests
+
+try:
+    from bs4 import BeautifulSoup
+except Exception:  # bs4 若不可用，仍可退回簡易 HTML strip
+    BeautifulSoup = None
+
+
+@dataclass(frozen=True)
+class OfficialSource:
+    etf_code: str
+    issuer: str
+    url: str
+    note: str = ""
+
+
+# 已確認能從公開搜尋結果看到 PCF / 投資組合內容的官方頁。
+# 其他投信先保留 generic/fallback，不在這裡硬塞未知 URL，避免抓錯基金。
+OFFICIAL_SOURCE_REGISTRY: Dict[str, List[OfficialSource]] = {
+    # 統一投信 ezmoney：Info 是投資組合頁，PCF 是申購買回清單。兩者都試。
+    "00981A": [
+        OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW", "基金投資組合"),
+        OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=49YTW", "PCF"),
+    ],
+    "00403A": [
+        OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=63YTW", "基金投資組合"),
+        OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=63YTW", "PCF"),
+    ],
+    "00988A": [
+        OfficialSource("00988A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=61YTW", "基金投資組合"),
+        OfficialSource("00988A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=61YTW", "PCF"),
+    ],
+    # 群益投信：官方 product/detail/{id}/buyback 頁面直接列 PCF 股票、權重、股數。
+    "00982A": [OfficialSource("00982A", "群益投信", "https://www.capitalfund.com.tw/etf/product/detail/399/buyback", "PCF")],
+    "00992A": [OfficialSource("00992A", "群益投信", "https://www.capitalfund.com.tw/etf/product/detail/500/buyback", "PCF")],
+    "00997A": [OfficialSource("00997A", "群益投信", "https://www.capitalfund.com.tw/etf/product/detail/502/buyback", "PCF")],
+    # 野村投信 PCF 入口目前為動態頁；先作為官方候選，解析成功才採用。
+    "00980A": [OfficialSource("00980A", "野村投信", "https://www.nomurafunds.com.tw/ETFWEB/pcf", "PCF入口")],
+    "00999A": [OfficialSource("00999A", "野村投信", "https://www.nomurafunds.com.tw/ETFWEB/pcf", "PCF入口")],
+}
+
+OUTPUT_COLUMNS = ["日期", "ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "持有股數", "來源"]
+
+
+def _session() -> requests.Session:
+    s = requests.Session()
+    s.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    })
+    return s
+
+
+def _fetch_html(url: str, timeout: int = 25) -> str:
+    try:
+        resp = _session().get(url, timeout=timeout, verify=False)
+        resp.raise_for_status()
+        text = resp.text or ""
+        return text if len(text) >= 80 else ""
+    except Exception:
+        return ""
+
+
+def _clean_code(v) -> str:
+    s = str(v or "").strip().upper()
+    s = re.sub(r"[^0-9A-Z]", "", s)
+    return s
+
+
+def _to_float(v, default=0.0) -> float:
+    try:
+        if pd.isna(v):
+            return default
+        s = str(v).replace("％", "%").replace("%", "").replace(",", "").strip()
+        m = re.search(r"-?\d+\.?\d*", s)
+        return float(m.group(0)) if m else default
+    except Exception:
+        return default
+
+
+def _parse_date(text: str) -> pd.Timestamp:
+    today = pd.Timestamp(datetime.now().date())
+    if not text:
+        return today
+    dates: List[pd.Timestamp] = []
+    for y, m, d in re.findall(r"(?<!\d)(\d{3,4})[./\-年](\d{1,2})[./\-月](\d{1,2})", text):
+        try:
+            yi = int(y)
+            if 100 <= yi < 200:  # 民國年
+                yi += 1911
+            ts = pd.Timestamp(f"{yi:04d}-{int(m):02d}-{int(d):02d}")
+            if pd.Timestamp("2020-01-01") <= ts <= today + pd.Timedelta(days=5):
+                dates.append(ts)
+        except Exception:
+            continue
+    return max(dates) if dates else today
+
+
+def _text_from_html(html_text: str) -> str:
+    if not html_text:
+        return ""
+    if BeautifulSoup is not None:
+        try:
+            soup = BeautifulSoup(html_text, "html.parser")
+            for tag in soup(["script", "style", "noscript"]):
+                tag.decompose()
+            text = soup.get_text("\n")
+        except Exception:
+            text = html_text
+    else:
+        text = re.sub(r"<script[\s\S]*?</script>", " ", html_text, flags=re.I)
+        text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)
+        text = re.sub(r"<[^>]+>", "\n", text)
+    text = html_lib.unescape(text)
+    text = re.sub(r"[\t\r\f\v]+", " ", text)
+    text = re.sub(r"\n{2,}", "\n", text)
+    return text
+
+
+def _norm_col(c: object) -> str:
+    return str(c).replace("\ufeff", "").replace("\n", "").strip()
+
+
+def _pick_col(cols: Iterable[str], keys: List[str], exclude: Optional[List[str]] = None) -> Optional[str]:
+    exclude = exclude or []
+    cols = [_norm_col(c) for c in cols]
+    for c in cols:
+        if any(x in c for x in exclude):
+            continue
+        if c in keys:
+            return c
+    for c in cols:
+        if any(x in c for x in exclude):
+            continue
+        if any(k in c for k in keys):
+            return c
+    return None
+
+
+def _standardize_table(raw: pd.DataFrame, etf_code: str, etf_name: str, date: pd.Timestamp, source_url: str) -> pd.DataFrame:
+    if raw is None or raw.empty:
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    df = raw.copy()
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = ["".join([str(x) for x in tup if str(x) != "nan"]) for tup in df.columns]
+    df.columns = [_norm_col(c) for c in df.columns]
+    code_col = _pick_col(df.columns, ["股票代號", "證券代號", "成分股代號", "代號", "股票代碼", "Code"])
+    name_col = _pick_col(df.columns, ["股票名稱", "證券名稱", "成分股名稱", "名稱", "Name"])
+    weight_col = _pick_col(df.columns, ["持股權重(%)", "持股權重", "權重", "比重", "比例", "Weight"])
+    share_col = _pick_col(df.columns, ["股數", "持有股數", "持股股數", "持股數", "Shares"])
+    if code_col is None or name_col is None or (weight_col is None and share_col is None):
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    out = pd.DataFrame({
+        "日期": date,
+        "ETF代號": _clean_code(etf_code),
+        "ETF名稱": etf_name or etf_code,
+        "成分股代號": df[code_col].map(_clean_code),
+        "成分股名稱": df[name_col].astype(str).str.strip(),
+        "權重": df[weight_col].map(_to_float) if weight_col else 0.0,
+        "持有股數": df[share_col].map(_to_float) if share_col else 0.0,
+        "來源": source_url,
+    })
+    return _clean_rows(out, etf_code)
+
+
+def _tokenize(text: str) -> List[str]:
+    # 先拿掉日期，避免 2026/05/12 被拆成 2026 這種假股票代碼。
+    text = re.sub(r"(?<!\d)\d{3,4}[./\-年]\d{1,2}[./\-月]\d{1,2}(?:日)?", " ", text)
+    text = re.sub(r"([0-9]+(?:,[0-9]{3})+(?:\.\d+)?|\d+\.\d+%?|\d+%?)", r" \1 ", text)
+    # 不移除 ASCII comma，保留 1,728,000 這類股數。
+    text = re.sub(r"[｜|()（）【】\[\]{};；，]", " ", text)
+    return [t.strip() for t in re.split(r"\s+", text) if t.strip()]
+
+
+def _looks_number(tok: str) -> bool:
+    return bool(re.fullmatch(r"-?\d+(?:,\d{3})*(?:\.\d+)?%?", str(tok).strip()))
+
+
+def _is_stock_code(tok: str, etf_code: str) -> bool:
+    s = _clean_code(tok)
+    if not s or s == _clean_code(etf_code):
+        return False
+    # 目前主力是台股主動 ETF，官方 PCF 台股持股多為 4 碼；允許 ETF/特別股 4碼+字母。
+    return bool(re.fullmatch(r"\d{4}[A-Z]?", s))
+
+
+def _parse_text_rows(html_text: str, etf_code: str, etf_name: str, source_url: str) -> pd.DataFrame:
+    text = _text_from_html(html_text)
+    if not text:
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    date = _parse_date(text)
+    # 優先從股票/投資組合區塊開始，降低抓到頁首基金清單的機率。
+    anchors = ["股票代號", "基金投資組合", "投資組合", "股票"]
+    start = min([text.find(a) for a in anchors if text.find(a) >= 0] or [0])
+    tail = text[start:start + 40000]
+    # 避免附買回債券、其他資產、備註被吃進來。
+    stop_pos = len(tail)
+    for stop in ["附買回債券", "其他資產", "備註", "買回總價金", "基金經理公司"]:
+        p = tail.find(stop)
+        if p > 0:
+            stop_pos = min(stop_pos, p)
+    segment = tail[:stop_pos]
+    tokens = _tokenize(segment)
+    rows = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if not _is_stock_code(tok, etf_code):
+            i += 1
+            continue
+        code = _clean_code(tok)
+        j = i + 1
+        name_parts = []
+        # 名稱可能有 *、英文縮寫；收集到第一個數字為止。
+        while j < len(tokens) and not _is_stock_code(tokens[j], etf_code):
+            if _looks_number(tokens[j]):
+                # 例如「元大台灣50 10,871,000 1.46%」：50 是名稱的一部分，不是權重。
+                if (name_parts and "%" not in tokens[j] and _to_float(tokens[j]) <= 100
+                        and j + 1 < len(tokens) and _looks_number(tokens[j + 1]) and _to_float(tokens[j + 1]) > 100):
+                    name_parts.append(tokens[j])
+                    j += 1
+                    continue
+                break
+            name_parts.append(tokens[j])
+            j += 1
+        nums = []
+        k = j
+        while k < len(tokens) and len(nums) < 2:
+            if _looks_number(tokens[k]):
+                nums.append(tokens[k])
+                k += 1
+                continue
+            break
+        if not name_parts or not nums:
+            i += 1
+            continue
+        name = "".join(name_parts).strip()
+        vals = [_to_float(x) for x in nums]
+        weight = 0.0
+        shares = 0.0
+        # 常見兩種：code name weight shares（群益），或 code name shares weight（統一投資組合）。
+        if len(vals) >= 2:
+            a, b = vals[0], vals[1]
+            if a <= 100 and ("%" in nums[0] or b > 100):
+                weight, shares = a, b
+            elif b <= 100:
+                shares, weight = a, b
+            elif a <= 100:
+                weight = a
+            else:
+                shares = a
+        elif vals[0] <= 100:
+            weight = vals[0]
+        else:
+            shares = vals[0]
+        if weight <= 0 or weight > 100:
+            i += 1
+            continue
+        rows.append({
+            "日期": date,
+            "ETF代號": _clean_code(etf_code),
+            "ETF名稱": etf_name or etf_code,
+            "成分股代號": code,
+            "成分股名稱": name,
+            "權重": weight,
+            "持有股數": shares,
+            "來源": source_url,
+        })
+        i = max(k, i + 1)
+    out = pd.DataFrame(rows, columns=OUTPUT_COLUMNS)
+    return _clean_rows(out, etf_code)
+
+
+def _clean_rows(df: pd.DataFrame, etf_code: str) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    out = df.copy()
+    for c in OUTPUT_COLUMNS:
+        if c not in out.columns:
+            out[c] = 0 if c in ["權重", "持有股數"] else ""
+    out["成分股代號"] = out["成分股代號"].map(_clean_code)
+    out["ETF代號"] = out["ETF代號"].map(_clean_code)
+    out["權重"] = pd.to_numeric(out["權重"], errors="coerce").fillna(0.0)
+    out["持有股數"] = pd.to_numeric(out["持有股數"], errors="coerce").fillna(0.0)
+    bad_name = out["成分股名稱"].astype(str).str.contains("合計|小計|現金|期貨|備註|申購|買回|債券|保證金|應收|應付|基金淨資產|ETF首頁", na=False)
+    out = out[~bad_name]
+    out = out[(out["成分股代號"] != "") & (out["成分股代號"] != _clean_code(etf_code)) & (out["權重"] > 0)]
+    if out.empty:
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    # 同頁常有桌機/手機兩份重複資料；同一代號保留股數較完整的一筆。
+    out["_rank"] = out["持有股數"].fillna(0)
+    out = out.sort_values(["成分股代號", "_rank"], ascending=[True, False]).drop_duplicates("成分股代號", keep="first")
+    out = out.drop(columns=["_rank"], errors="ignore")
+    return out[OUTPUT_COLUMNS].reset_index(drop=True)
+
+
+def parse_official_holdings_html(html_text: str, etf_code: str, etf_name: str, source_url: str) -> pd.DataFrame:
+    if not html_text:
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    text = _text_from_html(html_text)
+    date = _parse_date(text)
+    best = pd.DataFrame(columns=OUTPUT_COLUMNS)
+    # 1) 先試真正 HTML table。
+    try:
+        tables = pd.read_html(io.StringIO(html_text))
+    except Exception:
+        tables = []
+    for t in tables:
+        std = _standardize_table(t, etf_code, etf_name, date, source_url)
+        if len(std) > len(best):
+            best = std
+    # 2) 官方頁常是 div/span 排版，不一定有 table；用文字序列解析。
+    txt_df = _parse_text_rows(html_text, etf_code, etf_name, source_url)
+    if len(txt_df) > len(best):
+        best = txt_df
+    return best
+
+
+def source_quality(df: pd.DataFrame, min_rows: int = 10, min_weight_sum: float = 20.0) -> Tuple[bool, str, int, float]:
+    if df is None or df.empty:
+        return False, "empty", 0, 0.0
+    cnt = int(df["成分股代號"].nunique()) if "成分股代號" in df.columns else int(len(df))
+    wsum = float(pd.to_numeric(df.get("權重", 0), errors="coerce").fillna(0).sum())
+    reasons = []
+    if cnt < min_rows:
+        reasons.append(f"持股數<{min_rows}")
+    if wsum < min_weight_sum:
+        reasons.append(f"權重合計<{min_weight_sum:.0f}%")
+    ok = not reasons
+    return ok, "可用" if ok else "、".join(reasons), cnt, wsum
+
+
+def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.DataFrame, List[Dict[str, object]]]:
+    code = _clean_code(etf_code)
+    sources = OFFICIAL_SOURCE_REGISTRY.get(code, [])
+    reports: List[Dict[str, object]] = []
+    best = pd.DataFrame(columns=OUTPUT_COLUMNS)
+    for src in sources:
+        html_text = _fetch_html(src.url)
+        df = parse_official_holdings_html(html_text, code, etf_name or code, src.url)
+        ok, reason, cnt, wsum = source_quality(df)
+        reports.append({
+            "ETF代號": code,
+            "ETF名稱": etf_name or code,
+            "投信": src.issuer,
+            "來源": src.url,
+            "類型": src.note,
+            "抓到筆數": cnt,
+            "權重合計": round(wsum, 4),
+            "狀態": "✅ 官方完整" if ok else f"⚠️ {reason}",
+        })
+        if len(df) > len(best):
+            best = df
+        if ok:
+            return df, reports
+        time.sleep(0.4)
+    return best, reports
+
+
+def fetch_official_holdings_auto(candidates: Tuple[Tuple[str, str], ...]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    frames = []
+    all_reports: List[Dict[str, object]] = []
+    for code, name in candidates:
+        df, reports = fetch_official_holding_one(code, name)
+        all_reports.extend(reports)
+        ok, _, _, _ = source_quality(df)
+        if ok:
+            frames.append(df)
+    out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=OUTPUT_COLUMNS)
+    report = pd.DataFrame(all_reports)
+    return out, report

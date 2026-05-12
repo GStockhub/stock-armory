@@ -1,5 +1,6 @@
 import html
 import math
+import os
 
 import pandas as pd
 import streamlit as st
@@ -443,6 +444,15 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
 
     holdings = load_active_etf_holdings(etf_holdings_url) if etf_holdings_url else pd.DataFrame()
     auto_note = ""
+
+    # V37.9：優先讀 GitHub Actions 產出的本機 history CSV，避免每次開 Streamlit 都即時爬官方/第三方網站。
+    if holdings.empty and os.path.exists("data/active_etf_holdings_history.csv"):
+        try:
+            holdings = load_active_etf_holdings("data/active_etf_holdings_history.csv")
+            if not holdings.empty:
+                auto_note = "已使用 GitHub Actions / 官方公告 ETL 產出的本機歷史快照。"
+        except Exception:
+            holdings = pd.DataFrame()
     history_status = None
     if holdings.empty:
         manager_radar = active_pool if isinstance(active_pool, pd.DataFrame) and not active_pool.empty else radar
@@ -457,7 +467,8 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
     else:
         summary = summarize_active_etf_holdings(holdings, industry_map, name_map, top_n=10, lookback_days=20)
         history_status = get_history_status(holdings, lookback_days=20)
-        auto_note = "已使用側邊欄 CSV 備援資料。"
+        if not auto_note:
+            auto_note = "已使用側邊欄 CSV 備援資料。"
 
     if holdings.empty or summary is None or summary.get("snapshot", pd.DataFrame()).empty:
         st.info(f"{auto_note or '自動持股來源目前抓不到資料。'} ETF 動能排行仍可正常使用；若要啟用經理人風向，請使用側邊欄 CSV 備援。")

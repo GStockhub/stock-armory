@@ -39,6 +39,12 @@ from github_history_store import (
 )
 
 try:
+    from active_etf_official_sources import fetch_official_holding_one, source_quality
+except Exception:
+    fetch_official_holding_one = None
+    source_quality = None
+
+try:
     import streamlit as st
 except Exception:  # 允許單元測試或命令列環境不載入 Streamlit
     st = None
@@ -420,6 +426,21 @@ def fetch_active_etf_holding_one(
     """嘗試自動抓取單檔主動 ETF 持股。抓不到就回空表。"""
     code = _clean_code(etf_code)
     name = etf_name or DEFAULT_ACTIVE_ETFS.get(code, {}).get("名稱", code)
+
+    # V37.9：官方公告優先。這裡只作為前端 fallback；正式每日更新仍建議由 GitHub Actions ETL 跑。
+    if fetch_official_holding_one is not None:
+        try:
+            official_df, _official_report = fetch_official_holding_one(code, name)
+            ok = False
+            if source_quality is not None:
+                ok = bool(source_quality(official_df)[0])
+            elif official_df is not None and not official_df.empty:
+                ok = True
+            if ok:
+                return official_df
+        except Exception:
+            pass
+
     for url in _source_urls_for(code, custom_sources):
         html_text = _fetch_html(url)
         best = pd.DataFrame()

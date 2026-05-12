@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import os
 import re
+import io
+import contextlib
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
@@ -133,7 +135,9 @@ def fetch_yfinance_price(sid: str, period: str = "60d", min_bars: int = 20) -> p
     for suffix in [".TW", ".TWO"]:
         try:
             ticker = f"{sid}{suffix}"
-            raw = yf.download(ticker, period=period, threads=False, progress=False, auto_adjust=False)
+            # yfinance 會把 404 / delisted 訊息直接吐到 stderr；這裡靜音，避免 Streamlit log 被逐檔洗版。
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                raw = yf.download(ticker, period=period, threads=False, progress=False, auto_adjust=False)
             df = normalize_price_df(raw, source=f"Yahoo{suffix}", min_bars=min_bars)
             if validate_price_df(df, min_bars=min_bars):
                 return df
