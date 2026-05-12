@@ -45,13 +45,31 @@ except Exception:  # 允許單元測試或命令列環境不載入 Streamlit
 
 
 DEFAULT_ACTIVE_ETFS: Dict[str, Dict[str, str]] = {
-    "00400A": {"名稱": "主動國泰動能高息"},
-    "00981A": {"名稱": "主動統一台股增長"},
-    "00982A": {"名稱": "主動群益台灣強棒"},
-    "00980A": {"名稱": "主動野村臺灣優選"},
-    "00983A": {"名稱": "主動中信ARK創新"},
-    "00992A": {"名稱": "主動群益科技創新"},
-    "00999A": {"名稱": "主動復華未來50"},
+    # V37.4.1：依主動式 ETF 清單擴充，不再只追蹤少數幾檔。
+    # key 順序以目前規模/熱門度概念排列；動能表若有資料仍會優先重排。
+    "00981A": {"名稱": "主動統一台股增長", "投信": "統一投信"},
+    "00403A": {"名稱": "主動統一升級50", "投信": "統一投信"},
+    "00992A": {"名稱": "主動群益科技創新", "投信": "群益投信"},
+    "00982A": {"名稱": "主動群益台灣強棒", "投信": "群益投信"},
+    "00991A": {"名稱": "主動復華未來50", "投信": "復華投信"},
+    "00988A": {"名稱": "主動統一全球創新", "投信": "統一投信"},
+    "00990A": {"名稱": "主動元大AI新經濟", "投信": "元大投信"},
+    "00400A": {"名稱": "主動國泰動能高息", "投信": "國泰投信"},
+    "00980A": {"名稱": "主動野村臺灣優選", "投信": "野村投信"},
+    "00999A": {"名稱": "主動野村臺灣高息", "投信": "野村投信"},
+    "00997A": {"名稱": "主動群益美國增長", "投信": "群益投信"},
+    "00993A": {"名稱": "主動安聯台灣", "投信": "安聯投信"},
+    "00985A": {"名稱": "主動野村台灣50", "投信": "野村投信"},
+    "00984A": {"名稱": "主動安聯台灣高息", "投信": "安聯投信"},
+    "00994A": {"名稱": "主動第一金台股優", "投信": "第一金投信"},
+    "00995A": {"名稱": "主動中信台灣卓越", "投信": "中信投信"},
+    "00996A": {"名稱": "主動兆豐台灣豐收", "投信": "兆豐投信"},
+    "00401A": {"名稱": "主動摩根台灣鑫收", "投信": "摩根投信"},
+    "00987A": {"名稱": "主動台新優勢成長", "投信": "台新投信"},
+    "00998A": {"名稱": "主動復華金融股息", "投信": "復華投信"},
+    "00983A": {"名稱": "主動中信ARK創新", "投信": "中信投信"},
+    "00989A": {"名稱": "主動摩根美國科技", "投信": "摩根投信"},
+    "00986A": {"名稱": "主動台新龍頭成長", "投信": "台新投信"},
 }
 
 # Generic sources. 這些網頁格式可能變動，所以 fetch 會自動 fail-soft。
@@ -64,6 +82,18 @@ CACHE_FILE = "active_etf_holdings_history.csv"
 ALT_CACHE_FILE = "/tmp/active_etf_holdings_history.csv"
 SESSION_HISTORY_KEY = "_active_etf_holdings_history_df"
 GITHUB_DIAG_KEY = "_active_etf_github_diag"
+
+# V37.5 主動 ETF 經理人風向 V3
+# - 明細快照保留 60 天
+# - 主畫面判讀 20 天
+# - 事件表看近 30 天
+# - 股數變化優先；沒有股數時退回權重變化
+HOLDINGS_KEEP_DAYS = 60
+MAIN_LOOKBACK_DAYS = 20
+EVENT_LOOKBACK_DAYS = 30
+ACTIVE_ETF_TOP_N = 10
+SIGNIFICANT_SHARE_RATIO = 0.03
+SIGNIFICANT_WEIGHT_PP = 0.3
 
 
 # -----------------------------
@@ -139,7 +169,7 @@ def _name_reverse_map(name_map: Dict[str, str]) -> Dict[str, str]:
 # ETF 名單與自動來源
 # -----------------------------
 
-def get_active_etf_candidates(momentum_df: Optional[pd.DataFrame] = None, top_n: int = 10) -> List[Dict[str, str]]:
+def get_active_etf_candidates(momentum_df: Optional[pd.DataFrame] = None, top_n: int = 30) -> List[Dict[str, str]]:
     """主動 ETF 觀察清單。
 
     V37.4：不再只看 ETF 綜合動能 Top 10 內出現的主動 ETF。
@@ -170,7 +200,7 @@ def get_active_etf_candidates(momentum_df: Optional[pd.DataFrame] = None, top_n:
         if code not in seen:
             seen.add(code)
             out.append(r)
-    return out[:max(1, int(top_n))]
+    return out[:min(len(out), max(1, int(top_n)))]
 
 
 def _source_urls_for(code: str, custom_sources: Optional[Dict[str, str]] = None) -> List[str]:
@@ -484,12 +514,69 @@ def _industry_of(code: str, industry_map: Dict[str, str]) -> str:
     return (industry_map or {}).get(str(code).strip(), "未分類")
 
 
+def _to_ts(x):
+    try:
+        return pd.Timestamp(x)
+    except Exception:
+        return pd.NaT
+
+
+def _weighted_hot_candidates(
+    latest_df: pd.DataFrame,
+    momentum_df: Optional[pd.DataFrame],
+    top_n: int = ACTIVE_ETF_TOP_N,
+) -> pd.DataFrame:
+    """每週熱門主動 ETF Top N。
+
+    先用最新持股快照裡真的有資料的 ETF，再用：
+    - 規模 / 權重合計概念 50%
+    - 動能分數 30%
+    - 新上市關注 20%
+    做排序。若缺欄位，會自動退回持股數與內建順序。
+    """
+    if latest_df is None or latest_df.empty:
+        return pd.DataFrame()
+
+    rank = latest_df.groupby(["ETF代號", "ETF名稱"], dropna=False).agg(
+        權重合計=("權重", "sum"),
+        持股數=("成分股代號", "count"),
+    ).reset_index()
+
+    # 動能表只拿來加分 / 排序，不再限制候選池。
+    if momentum_df is not None and not momentum_df.empty and "代號" in momentum_df.columns:
+        mom = momentum_df.copy()
+        mom["ETF代號"] = mom["代號"].map(_clean_code)
+        if "動能分數" in mom.columns:
+            mom["動能分數"] = pd.to_numeric(mom["動能分數"], errors="coerce").fillna(0)
+        else:
+            mom["動能分數"] = 0
+        rank = pd.merge(rank, mom[["ETF代號", "動能分數"]].drop_duplicates("ETF代號"), on="ETF代號", how="left")
+    else:
+        rank["動能分數"] = 0
+
+    rank["動能分數"] = pd.to_numeric(rank["動能分數"], errors="coerce").fillna(0)
+    rank["_規模分"] = pd.to_numeric(rank["權重合計"], errors="coerce").fillna(0).rank(pct=True)
+    rank["_動能分"] = rank["動能分數"].rank(pct=True)
+
+    # 新 ETF / 近期熱門 ETF 若沒有足夠動能資料，也不能完全被吃掉：用內建清單前段給一點關注分。
+    order = {code: i for i, code in enumerate(DEFAULT_ACTIVE_ETFS.keys())}
+    rank["_內建序"] = rank["ETF代號"].map(order).fillna(len(order) + 99)
+    rank["_新關注"] = (1 - (rank["_內建序"] / max(1, len(order)))).clip(lower=0, upper=1)
+
+    rank["熱門分數"] = rank["_規模分"] * 50 + rank["_動能分"] * 30 + rank["_新關注"] * 20
+    rank = rank.sort_values(["熱門分數", "權重合計", "持股數"], ascending=[False, False, False]).head(int(top_n)).copy()
+    rank["熱門名次"] = range(1, len(rank) + 1)
+    return rank
+
+
 def summarize_holdings(
     holdings_df: pd.DataFrame,
     industry_map: Dict[str, str],
     name_map: Dict[str, str],
-    top_n: int = 5,
-    lookback_days: int = 5,
+    top_n: int = ACTIVE_ETF_TOP_N,
+    lookback_days: int = MAIN_LOOKBACK_DAYS,
+    momentum_df: Optional[pd.DataFrame] = None,
+    event_days: int = EVENT_LOOKBACK_DAYS,
 ) -> Dict[str, pd.DataFrame]:
     empty = {
         "snapshot": pd.DataFrame(),
@@ -501,6 +588,8 @@ def summarize_holdings(
         "daily_events": pd.DataFrame(),
         "shared_actions": pd.DataFrame(),
         "manager_profiles": pd.DataFrame(),
+        "hot_etfs": pd.DataFrame(),
+        "meta": pd.DataFrame(),
     }
     if holdings_df is None or holdings_df.empty:
         return empty
@@ -508,6 +597,9 @@ def summarize_holdings(
     df = holdings_df.copy()
     df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
     df["權重"] = df["權重"].map(_to_float)
+    if "持有股數" not in df.columns:
+        df["持有股數"] = 0
+    df["持有股數"] = df["持有股數"].map(_to_float)
     df = df.dropna(subset=["日期"])
     if df.empty:
         return empty
@@ -517,12 +609,8 @@ def summarize_holdings(
     if latest_df.empty:
         return empty
 
-    # 如果最新日 ETF 數 > top_n，用總權重較高者或資料列較多者做 focus。
-    etf_rank = latest_df.groupby(["ETF代號", "ETF名稱"], dropna=False).agg(
-        權重合計=("權重", "sum"),
-        持股數=("成分股代號", "count"),
-    ).reset_index().sort_values(["權重合計", "持股數"], ascending=[False, False]).head(top_n)
-    focus = etf_rank["ETF代號"].astype(str).tolist()
+    hot_etfs = _weighted_hot_candidates(latest_df, momentum_df, top_n=top_n)
+    focus = hot_etfs["ETF代號"].astype(str).tolist() if not hot_etfs.empty else latest_df["ETF代號"].astype(str).drop_duplicates().head(top_n).tolist()
 
     latest_focus = latest_df[latest_df["ETF代號"].isin(focus)].copy()
     latest_focus["產業"] = latest_focus["成分股代號"].map(lambda x: _industry_of(x, industry_map))
@@ -538,6 +626,7 @@ def summarize_holdings(
         snap_rows.append({
             "ETF": etf_code,
             "名稱": etf_name,
+            "熱門名次": int(hot_etfs.loc[hot_etfs["ETF代號"].astype(str).eq(str(etf_code)), "熱門名次"].iloc[0]) if not hot_etfs.empty and hot_etfs["ETF代號"].astype(str).eq(str(etf_code)).any() else "-",
             "前十大產業": "、".join([f"{k} {v:.1f}%" for k, v in ind_top.items()]),
             "前十大個股": "、".join([f"{r['成分股名稱']}({r['成分股代號']}) {r['權重']:.1f}%" for _, r in stock_top.iterrows()]),
             "持股數": len(sub),
@@ -546,7 +635,7 @@ def summarize_holdings(
     snapshot = pd.DataFrame(snap_rows)
 
     industries = latest_focus.groupby(["ETF代號", "產業"], dropna=False)["權重"].sum().reset_index().sort_values(["ETF代號", "權重"], ascending=[True, False])
-    stocks = latest_focus[["ETF代號", "成分股代號", "成分股名稱", "產業", "權重"]].sort_values(["ETF代號", "權重"], ascending=[True, False])
+    stocks = latest_focus[["ETF代號", "成分股代號", "成分股名稱", "產業", "權重", "持有股數"]].sort_values(["ETF代號", "權重"], ascending=[True, False])
 
     profile_rows = []
     for etf_code, sub in latest_focus.groupby("ETF代號"):
@@ -581,22 +670,48 @@ def summarize_holdings(
         old_df = df[(df["日期"] == prev_day) & (df["ETF代號"].isin(focus))].copy()
         if new_df.empty and old_df.empty:
             return pd.DataFrame()
-        new_key = new_df[["ETF代號", "成分股代號", "成分股名稱", "權重"]].copy() if not new_df.empty else pd.DataFrame(columns=["ETF代號", "成分股代號", "成分股名稱", "權重"])
-        old_key = old_df[["ETF代號", "成分股代號", "權重"]].copy() if not old_df.empty else pd.DataFrame(columns=["ETF代號", "成分股代號", "權重"])
+
+        new_cols = ["ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "持有股數"]
+        old_cols = ["ETF代號", "成分股代號", "權重", "持有股數"]
+        new_key = new_df[[c for c in new_cols if c in new_df.columns]].copy() if not new_df.empty else pd.DataFrame(columns=new_cols)
+        old_key = old_df[[c for c in old_cols if c in old_df.columns]].copy() if not old_df.empty else pd.DataFrame(columns=old_cols)
+
         merged = pd.merge(new_key, old_key, on=["ETF代號", "成分股代號"], how="outer", suffixes=("_新", "_舊"))
-        merged["權重_新"] = merged["權重_新"].fillna(0).map(_to_float)
-        merged["權重_舊"] = merged["權重_舊"].fillna(0).map(_to_float)
+        for c in ["權重_新", "權重_舊", "持有股數_新", "持有股數_舊"]:
+            if c not in merged.columns:
+                merged[c] = 0
+            merged[c] = merged[c].fillna(0).map(_to_float)
+
         merged["變化"] = merged["權重_新"] - merged["權重_舊"]
+        merged["股數變化"] = merged["持有股數_新"] - merged["持有股數_舊"]
+        merged["股數變化率"] = np.where(merged["持有股數_舊"] > 0, merged["股數變化"] / merged["持有股數_舊"], np.nan)
+        merged["最大權重"] = merged[["權重_新", "權重_舊"]].max(axis=1)
+
+        has_share_data = (merged["持有股數_新"].abs().sum() + merged["持有股數_舊"].abs().sum()) > 0
+        if has_share_data:
+            significant = (
+                ((merged["股數變化率"].abs() >= SIGNIFICANT_SHARE_RATIO) | ((merged["持有股數_舊"] == 0) & (merged["持有股數_新"] > 0)) | ((merged["持有股數_舊"] > 0) & (merged["持有股數_新"] == 0)))
+                & (merged["最大權重"] >= SIGNIFICANT_WEIGHT_PP)
+            )
+            mode = "股數變化"
+        else:
+            significant = (merged["變化"].abs() >= SIGNIFICANT_WEIGHT_PP) & (merged["最大權重"] >= SIGNIFICANT_WEIGHT_PP)
+            mode = "權重變化"
+
         merged["狀態"] = np.where((merged["權重_舊"] == 0) & (merged["權重_新"] > 0), "新增",
                               np.where((merged["權重_舊"] > 0) & (merged["權重_新"] == 0), "刪除",
-                              np.where(merged["變化"] > 0, "加碼", np.where(merged["變化"] < 0, "減碼", "持平"))))
-        merged = merged[merged["狀態"].isin(["新增", "刪除", "加碼", "減碼"])].copy()
+                              np.where(merged["股數變化"] > 0 if has_share_data else merged["變化"] > 0, "加碼",
+                              np.where(merged["股數變化"] < 0 if has_share_data else merged["變化"] < 0, "減碼", "持平"))))
+
+        merged = merged[merged["狀態"].isin(["新增", "刪除", "加碼", "減碼"]) & significant].copy()
         if merged.empty:
             return merged
+
         merged["成分股名稱"] = merged.apply(lambda r: (name_map or {}).get(str(r["成分股代號"]), str(r.get("成分股名稱", r["成分股代號"]))), axis=1)
         merged["產業"] = merged.apply(lambda r: _industry_of(r["成分股代號"], industry_map), axis=1)
         merged["比較基準"] = f"{pd.Timestamp(prev_day).strftime('%Y-%m-%d')} → {pd.Timestamp(new_day).strftime('%Y-%m-%d')}"
         merged["事件日期"] = pd.Timestamp(new_day).strftime("%Y-%m-%d")
+        merged["資料模式"] = mode
         return merged
 
     # 逐日事件：看每一天相對前一個有效快照，避免「一直顯示同一段區間」。
@@ -608,8 +723,12 @@ def summarize_holdings(
                 daily_parts.append(part)
     if daily_parts:
         daily_events = pd.concat(daily_parts, ignore_index=True)
-        latest_event_day = str(daily_events["事件日期"].max())
-        changes = daily_events[daily_events["事件日期"].astype(str).eq(latest_event_day)].copy()
+        # 事件表只保留近 30 天；主畫面再從其中抓最新一個事件日。
+        cutoff_event = latest - pd.Timedelta(days=int(event_days))
+        daily_events["_事件日_ts"] = pd.to_datetime(daily_events["事件日期"], errors="coerce")
+        daily_events = daily_events[daily_events["_事件日_ts"] >= cutoff_event].drop(columns=["_事件日_ts"], errors="ignore")
+        latest_event_day = str(daily_events["事件日期"].max()) if not daily_events.empty else ""
+        changes = daily_events[daily_events["事件日期"].astype(str).eq(latest_event_day)].copy() if latest_event_day else pd.DataFrame()
     else:
         changes = pd.DataFrame()
 
@@ -634,6 +753,15 @@ def summarize_holdings(
         "daily_events": daily_events,
         "shared_actions": shared_actions,
         "manager_profiles": manager_profiles,
+        "hot_etfs": hot_etfs,
+        "meta": pd.DataFrame([{
+            "資料意義": "主動 ETF 經理人持股變化，不代表全市場資金流",
+            "事件門檻": "|Δshares/prev_shares|≥3% 且 最大權重≥0.3pp；無股數資料時改用 |Δweight|≥0.3pp",
+            "快照保留": f"{HOLDINGS_KEEP_DAYS}天",
+            "主畫面判讀": f"{lookback_days}天",
+            "事件明細": f"{event_days}天",
+            "追蹤ETF數": len(focus),
+        }]),
     }
 
 
@@ -641,8 +769,8 @@ def build_active_etf_manager_radar(
     momentum_df: Optional[pd.DataFrame],
     industry_map: Dict[str, str],
     name_map: Dict[str, str],
-    top_n: int = 5,
-    lookback_days: int = 5,
+    top_n: int = ACTIVE_ETF_TOP_N,
+    lookback_days: int = MAIN_LOOKBACK_DAYS,
     custom_sources: Optional[Dict[str, str]] = None,
     cache_path: str = CACHE_FILE,
 ) -> Dict[str, object]:
@@ -651,8 +779,8 @@ def build_active_etf_manager_radar(
     cand_tuple = tuple((c["ETF代號"], c["ETF名稱"]) for c in candidates)
     latest = fetch_active_etf_holdings_auto(cand_tuple, custom_sources=custom_sources, name_map=name_map)
     if latest.empty:
-        hist = merge_holdings_history(pd.DataFrame(), cache_path=cache_path, max_days=max(20, lookback_days + 10))
-        summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days)
+        hist = merge_holdings_history(pd.DataFrame(), cache_path=cache_path, max_days=HOLDINGS_KEEP_DAYS)
+        summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days, momentum_df=momentum_df, event_days=EVENT_LOOKBACK_DAYS)
         history_status = get_history_status(hist, lookback_days=lookback_days)
         if hist is not None and not hist.empty and summary.get("snapshot", pd.DataFrame()).empty is False:
             return {
@@ -668,11 +796,11 @@ def build_active_etf_manager_radar(
             "message": "自動持股來源目前抓不到資料，且沒有可沿用的歷史快照；請使用 CSV 備援。",
             "candidates": pd.DataFrame(candidates),
             "holdings": pd.DataFrame(),
-            "summary": summarize_holdings(pd.DataFrame(), industry_map, name_map, top_n=top_n, lookback_days=lookback_days),
+            "summary": summarize_holdings(pd.DataFrame(), industry_map, name_map, top_n=top_n, lookback_days=lookback_days, momentum_df=momentum_df, event_days=EVENT_LOOKBACK_DAYS),
             "history_status": history_status,
         }
-    hist = merge_holdings_history(latest, cache_path=cache_path, max_days=max(20, lookback_days + 10))
-    summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days)
+    hist = merge_holdings_history(latest, cache_path=cache_path, max_days=HOLDINGS_KEEP_DAYS)
+    summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days, momentum_df=momentum_df, event_days=EVENT_LOOKBACK_DAYS)
     history_status = get_history_status(hist, lookback_days=lookback_days)
     return {
         "ok": True,
