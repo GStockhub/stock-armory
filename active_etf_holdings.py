@@ -732,16 +732,33 @@ def summarize_holdings(
     else:
         changes = pd.DataFrame()
 
-    if changes is not None and not changes.empty:
-        changes = changes.sort_values(["狀態", "變化"], ascending=[True, False])
-        industry_changes = changes.groupby("產業", dropna=False)["變化"].sum().reset_index().sort_values("變化", ascending=False)
-        shared_actions = changes.groupby(["成分股代號", "成分股名稱", "產業", "狀態"], dropna=False).agg(
-            ETF數=("ETF代號", "nunique"),
-            涉及ETF=("ETF代號", lambda x: "、".join(sorted(set(map(str, x))))),
-            合計變化=("變化", "sum"),
-        ).reset_index().sort_values(["ETF數", "合計變化"], ascending=[False, False])
+    event_scope = daily_events if daily_events is not None and not daily_events.empty else changes
+
+    if event_scope is not None and not event_scope.empty:
+        # 產業變化看近 30 天事件總和，不只看最新一天，避免共同減碼被吃掉。
+        industry_changes = event_scope.groupby("產業", dropna=False)["變化"].sum().reset_index().sort_values("變化", ascending=False)
+
+        agg_map = {
+            "ETF數": ("ETF代號", "nunique"),
+            "涉及ETF": ("ETF代號", lambda x: "、".join(sorted(set(map(str, x))))),
+            "事件數": ("ETF代號", "count"),
+            "合計變化": ("變化", "sum"),
+        }
+        if "股數變化" in event_scope.columns:
+            agg_map["合計股數變化"] = ("股數變化", "sum")
+        if "資料模式" in event_scope.columns:
+            agg_map["資料模式"] = ("資料模式", lambda x: "、".join(sorted(set(map(str, x)))))
+
+        shared_actions = event_scope.groupby(["成分股代號", "成分股名稱", "產業", "狀態"], dropna=False).agg(**agg_map).reset_index()
+        shared_actions = shared_actions[shared_actions["ETF數"] >= 2].copy()
+        if not shared_actions.empty:
+            shared_actions["_排序變化"] = shared_actions["合計變化"].abs()
+            shared_actions = shared_actions.sort_values(["ETF數", "事件數", "_排序變化"], ascending=[False, False, False]).drop(columns=["_排序變化"], errors="ignore")
     else:
         shared_actions = pd.DataFrame()
+
+    if changes is not None and not changes.empty:
+        changes = changes.sort_values(["狀態", "變化"], ascending=[True, False])
 
     return {
         "snapshot": snapshot,
