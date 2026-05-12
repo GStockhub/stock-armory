@@ -100,6 +100,11 @@ def _render_etf_cards(df, COLORS, title_prefix="ETF"):
 
 def _format_etf_table(df):
     disp = df.copy()
+    if "類型" in disp.columns:
+        disp["類型"] = disp["類型"].astype(str).str.replace("ETF", "", regex=False)
+    if "狀態" in disp.columns and "下一步" in disp.columns:
+        disp["狀態/下一步"] = disp["狀態"].astype(str) + "｜" + disp["下一步"].astype(str)
+        disp = disp.drop(columns=["狀態", "下一步"], errors="ignore")
     if "動能分數" in disp.columns:
         disp["動能分數"] = disp["動能分數"].map(_fmt_score)
     for c in ["3日漲幅(%)", "5日漲幅(%)", "10日漲幅(%)", "乖離(%)"]:
@@ -133,52 +138,55 @@ def _donut_gradient(values):
     return ", ".join(parts)
 
 
-def _render_industry_donut_cards(summary, COLORS, top_n=5):
+def _render_industry_donut_cards(summary, COLORS, top_n=10):
+    """V37.6：產業占比改成一張整合表，不再分散成多張卡片。"""
     industries = summary.get("industries", pd.DataFrame())
+    stocks = summary.get("stocks", pd.DataFrame())
     snapshot = summary.get("snapshot", pd.DataFrame())
     if industries is None or industries.empty or snapshot is None or snapshot.empty:
-        st.info("產業占比資料不足。")
+        st.info("產業占比資料不足。若每檔 ETF 只剩 1 筆持股，代表來源只抓到部分持股，需等來源更新或改用 CSV 備援。")
         return
 
-    # 依 snapshot 順序顯示，最多 5 張，手機會自動換行。
     rows = []
     for _, snap in snapshot.head(top_n).iterrows():
         code = str(snap.get("ETF", ""))
         name = str(snap.get("名稱", code))
-        sub = industries[industries["ETF代號"].astype(str).eq(code)].copy()
-        if sub.empty:
+        ind_sub = industries[industries["ETF代號"].astype(str).eq(code)].copy()
+        stock_sub = stocks[stocks["ETF代號"].astype(str).eq(code)].copy() if stocks is not None and not stocks.empty else pd.DataFrame()
+        if ind_sub.empty:
             continue
-        sub["權重"] = pd.to_numeric(sub["權重"], errors="coerce").fillna(0)
-        sub = sub.sort_values("權重", ascending=False).head(5)
-        rows.append((code, name, sub))
+        ind_sub["權重"] = pd.to_numeric(ind_sub["權重"], errors="coerce").fillna(0)
+        ind_sub = ind_sub.sort_values("權重", ascending=False)
+        industry_text = "、".join([f"{r['產業']} {float(r['權重']):.1f}%" for _, r in ind_sub.iterrows()])
+
+        if not stock_sub.empty:
+            stock_sub["權重"] = pd.to_numeric(stock_sub["權重"], errors="coerce").fillna(0)
+            stock_sub = stock_sub.sort_values("權重", ascending=False).head(10)
+            stock_text = "、".join([f"{r['成分股名稱']}({r['成分股代號']}) {float(r['權重']):.1f}%" for _, r in stock_sub.iterrows()])
+        else:
+            stock_text = ""
+
+        rows.append({
+            "ETF": code,
+            "名稱": name,
+            "產業數": int(ind_sub["產業"].nunique()),
+            "產業占比": industry_text,
+            "前十大個股": stock_text,
+        })
 
     if not rows:
         st.info("產業占比資料不足。")
         return
 
-    for start in range(0, len(rows), 3):
-        cols = st.columns(min(3, len(rows) - start))
-        for col, (code, name, sub) in zip(cols, rows[start:start+3]):
-            labels = sub["產業"].astype(str).tolist()
-            weights = sub["權重"].astype(float).tolist()
-            gradient = _donut_gradient(weights)
-            legend = "".join(
-                f"<div style='display:flex; justify-content:space-between; gap:8px; font-size:12.5px; margin:3px 0;'>"
-                f"<span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'><span style='display:inline-block;width:9px;height:9px;border-radius:50%;background:{_DONUT_COLORS[i % len(_DONUT_COLORS)]};margin-right:5px;'></span>{_safe_text(label)}</span>"
-                f"<b>{weight:.1f}%</b></div>"
-                for i, (label, weight) in enumerate(zip(labels, weights))
-            )
-            with col:
-                st.markdown(f"""
-                <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:10px; padding:13px 14px; min-height:275px;">
-                    <div style="font-size:13px; color:{COLORS['subtext']}; font-weight:700;">主動 ETF 產業占比</div>
-                    <div style="font-size:18px; font-weight:900; color:{COLORS['text']}; margin:3px 0 10px 0;">{_safe_text(name)} <span style="white-space:nowrap;">({_safe_text(code)})</span></div>
-                    <div style="width:118px; height:118px; border-radius:50%; margin:4px auto 12px auto; background:conic-gradient({gradient}); position:relative; box-shadow:inset 0 0 0 1px rgba(0,0,0,.05);">
-                        <div style="position:absolute; inset:28px; border-radius:50%; background:{COLORS['card']}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:{COLORS['subtext']};">Top 5</div>
-                    </div>
-                    {legend}
-                </div>
-                """, unsafe_allow_html=True)
+    disp = pd.DataFrame(rows)
+    st.dataframe(
+        disp.style.set_properties(**{"text-align": "left", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}),
+        use_container_width=True,
+        hide_index=True,
+        height=min(420, 90 + len(disp) * 46),
+    )
+    if (disp["產業數"] <= 1).any():
+        st.caption("有些 ETF 只顯示 1 種產業，通常不是計算錯，而是自動來源只抓到少量持股；若要完整持股，建議改用 CSV 備援資料源。")
 
 
 def _render_bar_list(df, COLORS, label_col, value_col, subtitle_col=None, max_rows=10, signed=False):
@@ -291,7 +299,7 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
     meta = summary.get("meta", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
 
     st.markdown("##### 📋 主動 ETF 經理人動作追蹤")
-    st.caption("母清單保留全部主動 ETF；主畫面每週/每輪只鎖定熱門前 10。事件明細看近 30 天，快照保留 60 天，過濾微調後只看真正調倉。")
+    st.caption("母清單保留全部主動 ETF；主畫面鎖定熱門前 10。事件看近 30 天，快照保留 60 天，過濾微調後只看真正調倉。")
 
     if meta is not None and not meta.empty:
         m = meta.iloc[0].to_dict()
@@ -308,26 +316,27 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
                 height=260,
             )
 
-    if changes is None or changes.empty:
+    basis = "尚無逐日變化"
+    if changes is not None and not changes.empty and "比較基準" in changes.columns:
+        basis = str(changes["比較基準"].iloc[0])
+    st.markdown(f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:10px 13px; border-radius:9px; margin:8px 0 12px 0;">
+        <b>比較基準：</b>{_safe_text(basis)}
+    </div>
+    """, unsafe_allow_html=True)
+
+    count_scope = daily_events if daily_events is not None and not daily_events.empty else changes
+    if count_scope is None or count_scope.empty:
         counts = {"新增": 0, "刪除": 0, "加碼": 0, "減碼": 0}
-        basis = "尚無逐日變化"
     else:
-        counts = {k: int((changes["狀態"] == k).sum()) for k in ["新增", "刪除", "加碼", "減碼"]}
-        basis = str(changes["比較基準"].iloc[0]) if "比較基準" in changes.columns and len(changes) else "最新有效快照"
+        counts = {k: int((count_scope["狀態"] == k).sum()) for k in ["新增", "刪除", "加碼", "減碼"]}
 
-    cc = st.columns(5)
-    metric_specs = [
-        ("比較基準", basis),
-        ("🆕 新增", counts.get("新增", 0)),
-        ("➕ 加碼", counts.get("加碼", 0)),
-        ("➖ 減碼", counts.get("減碼", 0)),
-        ("❌ 刪除", counts.get("刪除", 0)),
-    ]
-    for col, (label, val) in zip(cc, metric_specs):
+    cc = st.columns(4)
+    for col, (label, val) in zip(cc, [("🆕 新增", counts.get("新增", 0)), ("➕ 加碼", counts.get("加碼", 0)), ("➖ 減碼", counts.get("減碼", 0)), ("❌ 刪除", counts.get("刪除", 0))]):
         with col:
-            st.metric(label, val)
+            st.metric(label, f"{val} 筆")
 
-    tabs = st.tabs(["🧭 經理人差異", "🤝 共同動作", "📅 逐日事件", "📦 快照總覽", "🆕新增/❌刪除", "➕加碼/➖減碼"])
+    tabs = st.tabs(["🎯 總覽", "🤝 共同動作", "📅 逐日明細", "📦 ETF明細"])
 
     with tabs[0]:
         if manager_profiles is None or manager_profiles.empty:
@@ -344,28 +353,32 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
 
     with tabs[1]:
         if shared_actions is None or shared_actions.empty:
-            st.info("最新比較期間沒有多檔主動 ETF 同步新增、刪除或加減碼。")
+            st.info("近 30 天沒有出現 2 檔以上主動 ETF 對同一個股同步新增、刪除、加碼或減碼。")
         else:
-            show_cols = ["狀態", "成分股代號", "成分股名稱", "產業", "ETF數", "涉及ETF", "合計變化"]
-            disp = shared_actions[[c for c in show_cols if c in shared_actions.columns]].copy().head(80)
+            status_filter = st.multiselect("動作篩選", ["新增", "加碼", "減碼", "刪除"], default=["新增", "加碼", "減碼", "刪除"], key="active_etf_shared_status")
+            sub = shared_actions[shared_actions["狀態"].isin(status_filter)].copy() if status_filter else shared_actions.copy()
+            show_cols = ["狀態", "成分股代號", "成分股名稱", "產業", "ETF數", "事件數", "涉及ETF", "合計股數變化", "合計變化", "資料模式"]
+            disp = sub[[c for c in show_cols if c in sub.columns]].head(120).copy()
             st.dataframe(
-                disp.style.set_properties(**table_style).format({"合計變化": "{:+.2f}%"}),
+                disp.style.set_properties(**table_style).format({"合計股數變化": "{:,.0f}", "合計變化": "{:+.2f}%"}),
                 use_container_width=True,
                 hide_index=True,
-                height=360,
+                height=430,
             )
 
     with tabs[2]:
         if daily_events is None or daily_events.empty:
-            st.info("目前沒有逐日事件。若持股來源多日未更新，這裡會維持空白；這代表經理人尚未公布新快照或資料源未變。")
+            st.info("目前沒有逐日事件。若持股來源多日未更新，這裡會維持空白。")
         else:
+            status_filter = st.multiselect("逐日動作篩選", ["新增", "加碼", "減碼", "刪除"], default=["新增", "加碼", "減碼", "刪除"], key="active_etf_daily_status")
+            sub = daily_events[daily_events["狀態"].isin(status_filter)].copy() if status_filter else daily_events.copy()
             show_cols = ["事件日期", "比較基準", "資料模式", "ETF代號", "狀態", "成分股代號", "成分股名稱", "產業", "持有股數_舊", "持有股數_新", "股數變化率", "權重_舊", "權重_新", "變化"]
-            disp = daily_events[[c for c in show_cols if c in daily_events.columns]].copy().sort_values(["事件日期", "狀態", "變化"], ascending=[False, True, False]).head(200)
+            disp = sub[[c for c in show_cols if c in sub.columns]].copy().sort_values(["事件日期", "狀態", "變化"], ascending=[False, True, False]).head(240)
             st.dataframe(
                 disp.style.set_properties(**table_style).format({"持有股數_舊": "{:,.0f}", "持有股數_新": "{:,.0f}", "股數變化率": "{:+.1%}", "權重_舊": "{:.2f}%", "權重_新": "{:.2f}%", "變化": "{:+.2f}%"}),
                 use_container_width=True,
                 hide_index=True,
-                height=430,
+                height=460,
             )
 
     with tabs[3]:
@@ -378,51 +391,15 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
                 disp.style.set_properties(**table_style).format({"前十集中度": "{:.2f}%"}),
                 use_container_width=True,
                 hide_index=True,
-                height=280,
+                height=340,
             )
-
-    with tabs[4]:
-        if changes is None or changes.empty:
-            st.info("最新比較期間沒有新增 / 刪除事件。")
-        else:
-            sub = changes[changes["狀態"].isin(["新增", "刪除"])].copy()
-            if sub.empty:
-                st.info("最新比較期間沒有新增 / 刪除事件。")
-            else:
-                sub = sub.sort_values(["狀態", "權重_新", "權重_舊"], ascending=[True, False, False])
-                show_cols = ["比較基準", "資料模式", "ETF代號", "狀態", "成分股代號", "成分股名稱", "產業", "持有股數_舊", "持有股數_新", "股數變化率", "權重_舊", "權重_新", "變化"]
-                disp = sub[[c for c in show_cols if c in sub.columns]].head(160).copy()
-                st.dataframe(
-                    disp.style.set_properties(**table_style).format({"持有股數_舊": "{:,.0f}", "持有股數_新": "{:,.0f}", "股數變化率": "{:+.1%}", "權重_舊": "{:.2f}%", "權重_新": "{:.2f}%", "變化": "{:+.2f}%"}),
-                    use_container_width=True,
-                    hide_index=True,
-                    height=420,
-                )
-
-    with tabs[5]:
-        if changes is None or changes.empty:
-            st.info("最新比較期間沒有加碼 / 減碼事件。")
-        else:
-            sub = changes[changes["狀態"].isin(["加碼", "減碼"])].copy()
-            if sub.empty:
-                st.info("最新比較期間沒有加碼 / 減碼事件。")
-            else:
-                sub = sub.sort_values("變化", ascending=False)
-                show_cols = ["比較基準", "資料模式", "ETF代號", "狀態", "成分股代號", "成分股名稱", "產業", "持有股數_舊", "持有股數_新", "股數變化率", "權重_舊", "權重_新", "變化"]
-                disp = sub[[c for c in show_cols if c in sub.columns]].head(160).copy()
-                st.dataframe(
-                    disp.style.set_properties(**table_style).format({"持有股數_舊": "{:,.0f}", "持有股數_新": "{:,.0f}", "股數變化率": "{:+.1%}", "權重_舊": "{:.2f}%", "權重_新": "{:.2f}%", "變化": "{:+.2f}%"}),
-                    use_container_width=True,
-                    hide_index=True,
-                    height=420,
-                )
 
 
 def _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=None, auto_note=""):
     history_status = history_status or get_history_status(holdings, lookback_days=20)
 
-    st.markdown("##### 主動 ETF 產業占比")
-    _render_industry_donut_cards(summary, COLORS, top_n=5)
+    st.markdown("##### 主動 ETF 產業占比 / 重點持股")
+    _render_industry_donut_cards(summary, COLORS, top_n=10)
 
     # Top 主動 ETF 產業占比 與 下方共同重倉/加減碼區塊 的垂直間距
     # 避免兩個區塊黏在一起，手機與桌機都保留呼吸感。
@@ -441,10 +418,10 @@ def _render_manager_visuals(summary, holdings, COLORS, table_style, history_stat
             _render_bar_list(common, COLORS, "顯示", "合計權重", subtitle_col="產業", max_rows=10, signed=False)
 
     with c2:
-        st.markdown("##### 近 5 日共同加碼 / 減碼族群")
+        st.markdown("##### 近 30 日共同加碼 / 減碼族群")
         industry_changes = summary.get("industry_changes", pd.DataFrame())
         if industry_changes is None or industry_changes.empty:
-            st.info("近 5 日產業變化資料不足。若只有單日快照，需等後續交易日累積。")
+            st.info("近 30 日產業變化資料不足。若只有單日快照，需等後續交易日累積。")
         else:
             inc = industry_changes[pd.to_numeric(industry_changes["變化"], errors="coerce").fillna(0) > 0].sort_values("變化", ascending=False).head(6)
             dec = industry_changes[pd.to_numeric(industry_changes["變化"], errors="coerce").fillna(0) < 0].sort_values("變化", ascending=True).head(6)
@@ -495,7 +472,9 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
         show_cols = ["代號", "名稱", "類型", "狀態", "下一步", "動能分數", "3日漲幅(%)", "5日漲幅(%)", "10日漲幅(%)", "乖離(%)", "量能比", "現價"]
         disp = radar.head(10)[[c for c in show_cols if c in radar.columns]].copy()
         formatted = _format_etf_table(disp)
-        st.dataframe(formatted.style.set_properties(**table_style), use_container_width=True, hide_index=True, height=390)
+        ordered_cols = ["代號", "名稱", "類型", "狀態/下一步", "動能分數", "3日漲幅(%)", "5日漲幅(%)", "10日漲幅(%)", "乖離(%)", "量能比", "現價"]
+        formatted = formatted[[c for c in ordered_cols if c in formatted.columns]]
+        st.dataframe(formatted.style.set_properties(**table_style), use_container_width=True, hide_index=True, height=350)
 
     st.markdown("#### 🧭 主動 ETF 經理人風向")
     st.caption("持股快照與近 5 日變化合併；自動資料若不可得，可用側邊欄 CSV 備援。這區看產業風向，不是照抄成分股。")
