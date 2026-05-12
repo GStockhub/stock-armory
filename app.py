@@ -124,7 +124,7 @@ def render_data_health_panel():
     health = []
     health.append(("產業地圖", len(TWSE_NAME_MAP) > 0, f"{len(TWSE_NAME_MAP):,} 筆" if TWSE_NAME_MAP else "未讀取"))
     health.append(("大盤儀表", not MACRO_DF.empty, f"{len(MACRO_DF)} 項" if not MACRO_DF.empty else "無資料"))
-    health.append(("法人籌碼", chip_data_available, f"近 {len(chip_db)} 日｜{chips_data_source}" if chip_data_available else "暫缺/技術備援"))
+    health.append(("法人籌碼", chip_data_available or not today_df.empty, f"近 {len(chip_db)} 日｜{chips_data_source}" if chip_data_available else f"技術備援｜{len(today_df)} 檔候選"))
     health.append(("持股CSV", (auth_status != "admin_auth") or holding_read_ok, f"{holding_rows} 筆" if holding_read_ok else ("友軍隱藏" if auth_status != "admin_auth" else ("未設定" if not sheet_url else "讀取失敗/空表"))))
     health.append(("AAR日誌", aar_read_ok, f"{aar_rows} 筆" if aar_read_ok else ("未設定" if not aar_sheet_url else "讀取失敗/空表")))
     health.append(("FinMind Token", bool(str(FM_TOKEN).strip()), "已設定" if str(FM_TOKEN).strip() else "未設定"))
@@ -436,6 +436,32 @@ aar_read_ok = False
 aar_probe_df = pd.DataFrame()
 rescue_residual_map = {}
 
+def _build_technical_fallback_chips(max_rows=350):
+    """V37.2：法人籌碼 / 快取異常時，建立技術面候選池，避免個股游擊與情報局整區空白。"""
+    fallback_rows = []
+    for code, name in list(TWSE_NAME_MAP.items()):
+        code = str(code).strip()
+        ind = str(TWSE_IND_MAP.get(code, ""))
+        if not code.isdigit() or len(code) != 4 or code.startswith("00"):
+            continue
+        if any(x in ind for x in ["金融", "保險", "存託憑證"]):
+            continue
+        fallback_rows.append({
+            "代號": code,
+            "名稱": name,
+            "外資(張)": 0.0,
+            "投信(張)": 0.0,
+            "自營(張)": 0.0,
+            "三大法人合計": 0.0,
+            "連買": 0,
+            "投信連賣": 0,
+            "法人狀態": "⚪ 法人資料暫缺",
+        })
+        if len(fallback_rows) >= int(max_rows):
+            break
+    return pd.DataFrame(fallback_rows)
+
+
 chip_data_available = len(chip_db) >= 1
 chips_data_source = st.session_state.get("chips_data_source", "即時")
 
@@ -464,27 +490,22 @@ if chip_data_available:
     today_df["投信連賣"] = today_df.apply(get_sell_streak, axis=1)
     today_df["法人狀態"] = today_df.apply(get_institution_state, axis=1)
     top_80_chips = today_df.sort_values("投信(張)", ascending=False).head(80)["代號"].tolist()
+
+    # V37.2：防止 chip_db 有 key 但最新 DataFrame 為空，導致 S/A/B 與情報局整區無資料。
+    if today_df.empty or "代號" not in today_df.columns:
+        st.toast("法人籌碼快取格式異常；啟用技術面備援，避免個股游擊與情報局空白。", icon="⚠️")
+        today_df = _build_technical_fallback_chips(max_rows=350)
+        dates = ["TECH"]
+        top_80_chips = today_df["代號"].head(120).tolist() if not today_df.empty else []
+        chip_data_available = False
+        chips_data_source = "技術備援"
 else:
     st.toast("籌碼連線失敗；啟用技術面備援，S/A/B 仍可掃描但法人欄位暫缺。", icon="⚠️")
-    # v35.5.2：法人籌碼完全失敗時，不讓個股游擊整區停擺。
-    # 以產業地圖建立一組技術面備援候選池；法人相關欄位歸零，僅供臨時觀察。
-    fallback_rows = []
-    for code, name in list(TWSE_NAME_MAP.items()):
-        code = str(code).strip()
-        ind = str(TWSE_IND_MAP.get(code, ""))
-        if not code.isdigit() or len(code) != 4 or code.startswith("00"):
-            continue
-        if any(x in ind for x in ["金融", "保險", "存託憑證"]):
-            continue
-        fallback_rows.append({
-            "代號": code, "名稱": name, "外資(張)": 0.0, "投信(張)": 0.0, "自營(張)": 0.0,
-            "三大法人合計": 0.0, "連買": 0, "投信連賣": 0, "法人狀態": "⚪ 法人資料暫缺"
-        })
-        if len(fallback_rows) >= 350:
-            break
-    today_df = pd.DataFrame(fallback_rows)
+    today_df = _build_technical_fallback_chips(max_rows=350)
     dates = ["TECH"]
     top_80_chips = today_df["代號"].head(120).tolist() if not today_df.empty else []
+    chip_data_available = False
+    chips_data_source = "技術備援"
 
 if sheet_url and auth_status == "admin_auth":
     try:
@@ -1300,7 +1321,7 @@ with t_chip:
             styled_obs = obs_df.style.set_properties(**table_style).format({"外資(張)": "{:,.0f}", "投信(張)": "{:,.0f}", "自營(張)": "{:,.0f}", "三大法人合計": "{:,.0f}"}).map(risk_color, subset=["安全指數"])
             st.dataframe(styled_obs, height=430, use_container_width=True, hide_index=True)
     else:
-        st.info("法人籌碼暫時無法取得，情報局暫停；個股游擊已改用技術面備援，沙盤、ETF、司令部仍可使用。")
+        st.info("法人籌碼暫時無法取得；情報局會在技術備援候選池建立後恢復。沙盤、ETF、司令部仍可使用。")
 
 with t_cmd:
     cmd_hold_tab, cmd_aar_tab, cmd_bt_tab = st.tabs(["🛡️ 持股風控", "📊 AAR 戰術教練", "🧪 訊號追蹤室"])
