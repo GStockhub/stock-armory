@@ -237,6 +237,14 @@ def _current_signal_rows(twse_ind_map: Dict[str, str], fm_token: str, macro_scor
         for grade in ["S", "A", "B"]:
             part = master[master.get("評級", "").astype(str).str.replace("級", "", regex=False).eq(grade)].copy() if "評級" in master.columns else pd.DataFrame()
             rows.extend(_rows_from_signal_df(part, f"{grade}級", 10))
+    else:
+        # V37.1：若主清單剛好為空，仍從 rank_sorted 補一份保守 B 級觀察紀錄，
+        # 避免當日完全沒有訊號可追蹤。
+        ranked = st.session_state.get("eod_rank_sorted", pd.DataFrame())
+        if isinstance(ranked, pd.DataFrame) and not ranked.empty and "代號" in ranked.columns:
+            fallback = ranked.head(10).copy()
+            fallback["評級"] = "B"
+            rows.extend(_rows_from_signal_df(fallback, "B級", 10))
 
     special = st.session_state.get("eod_special_watch", pd.DataFrame())
     if isinstance(special, pd.DataFrame) and not special.empty:
@@ -431,7 +439,7 @@ def _summary_stats(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro_score, overheat_flag, operation_mode):
-    st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室</span>", unsafe_allow_html=True)
+    st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室 V37</span>", unsafe_allow_html=True)
     st.caption("取代原回測室：每天保存 S/A/B、特殊關注、產業輪動、主動 ETF 前五，之後檢查隔日 / 3 日 / 5 日命中率。")
 
     history, msg = load_signal_history()

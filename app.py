@@ -858,7 +858,40 @@ with t_rank:
             # v35：個股游擊主畫面只保留 S/A/B Top 10，避免 C 級雜訊干擾執行。
             master_list = pd.concat([s_all, a_all, b_all]).sort_values("Quant_Score", ascending=False).reset_index(drop=True)
             master_list = master_list[master_list["現價"] > master_list["停損價"]].head(10).copy()
-            master_list["名次"] = range(1, len(master_list) + 1)
+
+            # V37.1：S/A/B 顯示保護。
+            # 若嚴格條件剛好讓主清單為空，但 rank_sorted 仍有可觀察標的，
+            # 就用「保守 B 級觀察」補出清單，避免畫面看起來像 SAB 標籤整個消失。
+            # 這不是放寬買進，而是讓你仍看得到候選股與分數，實際進場仍需沙盤體檢。
+            if master_list.empty and not rank_sorted.empty:
+                fallback_pool = rank_sorted.copy()
+                fallback_pool["安全指數"] = fallback_pool.apply(calc_refined_safety_score, axis=1)
+                fallback_pool["決策標籤"] = fallback_pool.apply(get_decision_label, axis=1)
+                fallback_pool["建議"] = fallback_pool.apply(get_next_action, axis=1)
+                fallback_pool["法人狀態"] = fallback_pool.apply(get_institution_state, axis=1)
+                fallback_mask = (
+                    (pd.to_numeric(fallback_pool["Quant_Score"], errors="coerce").fillna(0) >= MODE_PROFILE["b"] - 10)
+                    & (pd.to_numeric(fallback_pool["現價"], errors="coerce").fillna(0) > pd.to_numeric(fallback_pool["停損價"], errors="coerce").fillna(0))
+                    & (~fallback_pool["生命週期"].astype(str).str.contains("爆量出貨|高機率末升", na=False))
+                    & (~fallback_pool["決策標籤"].astype(str).str.contains("禁買|出場", na=False))
+                )
+                master_list = fallback_pool[fallback_mask].sort_values(["Quant_Score", "安全指數"], ascending=[False, False]).head(10).copy()
+                if not master_list.empty:
+                    def _fallback_grade(row):
+                        score = float(row.get("Quant_Score", 0) or 0)
+                        basic_ok = bool(row.get("基本達標", False))
+                        if basic_ok and score >= MODE_PROFILE["s"]:
+                            return "S"
+                        if basic_ok and score >= MODE_PROFILE["a"]:
+                            return "A"
+                        return "B"
+                    master_list["評級"] = master_list.apply(_fallback_grade, axis=1)
+                    master_list["建議"] = master_list["建議"].astype(str).apply(
+                        lambda x: ("保守觀察｜" + x) if "保守觀察" not in x else x
+                    )
+                    st.warning("⚠️ 嚴格 S/A/B 條件暫時沒有主攻標的；已啟用保守觀察清單。這些標的需再用沙盤體檢，不代表直接買進。")
+
+            master_list["名次"] = range(1, len(master_list) + 1) if not master_list.empty else []
 
             main_codes_now = set(master_list["代號"].astype(str).tolist()) if not master_list.empty else set()
             st.session_state["eod_main_codes"] = main_codes_now
@@ -886,6 +919,14 @@ with t_rank:
             else:
                 special_watch = pd.DataFrame()
             st.session_state["eod_special_watch"] = special_watch.copy() if isinstance(special_watch, pd.DataFrame) else pd.DataFrame()
+
+            if master_list.empty:
+                st.warning("今日沒有通過 S/A/B 條件的標的。這通常不是壞掉，而是分數、基本達標、停損線、乖離或資料源限流造成清單被過濾。")
+                diag_cols = ["代號", "名稱", "Quant_Score", "基本達標", "現價", "停損價", "生命週期", "戰術型態", "決策標籤"]
+                diag_cols = [c for c in diag_cols if c in rank_sorted.columns]
+                if diag_cols:
+                    with st.expander("🔎 查看未入選診斷 Top 20", expanded=False):
+                        st.dataframe(rank_sorted[diag_cols].head(20), use_container_width=True, hide_index=True)
 
             if not master_list.empty:
                 def calc_suggested_lots(row):
@@ -1009,7 +1050,7 @@ with t_rank:
                                 card_html += f'<div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; width: 100%;">'
                                 
                                 # 🛡️ 標籤裝甲：flex: 0 0 auto 絕對禁止縮放，且給予固定寬度或讓他自己決定內容寬度
-                                card_html += f'<div style="flex: 0 0 auto; padding-top: 3px;"><span class="tier-badge {badge_class}">{badge_name}</span></div>'
+                                card_html += f'<div style="flex: 0 0 auto; padding-top: 3px;"><span class="tier-badge {badge_class}" style="display:inline-block; padding:2px 7px; border-radius:5px; font-size:12px; font-weight:900; color:{border_color}; border:1px solid {border_color}; background:rgba(255,255,255,0.05); white-space:nowrap;">{badge_name}</span></div>'
                                 
                                 # 📜 標題自適應：flex: 1 1 auto 填滿剩餘空間，加上 min-width: 0 允許內部文字被壓縮與換行
                                 card_html += f'<div style="flex: 1 1 auto; min-width: 0;">'
