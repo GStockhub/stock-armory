@@ -247,7 +247,7 @@ def _render_bar_list(df, COLORS, label_col, value_col, subtitle_col=None, max_ro
 
 
 def _render_manager_header_compact(summary, holdings, COLORS, history_status=None, auto_note=""):
-    """V35.3.1：把自動更新、歷史快照、GitHub 狀態壓成同一張單行摘要卡。"""
+    """V37.7.1：狀態與 GitHub 診斷整合成同一區，不再上下分開。"""
     history_status = history_status or get_history_status(holdings, lookback_days=20)
     days = int(history_status.get("days", 0) or 0)
     latest = str(history_status.get("latest", "-") or "-")
@@ -265,25 +265,19 @@ def _render_manager_header_compact(summary, holdings, COLORS, history_status=Non
     auto_text = str(auto_note or "自動持股來源正常；若 GitHub 寫入失敗則先沿用本機快取。")
     compact_msg = msg.replace("｜", "；")
 
-    st.markdown(f"""
-    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:10px 13px; border-radius:10px; margin:6px 0 14px 0;">
-        <div style="font-size:14px; color:{COLORS['text']}; line-height:1.65;">
-            <b>🧭 主動 ETF 風向狀態：</b>{_safe_text(auto_text)}
-            <span style="color:{COLORS['subtext']};">｜</span>
-            <b>📦 快照</b> {days} 日，最新 {_safe_text(latest)}，涵蓋 {etf_count} 檔，事件 {event_count} 筆
-            <span style="color:{COLORS['subtext']};">｜</span>
-            <b>🧪 GitHub</b> {_safe_text(gh_summary)}
+    title = f"🧭 主動 ETF 風向狀態｜快照 {days} 日｜最新 {latest}｜涵蓋 {etf_count} 檔｜事件 {event_count} 筆｜GitHub：{gh_summary}"
+    with st.expander(title, expanded=False):
+        st.markdown(f"""
+        <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:10px 13px; border-radius:10px; margin:4px 0 10px 0;">
+            <div style="font-size:14px; color:{COLORS['text']}; line-height:1.65;"><b>狀態：</b>{_safe_text(auto_text)}</div>
+            <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">{_safe_text(compact_msg)}</div>
         </div>
-        <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">{_safe_text(compact_msg)}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    if gh_diag:
-        with st.expander("🧪 GitHub 診斷細節", expanded=False):
-            checks = gh_diag.get("checks", [])
-            if checks:
-                st.dataframe(pd.DataFrame(checks), use_container_width=True, hide_index=True)
-            else:
-                st.json({k: v for k, v in gh_diag.items() if k != "checks"})
+        """, unsafe_allow_html=True)
+        checks = gh_diag.get("checks", []) if isinstance(gh_diag, dict) else []
+        if checks:
+            st.dataframe(pd.DataFrame(checks), use_container_width=True, hide_index=True)
+        elif gh_diag:
+            st.json({k: v for k, v in gh_diag.items() if k != "checks"})
 
 
 def _action_items_html(df, COLORS, title, icon, max_rows=8):
@@ -305,13 +299,13 @@ def _action_items_html(df, COLORS, title, icon, max_rows=8):
             shares_txt = f"｜{float(shares):+,.0f} 股" if str(shares) not in ['', 'nan', 'None'] else ''
         except Exception:
             shares_txt = ''
-        blocks.append(f"""
-        <div style="border-bottom:1px solid rgba(128,128,128,.18); padding:7px 0;">
-            <div style="font-weight:900; color:{COLORS['text']}; font-size:13.5px;">{i}. {_safe_text(stock)}</div>
-            <div style="color:{COLORS['subtext']}; font-size:12.5px; line-height:1.45;">{_safe_text(r.get('產業',''))}｜{etf_cnt} 檔 ETF｜{event_cnt} 事件｜{change_txt}{shares_txt}</div>
-            <div style="color:{COLORS['subtext']}; font-size:12px; line-height:1.45;">涉及：{_safe_text(etfs)}</div>
-        </div>
-        """)
+        blocks.append(
+            f"<div style='border-bottom:1px solid rgba(128,128,128,.18); padding:7px 0;'>"
+            f"<div style='font-weight:900; color:{COLORS['text']}; font-size:13.5px;'>{i}. {_safe_text(stock)}</div>"
+            f"<div style='color:{COLORS['subtext']}; font-size:12.5px; line-height:1.45;'>{_safe_text(r.get('產業',''))}｜{etf_cnt} 檔 ETF｜{event_cnt} 事件｜{change_txt}{shares_txt}</div>"
+            f"<div style='color:{COLORS['subtext']}; font-size:12px; line-height:1.45;'>涉及：{_safe_text(etfs)}</div>"
+            f"</div>"
+        )
     return "".join(blocks)
 
 
@@ -366,12 +360,13 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
                     sub["_sort"] = pd.to_numeric(sub.get(sort_col, 0), errors="coerce").abs().fillna(0)
                     sub = sub.sort_values(["ETF數", "事件數", "_sort"], ascending=[False, False, False])
                 with col:
-                    st.markdown(f"""
-                    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:12px; padding:12px 14px; margin:8px 0 14px 0; min-height:260px;">
-                        <div style="font-size:16px; font-weight:900; color:{COLORS['text']}; margin-bottom:6px;">{icon} 共同{status} Top 8</div>
-                        {_action_items_html(sub, COLORS, status, icon, max_rows=8)}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    card_html = (
+                        f"<div style='background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-radius:12px; padding:12px 14px; margin:8px 0 14px 0; min-height:260px;'>"
+                        f"<div style='font-size:16px; font-weight:900; color:{COLORS['text']}; margin-bottom:6px;'>{icon} 共同{status} Top 8</div>"
+                        + _action_items_html(sub, COLORS, status, icon, max_rows=8)
+                        + "</div>"
+                    )
+                    st.markdown(card_html, unsafe_allow_html=True)
 
     with st.expander("📋 展開逐日明細 / ETF 快照", expanded=False):
         tab1, tab2, tab3 = st.tabs(["逐日事件", "ETF快照", "熱門Top10"])

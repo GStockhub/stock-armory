@@ -144,7 +144,7 @@ def _filter_complete_holdings(df: pd.DataFrame, industry_map: Optional[Dict[str,
     quality = _holding_quality(df, industry_map=industry_map)
     if df is None or df.empty or quality.empty:
         return pd.DataFrame(), quality
-    good = set(quality[quality["資料狀態"].astype(str).str.contains("完整", na=False)]["ETF代號"].astype(str))
+    good = set(quality[quality["資料狀態"].astype(str).str.startswith("✅", na=False)]["ETF代號"].astype(str))
     if not good:
         return pd.DataFrame(), quality
     return df[df["ETF代號"].astype(str).isin(good)].copy(), quality
@@ -660,6 +660,24 @@ def summarize_holdings(
     if df.empty:
         return empty
 
+    # V37.7.1：清掉歷史庫中已污染的「單筆持股假快照」。
+    # 完整度必須以「日期 + ETF」為單位判斷，避免多天零碎資料累加後被誤判完整。
+    df["_產業_tmp"] = df["成分股代號"].map(lambda x: _industry_of(x, industry_map))
+    q = df.groupby(["日期", "ETF代號", "ETF名稱"], dropna=False).agg(
+        持股數=("成分股代號", "nunique"),
+        權重合計=("權重", "sum"),
+        產業數=("_產業_tmp", "nunique"),
+    ).reset_index()
+    good_groups = q[
+        (pd.to_numeric(q["持股數"], errors="coerce").fillna(0) >= MIN_COMPLETE_HOLDINGS)
+        & (pd.to_numeric(q["權重合計"], errors="coerce").fillna(0) >= MIN_COMPLETE_WEIGHT_SUM)
+    ][["日期", "ETF代號"]]
+    if good_groups.empty:
+        return empty
+    df = pd.merge(df.drop(columns=["_產業_tmp"], errors="ignore"), good_groups, on=["日期", "ETF代號"], how="inner")
+    if df.empty:
+        return empty
+
     latest = df["日期"].max()
     latest_df = df[df["日期"] == latest].copy()
     if latest_df.empty:
@@ -859,7 +877,7 @@ def build_active_etf_manager_radar(
     cand_tuple = tuple((c["ETF代號"], c["ETF名稱"]) for c in candidates)
     latest_raw = fetch_active_etf_holdings_auto(cand_tuple, custom_sources=custom_sources, name_map=name_map)
     latest, latest_quality = _filter_complete_holdings(latest_raw, industry_map=industry_map)
-    incomplete_count = 0 if latest_quality is None or latest_quality.empty else int((~latest_quality["資料狀態"].astype(str).str.contains("完整", na=False)).sum())
+    incomplete_count = 0 if latest_quality is None or latest_quality.empty else int((~latest_quality["資料狀態"].astype(str).str.startswith("✅", na=False)).sum())
     if latest.empty:
         hist = merge_holdings_history(pd.DataFrame(), cache_path=cache_path, max_days=HOLDINGS_KEEP_DAYS)
         summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days, momentum_df=momentum_df, event_days=EVENT_LOOKBACK_DAYS)
