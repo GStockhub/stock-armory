@@ -83,17 +83,71 @@ ALT_CACHE_FILE = "/tmp/active_etf_holdings_history.csv"
 SESSION_HISTORY_KEY = "_active_etf_holdings_history_df"
 GITHUB_DIAG_KEY = "_active_etf_github_diag"
 
-# V37.5 主動 ETF 經理人風向 V3
+# V37.7 主動 ETF 經理人雷達瘦身版
 # - 明細快照保留 60 天
 # - 主畫面判讀 20 天
 # - 事件表看近 30 天
 # - 股數變化優先；沒有股數時退回權重變化
+# - 自動來源完整度防呆：抓到太少持股不寫入 history、不參與共同動作
 HOLDINGS_KEEP_DAYS = 60
 MAIN_LOOKBACK_DAYS = 20
 EVENT_LOOKBACK_DAYS = 30
 ACTIVE_ETF_TOP_N = 10
 SIGNIFICANT_SHARE_RATIO = 0.03
 SIGNIFICANT_WEIGHT_PP = 0.3
+MIN_COMPLETE_HOLDINGS = 10
+MIN_COMPLETE_WEIGHT_SUM = 20.0
+
+
+def _holding_quality(df: pd.DataFrame, industry_map: Optional[Dict[str, str]] = None) -> pd.DataFrame:
+    """檢查每檔 ETF 的持股快照是否足夠完整。
+
+    抓到 1~2 筆不等於成功；這種資料會污染產業占比與共同動作。
+    """
+    cols = ["ETF代號", "ETF名稱", "持股數", "權重合計", "產業數", "資料狀態", "資料備註"]
+    if df is None or df.empty:
+        return pd.DataFrame(columns=cols)
+    tmp = df.copy()
+    if "權重" not in tmp.columns:
+        tmp["權重"] = 0
+    tmp["權重"] = tmp["權重"].map(_to_float)
+    if industry_map is not None and "產業" not in tmp.columns:
+        tmp["產業"] = tmp["成分股代號"].map(lambda x: _industry_of(x, industry_map))
+    elif "產業" not in tmp.columns:
+        tmp["產業"] = ""
+
+    q = tmp.groupby(["ETF代號", "ETF名稱"], dropna=False).agg(
+        持股數=("成分股代號", "nunique"),
+        權重合計=("權重", "sum"),
+        產業數=("產業", "nunique"),
+    ).reset_index()
+
+    def _status(r):
+        reasons = []
+        if int(r.get("持股數", 0) or 0) < MIN_COMPLETE_HOLDINGS:
+            reasons.append(f"持股數<{MIN_COMPLETE_HOLDINGS}")
+        if float(r.get("權重合計", 0) or 0) < MIN_COMPLETE_WEIGHT_SUM:
+            reasons.append(f"權重合計<{MIN_COMPLETE_WEIGHT_SUM:.0f}%")
+        if int(r.get("產業數", 0) or 0) <= 1 and int(r.get("持股數", 0) or 0) < MIN_COMPLETE_HOLDINGS:
+            reasons.append("產業過少")
+        if reasons:
+            return "⚠️ 不完整", "、".join(reasons)
+        return "✅ 完整", "可納入分析"
+
+    pairs = q.apply(_status, axis=1)
+    q["資料狀態"] = [x[0] for x in pairs]
+    q["資料備註"] = [x[1] for x in pairs]
+    return q[cols]
+
+
+def _filter_complete_holdings(df: pd.DataFrame, industry_map: Optional[Dict[str, str]] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    quality = _holding_quality(df, industry_map=industry_map)
+    if df is None or df.empty or quality.empty:
+        return pd.DataFrame(), quality
+    good = set(quality[quality["資料狀態"].astype(str).str.contains("完整", na=False)]["ETF代號"].astype(str))
+    if not good:
+        return pd.DataFrame(), quality
+    return df[df["ETF代號"].astype(str).isin(good)].copy(), quality
 
 
 # -----------------------------
@@ -589,6 +643,8 @@ def summarize_holdings(
         "shared_actions": pd.DataFrame(),
         "manager_profiles": pd.DataFrame(),
         "hot_etfs": pd.DataFrame(),
+        "quality": pd.DataFrame(),
+        "incomplete_holdings": pd.DataFrame(),
         "meta": pd.DataFrame(),
     }
     if holdings_df is None or holdings_df.empty:
@@ -608,6 +664,10 @@ def summarize_holdings(
     latest_df = df[df["日期"] == latest].copy()
     if latest_df.empty:
         return empty
+
+    latest_df["產業"] = latest_df["成分股代號"].map(lambda x: _industry_of(x, industry_map))
+    quality = _holding_quality(latest_df, industry_map=industry_map)
+    incomplete_holdings = quality[~quality["資料狀態"].astype(str).str.contains("完整", na=False)].copy() if not quality.empty else pd.DataFrame()
 
     hot_etfs = _weighted_hot_candidates(latest_df, momentum_df, top_n=top_n)
     focus = hot_etfs["ETF代號"].astype(str).tolist() if not hot_etfs.empty else latest_df["ETF代號"].astype(str).drop_duplicates().head(top_n).tolist()
@@ -771,9 +831,12 @@ def summarize_holdings(
         "shared_actions": shared_actions,
         "manager_profiles": manager_profiles,
         "hot_etfs": hot_etfs,
+        "quality": quality,
+        "incomplete_holdings": incomplete_holdings,
         "meta": pd.DataFrame([{
             "資料意義": "主動 ETF 經理人持股變化，不代表全市場資金流",
             "事件門檻": "|Δshares/prev_shares|≥3% 且 最大權重≥0.3pp；無股數資料時改用 |Δweight|≥0.3pp",
+            "完整度門檻": f"持股數≥{MIN_COMPLETE_HOLDINGS} 且 權重合計≥{MIN_COMPLETE_WEIGHT_SUM:.0f}%",
             "快照保留": f"{HOLDINGS_KEEP_DAYS}天",
             "主畫面判讀": f"{lookback_days}天",
             "事件明細": f"{event_days}天",
@@ -794,7 +857,9 @@ def build_active_etf_manager_radar(
     """主入口：追蹤主動 ETF 清單 → 抓持股 → 併歷史 → 產出分析。"""
     candidates = get_active_etf_candidates(momentum_df, top_n=top_n)
     cand_tuple = tuple((c["ETF代號"], c["ETF名稱"]) for c in candidates)
-    latest = fetch_active_etf_holdings_auto(cand_tuple, custom_sources=custom_sources, name_map=name_map)
+    latest_raw = fetch_active_etf_holdings_auto(cand_tuple, custom_sources=custom_sources, name_map=name_map)
+    latest, latest_quality = _filter_complete_holdings(latest_raw, industry_map=industry_map)
+    incomplete_count = 0 if latest_quality is None or latest_quality.empty else int((~latest_quality["資料狀態"].astype(str).str.contains("完整", na=False)).sum())
     if latest.empty:
         hist = merge_holdings_history(pd.DataFrame(), cache_path=cache_path, max_days=HOLDINGS_KEEP_DAYS)
         summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days, momentum_df=momentum_df, event_days=EVENT_LOOKBACK_DAYS)
@@ -802,7 +867,7 @@ def build_active_etf_manager_radar(
         if hist is not None and not hist.empty and summary.get("snapshot", pd.DataFrame()).empty is False:
             return {
                 "ok": True,
-                "message": "今日自動持股來源抓不到；已沿用 GitHub / 本機最近成功快照。",
+                "message": f"今日自動來源未取得完整快照；已沿用 GitHub / 本機最近成功快照。自動來源不完整 {incomplete_count} 檔。",
                 "candidates": pd.DataFrame(candidates),
                 "holdings": hist,
                 "summary": summary,
@@ -810,7 +875,7 @@ def build_active_etf_manager_radar(
             }
         return {
             "ok": False,
-            "message": "自動持股來源目前抓不到資料，且沒有可沿用的歷史快照；請使用 CSV 備援。",
+            "message": f"自動持股來源目前沒有完整資料，且沒有可沿用的歷史快照；請使用 CSV 備援。自動來源不完整 {incomplete_count} 檔。",
             "candidates": pd.DataFrame(candidates),
             "holdings": pd.DataFrame(),
             "summary": summarize_holdings(pd.DataFrame(), industry_map, name_map, top_n=top_n, lookback_days=lookback_days, momentum_df=momentum_df, event_days=EVENT_LOOKBACK_DAYS),
@@ -821,7 +886,7 @@ def build_active_etf_manager_radar(
     history_status = get_history_status(hist, lookback_days=lookback_days)
     return {
         "ok": True,
-        "message": f"已自動更新 {latest['ETF代號'].nunique()} 檔主動 ETF 持股；歷史庫會自動同步，若 GitHub 失敗則先用本機快取。",
+        "message": f"已自動更新 {latest['ETF代號'].nunique()} 檔完整主動 ETF 持股；不完整 {incomplete_count} 檔已排除，不寫入歷史庫。",
         "candidates": pd.DataFrame(candidates),
         "holdings": hist,
         "summary": summary,
