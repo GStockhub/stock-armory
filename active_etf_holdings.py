@@ -140,7 +140,11 @@ def _name_reverse_map(name_map: Dict[str, str]) -> Dict[str, str]:
 # -----------------------------
 
 def get_active_etf_candidates(momentum_df: Optional[pd.DataFrame] = None, top_n: int = 10) -> List[Dict[str, str]]:
-    """從 ETF 動能排行抓主動 ETF 前 N 名；若沒有動能表，就用預設主動 ETF 清單。"""
+    """主動 ETF 觀察清單。
+
+    V37.4：不再只看 ETF 綜合動能 Top 10 內出現的主動 ETF。
+    先依動能表排序，再把 DEFAULT_ACTIVE_ETFS 全部補齊；主動 ETF 不多，直接全追蹤比較適合。
+    """
     rows: List[Dict[str, str]] = []
     if momentum_df is not None and not momentum_df.empty:
         df = momentum_df.copy()
@@ -149,15 +153,16 @@ def get_active_etf_candidates(momentum_df: Optional[pd.DataFrame] = None, top_n:
         if "動能分數" in df.columns:
             df["_score"] = pd.to_numeric(df["動能分數"], errors="coerce").fillna(0)
             df = df.sort_values("_score", ascending=False)
-        for _, r in df.head(top_n).iterrows():
+        for _, r in df.iterrows():
             code = _clean_code(r.get("代號", ""))
             if not code:
                 continue
-            rows.append({"ETF代號": code, "ETF名稱": str(r.get("名稱", DEFAULT_ACTIVE_ETFS.get(code, {}).get("名稱", code)))} )
-    if not rows:
-        for code, meta in list(DEFAULT_ACTIVE_ETFS.items())[:top_n]:
-            rows.append({"ETF代號": code, "ETF名稱": meta.get("名稱", code)})
-    # 去重保序
+            rows.append({"ETF代號": code, "ETF名稱": str(r.get("名稱", DEFAULT_ACTIVE_ETFS.get(code, {}).get("名稱", code)))})
+
+    # 動能表沒出現也要追蹤，避免只剩 00981A / 00982A。
+    for code, meta in DEFAULT_ACTIVE_ETFS.items():
+        rows.append({"ETF代號": code, "ETF名稱": meta.get("名稱", code)})
+
     seen = set()
     out = []
     for r in rows:
@@ -165,7 +170,7 @@ def get_active_etf_candidates(momentum_df: Optional[pd.DataFrame] = None, top_n:
         if code not in seen:
             seen.add(code)
             out.append(r)
-    return out[:top_n]
+    return out[:max(1, int(top_n))]
 
 
 def _source_urls_for(code: str, custom_sources: Optional[Dict[str, str]] = None) -> List[str]:
@@ -641,7 +646,7 @@ def build_active_etf_manager_radar(
     custom_sources: Optional[Dict[str, str]] = None,
     cache_path: str = CACHE_FILE,
 ) -> Dict[str, object]:
-    """主入口：自動挑主動 ETF Top N → 抓持股 → 併歷史 → 產出分析。"""
+    """主入口：追蹤主動 ETF 清單 → 抓持股 → 併歷史 → 產出分析。"""
     candidates = get_active_etf_candidates(momentum_df, top_n=top_n)
     cand_tuple = tuple((c["ETF代號"], c["ETF名稱"]) for c in candidates)
     latest = fetch_active_etf_holdings_auto(cand_tuple, custom_sources=custom_sources, name_map=name_map)

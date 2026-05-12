@@ -289,7 +289,7 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
     manager_profiles = summary.get("manager_profiles", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
 
     st.markdown("##### 📋 主動 ETF 經理人動作追蹤")
-    st.caption("固定看主動 ETF Top 5，不管有沒有進 ETF 綜合動能 Top 10；逐日比較新增、刪除、加碼、減碼，避免一直顯示同一段舊區間。")
+    st.caption("固定追蹤全部主動 ETF；動能表只決定排序，不再限制觀察名單。逐日比較新增、刪除、加碼、減碼，讓你看經理人操作差異。")
 
     if changes is None or changes.empty:
         counts = {"新增": 0, "刪除": 0, "加碼": 0, "減碼": 0}
@@ -404,7 +404,7 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
 def _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=None, auto_note=""):
     history_status = history_status or get_history_status(holdings, lookback_days=5)
 
-    st.markdown("##### Top 主動 ETF 產業占比")
+    st.markdown("##### 主動 ETF 產業占比")
     _render_industry_donut_cards(summary, COLORS, top_n=5)
 
     # Top 主動 ETF 產業占比 與 下方共同重倉/加減碼區塊 的垂直間距
@@ -489,7 +489,7 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
     if holdings.empty:
         manager_radar = active_pool if isinstance(active_pool, pd.DataFrame) and not active_pool.empty else radar
         auto_result = build_active_etf_manager_radar(
-            manager_radar, industry_map, name_map, top_n=5, lookback_days=5,
+            manager_radar, industry_map, name_map, top_n=10, lookback_days=5,
             cache_path="active_etf_holdings_history.csv"
         )
         summary = auto_result.get("summary")
@@ -497,7 +497,7 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
         auto_note = auto_result.get("message", "")
         history_status = auto_result.get("history_status")
     else:
-        summary = summarize_active_etf_holdings(holdings, industry_map, name_map, top_n=5, lookback_days=5)
+        summary = summarize_active_etf_holdings(holdings, industry_map, name_map, top_n=10, lookback_days=5)
         history_status = get_history_status(holdings, lookback_days=5)
         auto_note = "已使用側邊欄 CSV 備援資料。"
 
