@@ -146,7 +146,7 @@ def render_data_status_bar():
     status_items = [
         len(TWSE_NAME_MAP) > 0,
         not MACRO_DF.empty,
-        len(chip_db) > 0,
+        (len(chip_db) > 0) or (isinstance(today_df, pd.DataFrame) and not today_df.empty),
         holding_read_ok or not sheet_url,
         aar_read_ok or not aar_sheet_url,
         bool(str(FM_TOKEN).strip()),
@@ -462,6 +462,74 @@ def _build_technical_fallback_chips(max_rows=350):
     return pd.DataFrame(fallback_rows)
 
 
+def _ensure_today_candidates(reason=""):
+    """V37.3：在頁籤渲染前再次保底，避免 today_df 在初始化後仍為空。"""
+    global today_df, top_80_chips, dates, chip_data_available, chips_data_source
+    if isinstance(today_df, pd.DataFrame) and not today_df.empty and "代號" in today_df.columns:
+        return
+    today_df = _build_technical_fallback_chips(max_rows=350)
+    dates = ["TECH"]
+    top_80_chips = today_df["代號"].astype(str).head(120).tolist() if not today_df.empty else []
+    chip_data_available = False
+    chips_data_source = "技術備援"
+    if reason:
+        st.warning(f"⚠️ 已啟用技術備援候選池：{reason}｜候選 {len(today_df)} 檔")
+
+
+def _debug_data_chain_box(extra=None):
+    """V37.3：把 S/A/B 與情報局資料鏈透明化，避免只看到空白。"""
+    extra = extra or {}
+    try:
+        eod_df = st.session_state.get("eod_intel_df", pd.DataFrame())
+        eod_rows = 0 if eod_df is None else (len(eod_df) if isinstance(eod_df, pd.DataFrame) else -1)
+    except Exception:
+        eod_rows = -1
+    diag = {
+        "MACRO_SCORE": MACRO_SCORE,
+        "today_df_rows": len(today_df) if isinstance(today_df, pd.DataFrame) else -1,
+        "today_df_cols": ",".join(list(today_df.columns)[:10]) if isinstance(today_df, pd.DataFrame) and not today_df.empty else "",
+        "chip_db_days": len(chip_db) if isinstance(chip_db, dict) else -1,
+        "chip_data_available": chip_data_available,
+        "chips_data_source": chips_data_source,
+        "top_80_chips": len(top_80_chips) if isinstance(top_80_chips, list) else -1,
+        "eod_intel_rows": eod_rows,
+    }
+    diag.update(extra)
+    with st.expander("🩺 S/A/B 與情報局資料鏈診斷", expanded=False):
+        st.dataframe(pd.DataFrame([diag]), use_container_width=True, hide_index=True)
+
+
+def _run_level2_rescue(calc_list, label="主掃描"):
+    """V37.3：level2 若被快取成空或批次失敗，清 cache 後用較小候選池再試一次。"""
+    calc_list = tuple(str(x).strip() for x in calc_list if str(x).strip() and not str(x).startswith("00"))
+    if not calc_list:
+        return pd.DataFrame(), "calc_list 空"
+    try:
+        df = level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df, f"{label} 成功：{len(df)} 檔"
+    except Exception as e:
+        first_err = str(e)
+    else:
+        first_err = "第一次回傳空表或 None"
+
+    # Streamlit cache 可能把限流期間的空結果暫存；強制清一次再縮小樣本。
+    try:
+        level2_quant_engine.clear()
+    except Exception:
+        pass
+
+    # 縮小候選池，降低 Yahoo / FinMind 壓力；優先用前 60 檔。
+    small_list = calc_list[:60]
+    try:
+        df2 = level2_quant_engine(small_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
+        if isinstance(df2, pd.DataFrame) and not df2.empty:
+            return df2, f"{label} 第一次失敗；縮小重試成功：{len(df2)} 檔"
+        return pd.DataFrame(), f"{label} 仍無技術資料：{first_err}"
+    except Exception as e:
+        return pd.DataFrame(), f"{label} 重試失敗：{first_err}｜{e}"
+
+
 chip_data_available = len(chip_db) >= 1
 chips_data_source = st.session_state.get("chips_data_source", "即時")
 
@@ -746,6 +814,8 @@ if mobile_quick_mode:
 t_rank, t_etf, t_chip, t_cmd, t_book = st.tabs(["🎯 個股游擊", "📈 ETF 主體倉", "📡 情報局", "🏦 總司令部", "📖 兵工廠與軍史館"])
 
 with t_rank:
+    _ensure_today_candidates("進入個股游擊時 today_df 仍為空")
+    _debug_data_chain_box()
     render_sandbox_panel()
     st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     st.markdown("### 🎯 <span class='highlight-primary'>明日作戰部隊</span>", unsafe_allow_html=True)
@@ -779,16 +849,20 @@ with t_rank:
         scan_key = f"{dates[0] if 'dates' in locals() and dates else 'nodate'}_{MACRO_SCORE}_{operation_mode}_{len(calc_list)}_{chips_data_source}"
         needs_eod_scan = force_eod_scan or st.session_state.get("eod_scan_key") != scan_key or "eod_intel_df" not in st.session_state
         if needs_eod_scan:
-            intel_df = level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
+            intel_df, scan_msg = _run_level2_rescue(calc_list, "S/A/B 技術掃描")
             st.session_state["eod_intel_df"] = intel_df
+            st.session_state["eod_scan_msg"] = scan_msg
             st.session_state["eod_scan_key"] = scan_key
             st.session_state["eod_last_scan_time"] = datetime.now().strftime("%H:%M:%S")
         else:
             intel_df = st.session_state.get("eod_intel_df")
+            scan_msg = st.session_state.get("eod_scan_msg", "沿用快取掃描結果")
 
-        if intel_df is None:
-            st.error("🚨 **資料斷線警告**：Yahoo與FinMind皆無回應。請稍後重整或確認 API 額度", icon="💀")
-        elif not intel_df.empty:
+        st.caption(f"技術掃描狀態：{scan_msg}")
+        if intel_df is None or getattr(intel_df, "empty", True):
+            st.error("🚨 S/A/B 技術掃描目前沒有產出資料。這代表批次價格資料鏈失敗或被限流；沙盤單檔仍可使用。", icon="💀")
+            _debug_data_chain_box({"calc_list": len(calc_list), "scan_msg": scan_msg})
+        else:
             final_rank = pd.merge(today_df, intel_df, on="代號", suffixes=("_chip", "_intel"))
             final_rank = final_rank[~final_rank["代號"].astype(str).str.startswith("00")].copy()
             if "名稱_chip" in final_rank.columns: final_rank = final_rank.rename(columns={"名稱_chip": "名稱"})
@@ -1293,6 +1367,14 @@ with t_etf:
     etf_ui.render_etf_tab(COLORS, FM_TOKEN, TWSE_IND_MAP, TWSE_NAME_MAP, etf_holdings_url, table_style)
 
 with t_chip:
+    _ensure_today_candidates("進入情報局時 today_df 仍為空")
+    if (st.session_state.get("eod_intel_df") is None or getattr(st.session_state.get("eod_intel_df"), "empty", True)) and not today_df.empty:
+        _chip_calc = tuple(today_df["代號"].astype(str).head(80).tolist())
+        _chip_intel, _chip_msg = _run_level2_rescue(_chip_calc, "情報局技術補掃描")
+        if isinstance(_chip_intel, pd.DataFrame) and not _chip_intel.empty:
+            st.session_state["eod_intel_df"] = _chip_intel
+            st.session_state["eod_scan_msg"] = _chip_msg
+    _debug_data_chain_box()
     rotation_radar.render_industry_rotation_radar(COLORS, table_style, TWSE_IND_MAP, today_df, MACRO_DF)
     st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     if not today_df.empty:

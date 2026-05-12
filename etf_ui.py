@@ -283,47 +283,122 @@ def _render_manager_header_compact(summary, holdings, COLORS, history_status=Non
 
 def _render_etfedge_like_changes(summary, COLORS, table_style):
     changes = summary.get("changes", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    daily_events = summary.get("daily_events", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    shared_actions = summary.get("shared_actions", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
     snapshot = summary.get("snapshot", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
-    st.markdown("##### 📋 ETF 持股事件總覽（濃縮版）")
+    manager_profiles = summary.get("manager_profiles", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+
+    st.markdown("##### 📋 主動 ETF 經理人動作追蹤")
+    st.caption("固定看主動 ETF Top 5，不管有沒有進 ETF 綜合動能 Top 10；逐日比較新增、刪除、加碼、減碼，避免一直顯示同一段舊區間。")
+
     if changes is None or changes.empty:
         counts = {"新增": 0, "刪除": 0, "加碼": 0, "減碼": 0}
+        basis = "尚無逐日變化"
     else:
         counts = {k: int((changes["狀態"] == k).sum()) for k in ["新增", "刪除", "加碼", "減碼"]}
-    cc = st.columns(4)
-    metric_specs = [("🆕 新增", counts.get("新增", 0)), ("➕ 加碼", counts.get("加碼", 0)), ("➖ 減碼", counts.get("減碼", 0)), ("❌ 刪除", counts.get("刪除", 0))]
+        basis = str(changes["比較基準"].iloc[0]) if "比較基準" in changes.columns and len(changes) else "最新有效快照"
+
+    cc = st.columns(5)
+    metric_specs = [
+        ("比較基準", basis),
+        ("🆕 新增", counts.get("新增", 0)),
+        ("➕ 加碼", counts.get("加碼", 0)),
+        ("➖ 減碼", counts.get("減碼", 0)),
+        ("❌ 刪除", counts.get("刪除", 0)),
+    ]
     for col, (label, val) in zip(cc, metric_specs):
         with col:
-            st.metric(label, f"{val} 筆")
+            st.metric(label, val)
 
-    tabs = st.tabs(["📦 快照總覽", "🆕 新增", "➕ 加碼", "➖ 減碼", "❌ 刪除"])
+    tabs = st.tabs(["🧭 經理人差異", "🤝 共同動作", "📅 逐日事件", "📦 快照總覽", "🆕新增/❌刪除", "➕加碼/➖減碼"])
+
     with tabs[0]:
+        if manager_profiles is None or manager_profiles.empty:
+            st.info("目前沒有主動 ETF 經理人差異資料。")
+        else:
+            show_cols = ["ETF代號", "ETF名稱", "持股數", "集中度", "主要產業", "重點持股"]
+            disp = manager_profiles[[c for c in show_cols if c in manager_profiles.columns]].copy()
+            st.dataframe(
+                disp.style.set_properties(**table_style).format({"集中度": "{:.2f}%"}),
+                use_container_width=True,
+                hide_index=True,
+                height=340,
+            )
+
+    with tabs[1]:
+        if shared_actions is None or shared_actions.empty:
+            st.info("最新比較期間沒有多檔主動 ETF 同步新增、刪除或加減碼。")
+        else:
+            show_cols = ["狀態", "成分股代號", "成分股名稱", "產業", "ETF數", "涉及ETF", "合計變化"]
+            disp = shared_actions[[c for c in show_cols if c in shared_actions.columns]].copy().head(80)
+            st.dataframe(
+                disp.style.set_properties(**table_style).format({"合計變化": "{:+.2f}%"}),
+                use_container_width=True,
+                hide_index=True,
+                height=360,
+            )
+
+    with tabs[2]:
+        if daily_events is None or daily_events.empty:
+            st.info("目前沒有逐日事件。若持股來源多日未更新，這裡會維持空白；這代表經理人尚未公布新快照或資料源未變。")
+        else:
+            show_cols = ["事件日期", "比較基準", "ETF代號", "狀態", "成分股代號", "成分股名稱", "產業", "權重_舊", "權重_新", "變化"]
+            disp = daily_events[[c for c in show_cols if c in daily_events.columns]].copy().sort_values(["事件日期", "狀態", "變化"], ascending=[False, True, False]).head(200)
+            st.dataframe(
+                disp.style.set_properties(**table_style).format({"權重_舊": "{:.2f}%", "權重_新": "{:.2f}%", "變化": "{:+.2f}%"}),
+                use_container_width=True,
+                hide_index=True,
+                height=430,
+            )
+
+    with tabs[3]:
         if snapshot is None or snapshot.empty:
             st.info("目前沒有可顯示的持股快照。")
         else:
             show_cols = ["ETF", "名稱", "持股數", "前十集中度", "前十大產業", "前十大個股"]
             disp = snapshot[[c for c in show_cols if c in snapshot.columns]].copy()
-            st.dataframe(disp.style.set_properties(**table_style).format({"前十集中度":"{:.2f}%"}), use_container_width=True, hide_index=True, height=280)
+            st.dataframe(
+                disp.style.set_properties(**table_style).format({"前十集中度": "{:.2f}%"}),
+                use_container_width=True,
+                hide_index=True,
+                height=280,
+            )
 
-    for tab, status in zip(tabs[1:], ["新增", "加碼", "減碼", "刪除"]):
-        with tab:
-            if changes is None or changes.empty:
-                st.info("近 5 日沒有明顯持股變化，或資料只有單一日期。")
-                continue
-            sub = changes[changes["狀態"].eq(status)].copy()
+    with tabs[4]:
+        if changes is None or changes.empty:
+            st.info("最新比較期間沒有新增 / 刪除事件。")
+        else:
+            sub = changes[changes["狀態"].isin(["新增", "刪除"])].copy()
             if sub.empty:
-                st.info(f"目前沒有『{status}』事件。")
-                continue
-            if status == "新增":
-                sub = sub.sort_values(["權重_新", "變化"], ascending=[False, False])
-            elif status == "刪除":
-                sub = sub.sort_values(["權重_舊", "變化"], ascending=[False, True])
-            elif status == "加碼":
-                sub = sub.sort_values("變化", ascending=False)
+                st.info("最新比較期間沒有新增 / 刪除事件。")
             else:
-                sub = sub.sort_values("變化", ascending=True)
-            show_cols = ["比較基準", "ETF代號", "成分股代號", "成分股名稱", "產業", "狀態", "權重_舊", "權重_新", "變化"]
-            disp = sub[[c for c in show_cols if c in sub.columns]].head(120).copy()
-            st.dataframe(disp.style.set_properties(**table_style).format({"權重_舊":"{:.2f}%", "權重_新":"{:.2f}%", "變化":"{:+.2f}%"}), use_container_width=True, hide_index=True, height=420)
+                sub = sub.sort_values(["狀態", "權重_新", "權重_舊"], ascending=[True, False, False])
+                show_cols = ["比較基準", "ETF代號", "狀態", "成分股代號", "成分股名稱", "產業", "權重_舊", "權重_新", "變化"]
+                disp = sub[[c for c in show_cols if c in sub.columns]].head(160).copy()
+                st.dataframe(
+                    disp.style.set_properties(**table_style).format({"權重_舊": "{:.2f}%", "權重_新": "{:.2f}%", "變化": "{:+.2f}%"}),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=420,
+                )
+
+    with tabs[5]:
+        if changes is None or changes.empty:
+            st.info("最新比較期間沒有加碼 / 減碼事件。")
+        else:
+            sub = changes[changes["狀態"].isin(["加碼", "減碼"])].copy()
+            if sub.empty:
+                st.info("最新比較期間沒有加碼 / 減碼事件。")
+            else:
+                sub = sub.sort_values("變化", ascending=False)
+                show_cols = ["比較基準", "ETF代號", "狀態", "成分股代號", "成分股名稱", "產業", "權重_舊", "權重_新", "變化"]
+                disp = sub[[c for c in show_cols if c in sub.columns]].head(160).copy()
+                st.dataframe(
+                    disp.style.set_properties(**table_style).format({"權重_舊": "{:.2f}%", "權重_新": "{:.2f}%", "變化": "{:+.2f}%"}),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=420,
+                )
 
 
 def _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=None, auto_note=""):

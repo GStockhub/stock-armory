@@ -493,6 +493,9 @@ def summarize_holdings(
         "common_holdings": pd.DataFrame(),
         "changes": pd.DataFrame(),
         "industry_changes": pd.DataFrame(),
+        "daily_events": pd.DataFrame(),
+        "shared_actions": pd.DataFrame(),
+        "manager_profiles": pd.DataFrame(),
     }
     if holdings_df is None or holdings_df.empty:
         return empty
@@ -540,6 +543,21 @@ def summarize_holdings(
     industries = latest_focus.groupby(["ETF代號", "產業"], dropna=False)["權重"].sum().reset_index().sort_values(["ETF代號", "權重"], ascending=[True, False])
     stocks = latest_focus[["ETF代號", "成分股代號", "成分股名稱", "產業", "權重"]].sort_values(["ETF代號", "權重"], ascending=[True, False])
 
+    profile_rows = []
+    for etf_code, sub in latest_focus.groupby("ETF代號"):
+        etf_name = sub["ETF名稱"].iloc[0] if "ETF名稱" in sub else etf_code
+        ind_top = sub.groupby("產業")["權重"].sum().sort_values(ascending=False).head(5)
+        stock_top = sub.sort_values("權重", ascending=False).head(8)
+        profile_rows.append({
+            "ETF代號": etf_code,
+            "ETF名稱": etf_name,
+            "持股數": int(len(sub)),
+            "集中度": round(float(stock_top["權重"].sum()), 2),
+            "主要產業": "、".join([f"{k} {v:.1f}%" for k, v in ind_top.items()]),
+            "重點持股": "、".join([f"{r['成分股名稱']}({r['成分股代號']}) {r['權重']:.1f}%" for _, r in stock_top.iterrows()]),
+        })
+    manager_profiles = pd.DataFrame(profile_rows)
+
     common = latest_focus.groupby(["成分股代號", "成分股名稱", "產業"], dropna=False).agg(
         出現ETF數=("ETF代號", "nunique"),
         合計權重=("權重", "sum"),
@@ -548,30 +566,58 @@ def summarize_holdings(
     common_holdings = common[common["出現ETF數"] >= 2].sort_values(["出現ETF數", "合計權重"], ascending=[False, False]).head(30)
 
     changes = pd.DataFrame()
+    daily_events = pd.DataFrame()
+    shared_actions = pd.DataFrame()
     industry_changes = pd.DataFrame()
     dates = sorted(df["日期"].dropna().unique())
-    prev_dates = [d for d in dates if d < latest]
-    if prev_dates:
-        target_min = latest - pd.Timedelta(days=max(1, int(lookback_days) + 2))
-        candidates = [d for d in prev_dates if d >= target_min]
-        prev = min(candidates) if candidates else prev_dates[-1]
-        prev_df = df[(df["日期"] == prev) & (df["ETF代號"].isin(focus))].copy()
-        prev_df["產業"] = prev_df["成分股代號"].map(lambda x: _industry_of(x, industry_map))
 
-        latest_key = latest_focus[["ETF代號", "成分股代號", "成分股名稱", "產業", "權重"]].copy()
-        prev_key = prev_df[["ETF代號", "成分股代號", "權重"]].copy() if not prev_df.empty else pd.DataFrame(columns=["ETF代號", "成分股代號", "權重"])
-        merged = pd.merge(latest_key, prev_key, on=["ETF代號", "成分股代號"], how="outer", suffixes=("_新", "_舊"))
+    def _compare_pair(prev_day, new_day):
+        new_df = df[(df["日期"] == new_day) & (df["ETF代號"].isin(focus))].copy()
+        old_df = df[(df["日期"] == prev_day) & (df["ETF代號"].isin(focus))].copy()
+        if new_df.empty and old_df.empty:
+            return pd.DataFrame()
+        new_key = new_df[["ETF代號", "成分股代號", "成分股名稱", "權重"]].copy() if not new_df.empty else pd.DataFrame(columns=["ETF代號", "成分股代號", "成分股名稱", "權重"])
+        old_key = old_df[["ETF代號", "成分股代號", "權重"]].copy() if not old_df.empty else pd.DataFrame(columns=["ETF代號", "成分股代號", "權重"])
+        merged = pd.merge(new_key, old_key, on=["ETF代號", "成分股代號"], how="outer", suffixes=("_新", "_舊"))
         merged["權重_新"] = merged["權重_新"].fillna(0).map(_to_float)
         merged["權重_舊"] = merged["權重_舊"].fillna(0).map(_to_float)
         merged["變化"] = merged["權重_新"] - merged["權重_舊"]
         merged["狀態"] = np.where((merged["權重_舊"] == 0) & (merged["權重_新"] > 0), "新增",
                               np.where((merged["權重_舊"] > 0) & (merged["權重_新"] == 0), "刪除",
                               np.where(merged["變化"] > 0, "加碼", np.where(merged["變化"] < 0, "減碼", "持平"))))
+        merged = merged[merged["狀態"].isin(["新增", "刪除", "加碼", "減碼"])].copy()
+        if merged.empty:
+            return merged
         merged["成分股名稱"] = merged.apply(lambda r: (name_map or {}).get(str(r["成分股代號"]), str(r.get("成分股名稱", r["成分股代號"]))), axis=1)
         merged["產業"] = merged.apply(lambda r: _industry_of(r["成分股代號"], industry_map), axis=1)
-        changes = merged[merged["狀態"].isin(["新增", "刪除", "加碼", "減碼"])].sort_values("變化", ascending=False)
-        changes["比較基準"] = f"{pd.Timestamp(prev).strftime('%Y-%m-%d')} → {pd.Timestamp(latest).strftime('%Y-%m-%d')}"
+        merged["比較基準"] = f"{pd.Timestamp(prev_day).strftime('%Y-%m-%d')} → {pd.Timestamp(new_day).strftime('%Y-%m-%d')}"
+        merged["事件日期"] = pd.Timestamp(new_day).strftime("%Y-%m-%d")
+        return merged
+
+    # 逐日事件：看每一天相對前一個有效快照，避免「一直顯示同一段區間」。
+    daily_parts = []
+    if len(dates) >= 2:
+        for prev_day, new_day in zip(dates[:-1], dates[1:]):
+            part = _compare_pair(prev_day, new_day)
+            if part is not None and not part.empty:
+                daily_parts.append(part)
+    if daily_parts:
+        daily_events = pd.concat(daily_parts, ignore_index=True)
+        latest_event_day = str(daily_events["事件日期"].max())
+        changes = daily_events[daily_events["事件日期"].astype(str).eq(latest_event_day)].copy()
+    else:
+        changes = pd.DataFrame()
+
+    if changes is not None and not changes.empty:
+        changes = changes.sort_values(["狀態", "變化"], ascending=[True, False])
         industry_changes = changes.groupby("產業", dropna=False)["變化"].sum().reset_index().sort_values("變化", ascending=False)
+        shared_actions = changes.groupby(["成分股代號", "成分股名稱", "產業", "狀態"], dropna=False).agg(
+            ETF數=("ETF代號", "nunique"),
+            涉及ETF=("ETF代號", lambda x: "、".join(sorted(set(map(str, x))))),
+            合計變化=("變化", "sum"),
+        ).reset_index().sort_values(["ETF數", "合計變化"], ascending=[False, False])
+    else:
+        shared_actions = pd.DataFrame()
 
     return {
         "snapshot": snapshot,
@@ -580,6 +626,9 @@ def summarize_holdings(
         "common_holdings": common_holdings,
         "changes": changes,
         "industry_changes": industry_changes,
+        "daily_events": daily_events,
+        "shared_actions": shared_actions,
+        "manager_profiles": manager_profiles,
     }
 
 
