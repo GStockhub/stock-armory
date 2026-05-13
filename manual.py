@@ -220,6 +220,21 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
+### 🧨 v37.12.1（強制核心 Top10 + 誤採用封鎖修正版）
+
+* **【強制核心 Top10】** daily 不再受 history 排序影響，固定抓 00981A、00982A、00992A、00991A、00980A、00400A、00990A、00999A、00993A、00985A。
+* **【移除 00997A daily 誤入】** 00997A 不再進 daily 核心名單，冷門或海外主動 ETF 交給週末 full。
+* **【硬性封鎖非持股頁】** interest / news / service / dividend / networth / performance / selection 不得被採用為 holdings。
+* **【source_mode 明確化】** report 會顯示 `force_top10_adapter_official_first_weekly_full`，方便確認新版本是否真的跑到。
+
+### 🎯 v37.12（熱門 Top10 投信專用 Adapter 打擊版）
+
+* **【每日只打 Top10】** 平日 daily 改成熱門核心 Top10，避免冷門 ETF 拖慢 Actions 與污染 report。
+* **【每週全量保留】** 週六 full 仍全抓全部主動 ETF，冷門 ETF 用於補歷史，不做每日決策主體。
+* **【固定核心名單】** daily 優先抓 00981A、00982A、00992A、00991A、00980A、00400A、00990A、00999A、00993A、00985A。
+* **【投信分流】** 群益保留 buyback 成功路線；復華固定 detail URL；統一補 GetPCF / PCFExcelNPOI 候選；國泰固定 purchase；野村標示 PCF 入口待 POST/API。
+* **【誤判封鎖】** 禁止 interest / news / service / dividend / networth / performance 等頁面被採用為 holdings。
+
 ### 🎯 v37.11.1（精準來源偵察 + 官方直連補強版）
 
 * **【偵察器降噪】** 過濾 CSS / icon / jpg / svg / 字型 / Microsoft 外站 / 超長 HTML 片段，避免 report 被垃圾 URL 洗版。

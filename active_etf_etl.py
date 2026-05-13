@@ -1,6 +1,6 @@
 """active_etf_etl.py
 
-V37.11.1 主動 ETF 精準偵察分層 ETL
+V37.12.1 強制核心 Top10 投信 Adapter 分層 ETL
 ------------------------------
 用途：
 - 由 GitHub Actions 每天自動執行
@@ -41,6 +41,7 @@ except Exception:  # yfinance 失敗不阻斷 ETL，收盤價欄可留 0
 from active_etf_holdings import (
     ACTIVE_ETF_TOP_N,
     DEFAULT_ACTIVE_ETFS,
+    PREFERRED_DAILY_ACTIVE_ETFS,
     HOLDINGS_KEEP_DAYS,
     _filter_complete_holdings,
     fetch_active_etf_holdings_auto,
@@ -178,11 +179,9 @@ def _read_latest_history_etf_order(output_path: str) -> list:
 
 
 def select_etf_candidates(mode: str, top_n: int, output_path: str):
-    """V37.10.1 分層抓取候選清單。
+    """V37.12.1 分層抓取候選清單。
 
-    daily：熱門前 N。排序優先序：
-      1. 現有 history 最新日權重 / 持股數較高者
-      2. DEFAULT_ACTIVE_ETFS 內建熱門順序
+    daily：強制熱門核心 Top10，不受 history 排序影響。
     full：全部母清單。
     auto：週末 full，其餘 daily。
     """
@@ -190,29 +189,28 @@ def select_etf_candidates(mode: str, top_n: int, output_path: str):
     if mode not in {"daily", "full", "auto"}:
         mode = "daily"
     if mode == "auto":
-        # GitHub Actions 使用 UTC；台灣週六上午也可能仍是 UTC 週五，保守用 UTC 週六/日做 full。
         mode = "full" if datetime.utcnow().weekday() >= 5 else "daily"
 
     all_candidates = get_active_etf_candidates(None, top_n=999)
+    by_code = {c["ETF代號"]: c for c in all_candidates}
+
     if mode == "full":
         return all_candidates, mode, "full：全抓內建全部主動 ETF"
 
-    top_n = max(1, int(top_n))
-    hist_order = _read_latest_history_etf_order(output_path)
-    order = []
-    for code in hist_order:
-        if code not in order:
-            order.append(code)
-    for code in DEFAULT_ACTIVE_ETFS.keys():
-        if code not in order:
-            order.append(code)
+    top_n = max(1, int(top_n or 10))
+    forced_order = list(PREFERRED_DAILY_ACTIVE_ETFS)
 
-    by_code = {c["ETF代號"]: c for c in all_candidates}
-    selected = [by_code[c] for c in order if c in by_code][:top_n]
+    # preferred 不足才補位，但不能讓 history 排序覆蓋核心名單。
+    for code in DEFAULT_ACTIVE_ETFS.keys():
+        code = str(code).upper()
+        if code not in forced_order:
+            forced_order.append(code)
+
+    selected = [by_code[c] for c in forced_order if c in by_code][:top_n]
     if not selected:
         selected = all_candidates[:top_n]
-    return selected, "daily", f"daily：熱門/既有資料前 {top_n} 檔；其餘交給每週 full 補抓"
 
+    return selected, "daily", f"daily：強制熱門核心 Top {top_n}；其餘交給每週 full 補抓"
 
 
 def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_prices: bool = True, mode: str = 'daily') -> int:
@@ -283,7 +281,7 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         "raw_rows": 0 if raw is None else int(len(raw)),
         "complete_rows": int(len(latest)) if latest is not None else 0,
         "history_rows": int(len(merged)) if merged is not None else 0,
-        "source_mode": "official_precision_probe_then_fallback_layered",
+        "source_mode": "force_top10_adapter_official_first_weekly_full",
         "official_source_report": [] if official_report is None or official_report.empty else official_report.to_dict(orient="records"),
         "fallback_source_report": [] if fallback_report is None or fallback_report.empty else fallback_report.to_dict(orient="records"),
         "source_report": source_reports,
@@ -305,7 +303,7 @@ def main() -> int:
     ap.add_argument("--output", default=os.environ.get("ACTIVE_ETF_HISTORY_PATH", "data/active_etf_holdings_history.csv"))
     ap.add_argument("--report", default=os.environ.get("ACTIVE_ETF_REPORT_PATH", "data/active_etf_etl_report.json"))
     ap.add_argument("--mode", choices=["daily", "full", "auto"], default=os.environ.get("ACTIVE_ETF_ETL_MODE", "daily"), help="daily=每日熱門前N；full=全主動ETF；auto=依日期自動判斷")
-    ap.add_argument("--top-n", type=int, default=int(os.environ.get("ACTIVE_ETF_TOP_N", 15)))
+    ap.add_argument("--top-n", type=int, default=int(os.environ.get("ACTIVE_ETF_TOP_N", 10)))
     ap.add_argument("--keep-days", type=int, default=int(os.environ.get("ACTIVE_ETF_KEEP_DAYS", HOLDINGS_KEEP_DAYS)))
     ap.add_argument("--with-prices", action="store_true", help="補抓個股收盤價；預設關閉，避免逐檔訪問 Yahoo")
     args = ap.parse_args()

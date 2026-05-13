@@ -36,6 +36,8 @@ DATA_KEYWORDS = [
     "申購", "買回", "清單", "投資組合", "持股", "成分", "權重",
 ]
 
+BAD_PATH_KEYWORDS = ["interest", "news", "service", "dividend", "networth", "performance", "selection", "download-app", "fund-calendar"]
+
 BAD_EXT = re.compile(r"\.(css|ico|jpg|jpeg|png|gif|svg|webp|woff2?|ttf|eot|map|mp4|mp3)(\?|$)", re.I)
 BAD_TEXT = re.compile(r"(<|>|\\u003c|\\u003e|\{|\}|data:image|base64|microsoft\.com|edge\?|download10|font-weight|background:|text-align|@media|svg\+xml)", re.I)
 
@@ -88,6 +90,9 @@ def _is_clean_candidate(base_url: str, url: str, etf_code: str = "") -> bool:
     if BAD_EXT.search(u) or BAD_TEXT.search(u):
         return False
     if not _same_official_domain(base_url, u):
+        return False
+    path_lower = urlparse(u).path.lower()
+    if any(x in path_lower for x in BAD_PATH_KEYWORDS):
         return False
     low = u.lower()
     code = str(etf_code or "").lower()

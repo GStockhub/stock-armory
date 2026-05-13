@@ -59,14 +59,20 @@ OFFICIAL_SOURCE_REGISTRY: Dict[str, List[OfficialSource]] = {
     "00981A": [
         OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW", "基金投資組合"),
         OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=49YTW", "PCF"),
+        OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/GetPCF?fundCode=49YTW", "PCF API候選"),
+        OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCFExcelNPOI?fundCode=49YTW", "PCF Excel候選"),
     ],
     "00403A": [
         OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=63YTW", "基金投資組合"),
         OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=63YTW", "PCF"),
+        OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/GetPCF?fundCode=63YTW", "PCF API候選"),
+        OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCFExcelNPOI?fundCode=63YTW", "PCF Excel候選"),
     ],
     "00988A": [
         OfficialSource("00988A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=61YTW", "基金投資組合"),
         OfficialSource("00988A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=61YTW", "PCF"),
+        OfficialSource("00988A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/GetPCF?fundCode=61YTW", "PCF API候選"),
+        OfficialSource("00988A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCFExcelNPOI?fundCode=61YTW", "PCF Excel候選"),
     ],
 
     # 群益投信：product/detail/{id}/buyback 頁目前可直接解析 PCF。
@@ -452,6 +458,17 @@ def source_quality(
 
 
 
+
+def _is_rejected_holding_source(url: str) -> bool:
+    """V37.12.1：硬性排除非 holdings 頁，避免 interest/news/dividend 誤採用。"""
+    s = str(url or "").lower()
+    bad = [
+        "interest", "news", "service", "dividend", "networth",
+        "performance", "selection", "download-app", "fund-calendar"
+    ]
+    return any(x in s for x in bad)
+
+
 def _short_url_for_report(url: str, max_len: int = 220) -> str:
     s = str(url or "").strip()
     if len(s) <= max_len:
@@ -476,6 +493,9 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
         html_text = _fetch_html(src.url)
         df = parse_official_response(html_text, code, etf_name or code, src.url, "text/html")
         ok, reason, cnt, wsum = source_quality(df)
+        if _is_rejected_holding_source(src.url):
+            ok = False
+            reason = "疑似非持股來源頁"
         reports.append({
             "ETF代號": code,
             "ETF名稱": etf_name or code,
@@ -538,6 +558,9 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
 
             df = parse_official_response(text, code, etf_name or code, cand.url, ct)
             ok, reason, cnt, wsum = source_quality(df)
+            if _is_rejected_holding_source(cand.url):
+                ok = False
+                reason = "疑似非持股來源頁"
             reports.append({
                 "ETF代號": code,
                 "ETF名稱": etf_name or code,
