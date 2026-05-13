@@ -47,7 +47,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.2 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -96,7 +96,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— V37.12.2 官方頁籤URL補強版｜00981A/00403A/00400A</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— V37.12 </p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -1624,4 +1624,4 @@ with t_book:
         st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v35.0 </p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部</p>", unsafe_allow_html=True)
