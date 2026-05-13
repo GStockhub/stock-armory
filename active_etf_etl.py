@@ -1,6 +1,6 @@
 """active_etf_etl.py
 
-V37.11 主動 ETF 官方來源偵察分層 ETL
+V37.11.1 主動 ETF 精準偵察分層 ETL
 ------------------------------
 用途：
 - 由 GitHub Actions 每天自動執行
@@ -283,7 +283,7 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         "raw_rows": 0 if raw is None else int(len(raw)),
         "complete_rows": int(len(latest)) if latest is not None else 0,
         "history_rows": int(len(merged)) if merged is not None else 0,
-        "source_mode": "official_probe_first_then_fallback_layered",
+        "source_mode": "official_precision_probe_then_fallback_layered",
         "official_source_report": [] if official_report is None or official_report.empty else official_report.to_dict(orient="records"),
         "fallback_source_report": [] if fallback_report is None or fallback_report.empty else fallback_report.to_dict(orient="records"),
         "source_report": source_reports,

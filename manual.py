@@ -220,6 +220,14 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
+### 🎯 v37.11.1（精準來源偵察 + 官方直連補強版）
+
+* **【偵察器降噪】** 過濾 CSS / icon / jpg / svg / 字型 / Microsoft 外站 / 超長 HTML 片段，避免 report 被垃圾 URL 洗版。
+* **【同網域限制】** 官方偵察只打同一投信官方網域或子網域，避免亂跳外站。
+* **【候選數限制】** 每個官方入口最多測 8 個候選 URL，總候選最多 20 個，降低 Actions 時間。
+* **【官方直連補強】** 國泰 00400A 改走官方 PCF 申購買回清單 URL；復華 00991A 直接收錄已驗證的 ETF detail URL。
+* **【保留權重防污】** 權重合計 >105% 仍不採用，避免污染 history。
+
 ### 🛰️ v37.11（官方來源偵察器 + 權重污染防呆版）
 
 * **【新增來源偵察器】** 新增 `active_etf_source_probe.py`，會掃描官方入口頁中的 API / JSON / CSV / XLS / XLSX / PCF / download 候選連結。

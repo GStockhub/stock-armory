@@ -81,12 +81,13 @@ OFFICIAL_SOURCE_REGISTRY: Dict[str, List[OfficialSource]] = {
 
     # 國泰投信
     "00400A": [
+        OfficialSource("00400A", "國泰投信", "https://www.cathaysite.com.tw/ETF/purchase?code=EA&name=%E5%9C%8B%E6%B3%B0%E5%8F%B0%E8%82%A1%E5%8B%95%E8%83%BD%E9%AB%98%E6%81%AF%E4%B8%BB%E5%8B%95%E5%BC%8FETF%E5%9F%BA%E9%87%91", "PCF申購買回清單"),
         OfficialSource("00400A", "國泰投信", "https://www.cathaysite.com.tw/ETF/detail/EEA", "ETF詳情"),
-        OfficialSource("00400A", "國泰投信", "https://www.cathaysite.com.tw/proj/activethdm/", "活動/產品頁"),
     ],
 
     # 復華投信
     "00991A": [
+        OfficialSource("00991A", "復華投信", "https://www.fhtrust.com.tw/ETF/etf_detail/ETF24#nav", "ETF明細"),
         OfficialSource("00991A", "復華投信", "https://www.fhtrust.com.tw/ETF", "ETF入口"),
     ],
     "00998A": [
@@ -450,6 +451,14 @@ def source_quality(
     return ok, "可用" if ok else "、".join(reasons), cnt, wsum
 
 
+
+def _short_url_for_report(url: str, max_len: int = 220) -> str:
+    s = str(url or "").strip()
+    if len(s) <= max_len:
+        return s
+    return s[:max_len] + "...[truncated]"
+
+
 def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.DataFrame, List[Dict[str, object]]]:
     """官方來源單檔抓取。
 
@@ -502,7 +511,7 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
                     "ETF名稱": etf_name or code,
                     "投信": sources[0].issuer if sources else "",
                     "來源類別": "官方偵察",
-                    "來源": cand.url,
+                    "來源": _short_url_for_report(cand.url),
                     "類型": f"{cand.kind}:{cand.source_hint}",
                     "抓到筆數": 0,
                     "權重合計": 0.0,
@@ -518,7 +527,7 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
                     "ETF名稱": etf_name or code,
                     "投信": sources[0].issuer if sources else "",
                     "來源類別": "官方偵察",
-                    "來源": cand.url,
+                    "來源": _short_url_for_report(cand.url),
                     "類型": f"{cand.kind}:{cand.source_hint}",
                     "抓到筆數": 0,
                     "權重合計": 0.0,
@@ -534,7 +543,7 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
                 "ETF名稱": etf_name or code,
                 "投信": sources[0].issuer if sources else "",
                 "來源類別": "官方偵察",
-                "來源": cand.url,
+                "來源": _short_url_for_report(cand.url),
                 "類型": f"{cand.kind}:{cand.source_hint}",
                 "抓到筆數": cnt,
                 "權重合計": round(wsum, 4),
