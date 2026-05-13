@@ -220,6 +220,13 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
+### 🎯 v37.12.2（指定官方頁籤 URL 補強版）
+
+* **【統一 00981A】** 優先嘗試 `https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW#asset`，對準資產 / 投資組合頁籤。
+* **【統一 00403A】** 優先嘗試 `https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=63YTW&tabName=basic#asset`。
+* **【國泰 00400A】** 優先嘗試 `https://www.cathaysite.com.tw/ETF/detail/EEA?tab=etf3`，再退回 purchase / detail。
+* **【保持核心 Top10】** daily 強制核心 Top10 與誤採用封鎖規則不變。
+
 ### 🧨 v37.12.1（強制核心 Top10 + 誤採用封鎖修正版）
 
 * **【強制核心 Top10】** daily 不再受 history 排序影響，固定抓 00981A、00982A、00992A、00991A、00980A、00400A、00990A、00999A、00993A、00985A。

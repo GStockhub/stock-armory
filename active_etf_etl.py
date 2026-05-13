@@ -1,6 +1,6 @@
 """active_etf_etl.py
 
-V37.12.1 強制核心 Top10 投信 Adapter 分層 ETL
+V37.12.2 指定官方頁籤 Top10 Adapter 分層 ETL
 ------------------------------
 用途：
 - 由 GitHub Actions 每天自動執行
@@ -281,7 +281,7 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         "raw_rows": 0 if raw is None else int(len(raw)),
         "complete_rows": int(len(latest)) if latest is not None else 0,
         "history_rows": int(len(merged)) if merged is not None else 0,
-        "source_mode": "force_top10_adapter_official_first_weekly_full",
+        "source_mode": "force_top10_official_tab_urls_weekly_full",
         "official_source_report": [] if official_report is None or official_report.empty else official_report.to_dict(orient="records"),
         "fallback_source_report": [] if fallback_report is None or fallback_report.empty else fallback_report.to_dict(orient="records"),
         "source_report": source_reports,

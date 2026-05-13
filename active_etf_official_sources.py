@@ -57,12 +57,14 @@ class OfficialSource:
 OFFICIAL_SOURCE_REGISTRY: Dict[str, List[OfficialSource]] = {
     # 統一投信 ezmoney
     "00981A": [
+        OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW#asset", "資產/投資組合頁籤"),
         OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW", "基金投資組合"),
         OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=49YTW", "PCF"),
         OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/GetPCF?fundCode=49YTW", "PCF API候選"),
         OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCFExcelNPOI?fundCode=49YTW", "PCF Excel候選"),
     ],
     "00403A": [
+        OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=63YTW&tabName=basic#asset", "資產/投資組合頁籤"),
         OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=63YTW", "基金投資組合"),
         OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=63YTW", "PCF"),
         OfficialSource("00403A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/GetPCF?fundCode=63YTW", "PCF API候選"),
@@ -87,6 +89,7 @@ OFFICIAL_SOURCE_REGISTRY: Dict[str, List[OfficialSource]] = {
 
     # 國泰投信
     "00400A": [
+        OfficialSource("00400A", "國泰投信", "https://www.cathaysite.com.tw/ETF/detail/EEA?tab=etf3", "ETF持股/投資組合頁籤"),
         OfficialSource("00400A", "國泰投信", "https://www.cathaysite.com.tw/ETF/purchase?code=EA&name=%E5%9C%8B%E6%B3%B0%E5%8F%B0%E8%82%A1%E5%8B%95%E8%83%BD%E9%AB%98%E6%81%AF%E4%B8%BB%E5%8B%95%E5%BC%8FETF%E5%9F%BA%E9%87%91", "PCF申購買回清單"),
         OfficialSource("00400A", "國泰投信", "https://www.cathaysite.com.tw/ETF/detail/EEA", "ETF詳情"),
     ],
