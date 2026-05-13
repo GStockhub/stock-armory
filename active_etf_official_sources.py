@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import html as html_lib
 import io
+import json
 import re
 import time
 from dataclasses import dataclass
@@ -25,6 +26,12 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 import requests
+
+try:
+    from active_etf_source_probe import probe_official_urls, fetch_url as probe_fetch_url
+except Exception:
+    probe_official_urls = None
+    probe_fetch_url = None
 
 try:
     from bs4 import BeautifulSoup
@@ -358,6 +365,47 @@ def _clean_rows(df: pd.DataFrame, etf_code: str) -> pd.DataFrame:
     return out[OUTPUT_COLUMNS].reset_index(drop=True)
 
 
+
+def _flatten_json_records(obj):
+    """從未知 JSON 結構中找 list[dict] 候選。"""
+    records = []
+    if isinstance(obj, list):
+        if obj and all(isinstance(x, dict) for x in obj):
+            records.append(obj)
+        for x in obj:
+            records.extend(_flatten_json_records(x))
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            records.extend(_flatten_json_records(v))
+    return records
+
+
+def parse_official_response(text: str, etf_code: str, etf_name: str, source_url: str, content_type: str = "") -> pd.DataFrame:
+    """解析 HTML / JSON response。Excel/PDF 目前只記錄候選，不解析 binary。"""
+    if not text:
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    ct = str(content_type or "").lower()
+    if "json" in ct or text.strip().startswith(("{", "[")):
+        try:
+            obj = json.loads(text)
+            best = pd.DataFrame(columns=OUTPUT_COLUMNS)
+            date = _parse_date(text)
+            for recs in _flatten_json_records(obj):
+                try:
+                    raw = pd.DataFrame(recs)
+                    std = _standardize_table(raw, etf_code, etf_name, date, source_url)
+                    if len(std) > len(best):
+                        best = std
+                except Exception:
+                    continue
+            if not best.empty:
+                return best
+        except Exception:
+            pass
+    return parse_official_holdings_html(text, etf_code, etf_name, source_url)
+
+
+
 def parse_official_holdings_html(html_text: str, etf_code: str, etf_name: str, source_url: str) -> pd.DataFrame:
     if not html_text:
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
@@ -380,7 +428,13 @@ def parse_official_holdings_html(html_text: str, etf_code: str, etf_name: str, s
     return best
 
 
-def source_quality(df: pd.DataFrame, min_rows: int = 10, min_weight_sum: float = 20.0) -> Tuple[bool, str, int, float]:
+def source_quality(
+    df: pd.DataFrame,
+    min_rows: int = 10,
+    min_weight_sum: float = 20.0,
+    max_weight_sum: float = 105.0,
+) -> Tuple[bool, str, int, float]:
+    """來源品質門檻。V37.11 新增權重上限，避免 parser 吃到重複或污染區塊。"""
     if df is None or df.empty:
         return False, "empty", 0, 0.0
     cnt = int(df["成分股代號"].nunique()) if "成分股代號" in df.columns else int(len(df))
@@ -390,6 +444,8 @@ def source_quality(df: pd.DataFrame, min_rows: int = 10, min_weight_sum: float =
         reasons.append(f"持股數<{min_rows}")
     if wsum < min_weight_sum:
         reasons.append(f"權重合計<{min_weight_sum:.0f}%")
+    if wsum > max_weight_sum:
+        reasons.append(f"權重合計>{max_weight_sum:.0f}%疑似重複/污染")
     ok = not reasons
     return ok, "可用" if ok else "、".join(reasons), cnt, wsum
 
@@ -397,16 +453,19 @@ def source_quality(df: pd.DataFrame, min_rows: int = 10, min_weight_sum: float =
 def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.DataFrame, List[Dict[str, object]]]:
     """官方來源單檔抓取。
 
-    回傳 best df 與每個官方候選來源的報告。
-    best df 不一定完整；active_etf_etl.py 會再判定是否採用或轉備援。
+    V37.11：
+    1. 先跑 registry 固定官方 URL。
+    2. 若沒有完整資料，對官方入口做 probe，掃描 deeper API / download / JSON / PCF 候選。
+    3. 權重合計過高視為疑似污染，不採用。
     """
     code = _clean_code(etf_code)
     sources = OFFICIAL_SOURCE_REGISTRY.get(code, [])
     reports: List[Dict[str, object]] = []
     best = pd.DataFrame(columns=OUTPUT_COLUMNS)
+
     for src in sources:
         html_text = _fetch_html(src.url)
-        df = parse_official_holdings_html(html_text, code, etf_name or code, src.url)
+        df = parse_official_response(html_text, code, etf_name or code, src.url, "text/html")
         ok, reason, cnt, wsum = source_quality(df)
         reports.append({
             "ETF代號": code,
@@ -425,6 +484,69 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
         if ok:
             return df, reports
         time.sleep(0.35)
+
+    if sources and probe_official_urls is not None and probe_fetch_url is not None:
+        try:
+            candidates = probe_official_urls([s.url for s in sources], etf_code=code, max_candidates_per_source=25)
+        except Exception:
+            candidates = []
+
+        seen = {r.get("來源") for r in reports}
+        for cand in candidates:
+            if cand.url in seen:
+                continue
+
+            if re.search(r"\\.(pdf|xlsx?|zip)(\\?|$)", cand.url, re.I):
+                reports.append({
+                    "ETF代號": code,
+                    "ETF名稱": etf_name or code,
+                    "投信": sources[0].issuer if sources else "",
+                    "來源類別": "官方偵察",
+                    "來源": cand.url,
+                    "類型": f"{cand.kind}:{cand.source_hint}",
+                    "抓到筆數": 0,
+                    "權重合計": 0.0,
+                    "狀態": "⚠️ binary_candidate_not_parsed",
+                    "採用": False,
+                })
+                continue
+
+            text, ct = probe_fetch_url(cand.url)
+            if any(x in str(ct).lower() for x in ["pdf", "excel", "spreadsheet"]):
+                reports.append({
+                    "ETF代號": code,
+                    "ETF名稱": etf_name or code,
+                    "投信": sources[0].issuer if sources else "",
+                    "來源類別": "官方偵察",
+                    "來源": cand.url,
+                    "類型": f"{cand.kind}:{cand.source_hint}",
+                    "抓到筆數": 0,
+                    "權重合計": 0.0,
+                    "狀態": "⚠️ binary_candidate_not_parsed",
+                    "採用": False,
+                })
+                continue
+
+            df = parse_official_response(text, code, etf_name or code, cand.url, ct)
+            ok, reason, cnt, wsum = source_quality(df)
+            reports.append({
+                "ETF代號": code,
+                "ETF名稱": etf_name or code,
+                "投信": sources[0].issuer if sources else "",
+                "來源類別": "官方偵察",
+                "來源": cand.url,
+                "類型": f"{cand.kind}:{cand.source_hint}",
+                "抓到筆數": cnt,
+                "權重合計": round(wsum, 4),
+                "狀態": "✅ 官方偵察完整" if ok else f"⚠️ {reason}",
+                "採用": bool(ok),
+            })
+            if len(df) > len(best):
+                best = df
+            if ok:
+                return df, reports
+            time.sleep(0.25)
+
     if not sources:
         reports.append({
             "ETF代號": code,

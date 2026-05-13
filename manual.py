@@ -220,6 +220,13 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
+### 🛰️ v37.11（官方來源偵察器 + 權重污染防呆版）
+
+* **【新增來源偵察器】** 新增 `active_etf_source_probe.py`，會掃描官方入口頁中的 API / JSON / CSV / XLS / XLSX / PCF / download 候選連結。
+* **【官方深層資料優先】** 固定官方 URL 抓不到完整資料時，會嘗試官方偵察候選 URL，再失敗才走 MoneyDJ / CMoney / Pocket 備援。
+* **【權重防污】** 權重合計 >105% 標記為疑似重複或污染，不直接採用，避免把活動頁、摘要頁、桌機/手機重複表吃進 history。
+* **【前端不變】** Streamlit 仍只讀 history / report，不即時爬官方來源。
+
 ### 🧩 v37.10.3（ETF Import 同步修正版）
 
 * **【修正 ImportError】** 將 `active_etf_holdings.py` 中的 `fetch_active_etf_holdings_with_report()` 與 `fetch_active_etf_holding_one_with_report()` 一併納入修改檔。
