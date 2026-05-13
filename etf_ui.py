@@ -1,4 +1,5 @@
 import html
+import json
 import math
 import os
 
@@ -7,7 +8,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from etf_engine import load_active_etf_holdings, run_etf_momentum_radar, summarize_active_etf_holdings
-from active_etf_holdings import build_active_etf_manager_radar, get_history_status, get_github_history_diagnostics
+from active_etf_holdings import get_history_status
 
 
 # =========================
@@ -63,6 +64,25 @@ def _to_float(v, default=0.0):
 
 def _safe_text(x):
     return html.escape(str(x if x is not None else ""))
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _load_local_active_etf_history(path="data/active_etf_holdings_history.csv"):
+    """V37.9.1：ETF 經理人風向只讀本機 ETL 產物，不在頁面載入時即時爬官方/第三方。"""
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    return load_active_etf_holdings(path)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _load_local_etl_report(path="data/active_etf_etl_report.json"):
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 
 # =========================
@@ -248,37 +268,35 @@ def _render_bar_list(df, COLORS, label_col, value_col, subtitle_col=None, max_ro
 
 
 def _render_manager_header_compact(summary, holdings, COLORS, history_status=None, auto_note=""):
-    """V37.7.1：狀態與 GitHub 診斷整合成同一區，不再上下分開。"""
+    """V37.9.1：只顯示本機 ETL report，不在頁面載入時打 GitHub API 診斷。"""
     history_status = history_status or get_history_status(holdings, lookback_days=20)
     days = int(history_status.get("days", 0) or 0)
     latest = str(history_status.get("latest", "-") or "-")
     msg = str(history_status.get("message", "") or "")
-    gh_diag = {}
-    try:
-        gh_diag = get_github_history_diagnostics() or {}
-    except Exception:
-        gh_diag = {}
-    gh_summary = str(gh_diag.get("summary", "GitHub 診斷暫時無法取得") or "GitHub 診斷暫時無法取得")
     snapshot = summary.get("snapshot", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
     etf_count = int(snapshot["ETF"].nunique()) if snapshot is not None and not snapshot.empty and "ETF" in snapshot.columns else 0
     changes = summary.get("changes", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
     event_count = int(len(changes)) if changes is not None and not changes.empty else 0
-    auto_text = str(auto_note or "自動持股來源正常；若 GitHub 寫入失敗則先沿用本機快取。")
+    report = _load_local_etl_report()
+    run_at = report.get("run_at", "-") if isinstance(report, dict) else "-"
+    complete_etfs = report.get("complete_etfs", []) if isinstance(report, dict) else []
+    raw_rows = report.get("raw_rows", "-") if isinstance(report, dict) else "-"
+    complete_rows = report.get("complete_rows", "-") if isinstance(report, dict) else "-"
+    auto_text = str(auto_note or "已讀取本機 ETL 歷史快照；官方抓取交給 GitHub Actions，不在前端即時執行。")
     compact_msg = msg.replace("｜", "；")
 
-    title = f"🧭 主動 ETF 風向狀態｜快照 {days} 日｜最新 {latest}｜涵蓋 {etf_count} 檔｜事件 {event_count} 筆｜GitHub：{gh_summary}"
+    title = f"🧭 主動 ETF 風向狀態｜快照 {days} 日｜最新 {latest}｜涵蓋 {etf_count} 檔｜事件 {event_count} 筆｜ETL {run_at}"
     with st.expander(title, expanded=False):
         st.markdown(f"""
         <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:10px 13px; border-radius:10px; margin:4px 0 10px 0;">
             <div style="font-size:14px; color:{COLORS['text']}; line-height:1.65;"><b>狀態：</b>{_safe_text(auto_text)}</div>
             <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">{_safe_text(compact_msg)}</div>
+            <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">ETL：raw {raw_rows}｜complete {complete_rows}｜完整 ETF：{_safe_text('、'.join(map(str, complete_etfs)) if complete_etfs else '-')}</div>
         </div>
         """, unsafe_allow_html=True)
-        checks = gh_diag.get("checks", []) if isinstance(gh_diag, dict) else []
-        if checks:
-            st.dataframe(pd.DataFrame(checks), use_container_width=True, hide_index=True)
-        elif gh_diag:
-            st.json({k: v for k, v in gh_diag.items() if k != "checks"})
+        quality = report.get("quality", []) if isinstance(report, dict) else []
+        if quality:
+            st.dataframe(pd.DataFrame(quality), use_container_width=True, hide_index=True, height=260)
 
 
 def _action_items_html(df, COLORS, title, icon, max_rows=8):
@@ -440,37 +458,25 @@ def render_etf_tab(COLORS, fm_token, industry_map, name_map, etf_holdings_url=""
         st.dataframe(formatted.style.set_properties(**table_style), use_container_width=True, hide_index=True, height=350)
 
     st.markdown("#### 🧭 主動 ETF 經理人風向")
-    st.caption("持股快照與近 5 日變化合併；自動資料若不可得，可用側邊欄 CSV 備援。這區看產業風向，不是照抄成分股。")
+    st.caption("V37.9.1 速度瘦身：前端只讀 GitHub Actions 產出的 history / CSV，不再即時爬官方或第三方來源。")
 
-    holdings = load_active_etf_holdings(etf_holdings_url) if etf_holdings_url else pd.DataFrame()
+    holdings = pd.DataFrame()
     auto_note = ""
 
-    # V37.9：優先讀 GitHub Actions 產出的本機 history CSV，避免每次開 Streamlit 都即時爬官方/第三方網站。
-    if holdings.empty and os.path.exists("data/active_etf_holdings_history.csv"):
-        try:
-            holdings = load_active_etf_holdings("data/active_etf_holdings_history.csv")
-            if not holdings.empty:
-                auto_note = "已使用 GitHub Actions / 官方公告 ETL 產出的本機歷史快照。"
-        except Exception:
-            holdings = pd.DataFrame()
-    history_status = None
-    if holdings.empty:
-        manager_radar = active_pool if isinstance(active_pool, pd.DataFrame) and not active_pool.empty else radar
-        auto_result = build_active_etf_manager_radar(
-            manager_radar, industry_map, name_map, top_n=10, lookback_days=20,
-            cache_path="data/active_etf_holdings_history.csv"
-        )
-        summary = auto_result.get("summary")
-        holdings = auto_result.get("holdings", pd.DataFrame())
-        auto_note = auto_result.get("message", "")
-        history_status = auto_result.get("history_status")
-    else:
-        summary = summarize_active_etf_holdings(holdings, industry_map, name_map, top_n=10, lookback_days=20)
-        history_status = get_history_status(holdings, lookback_days=20)
-        if not auto_note:
+    # 使用者若在側邊欄指定 CSV，優先讀側邊欄 CSV；否則讀 GitHub Actions 產出的本機 history。
+    if etf_holdings_url:
+        holdings = load_active_etf_holdings(etf_holdings_url)
+        if not holdings.empty:
             auto_note = "已使用側邊欄 CSV 備援資料。"
+    else:
+        holdings = _load_local_active_etf_history("data/active_etf_holdings_history.csv")
+        if not holdings.empty:
+            auto_note = "已使用 GitHub Actions / 官方公告 ETL 產出的本機歷史快照。"
+
+    summary = summarize_active_etf_holdings(holdings, industry_map, name_map, top_n=10, lookback_days=20) if not holdings.empty else None
+    history_status = get_history_status(holdings, lookback_days=20) if not holdings.empty else None
 
     if holdings.empty or summary is None or summary.get("snapshot", pd.DataFrame()).empty:
-        st.info(f"{auto_note or '自動持股來源目前抓不到資料。'} ETF 動能排行仍可正常使用；若要啟用經理人風向，請使用側邊欄 CSV 備援。")
+        st.info("目前沒有可用的主動 ETF history。ETF 動能排行仍可正常使用；官方持股更新請交給 GitHub Actions，不在前端即時抓取。")
     else:
         _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=history_status, auto_note=auto_note)

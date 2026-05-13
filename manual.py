@@ -220,6 +220,12 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
+### ⚡ v37.9.1（ETF 速度瘦身版）
+
+* **【前端不即時抓取】** ETF 經理人風向只讀 `data/active_etf_holdings_history.csv` 或側邊欄 CSV，不再於 Streamlit 頁面載入時跑官方/第三方 fallback。
+* **【責任切乾淨】** GitHub Actions 負責抓取與更新；Streamlit 只負責讀取與顯示。
+* **【診斷改輕量】** 主動 ETF 狀態改讀 `data/active_etf_etl_report.json`，不再每次打 GitHub API 診斷。
+
 ### 🔥 v37.9（主動 ETF 官方公告追蹤 ✕ 投信官網 PCF 優先版）- 本次改版
 
 * **【官方公告優先】** 新增 `active_etf_official_sources.py`，優先追蹤投信官網每日揭露的 PCF / 投資組合明細，不再把第三方頁面當主來源。
