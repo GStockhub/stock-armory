@@ -79,6 +79,22 @@ DEFAULT_ACTIVE_ETFS: Dict[str, Dict[str, str]] = {
 }
 
 # Generic sources. 這些網頁格式可能變動，所以 fetch 會自動 fail-soft。
+
+# V37.12：平日 daily 專攻熱門 Top10；冷門 ETF 交給週末 full 補抓。
+# 固定核心優先，避免重要 ETF 因暫時抓不到完整資料而被擠出 daily 名單。
+PREFERRED_DAILY_ACTIVE_ETFS = [
+    "00981A",  # 統一台股增長
+    "00982A",  # 群益台灣強棒
+    "00992A",  # 群益科技創新
+    "00991A",  # 復華未來50
+    "00980A",  # 野村臺灣優選
+    "00400A",  # 國泰動能高息
+    "00990A",  # 元大AI新經濟
+    "00999A",  # 野村臺灣高息
+    "00993A",  # 安聯台灣
+    "00985A",  # 野村台灣50
+]
+
 GENERIC_SOURCE_TEMPLATES = [
     # V37.10：官方失敗後的備援來源，MoneyDJ 持股頁優先。
     "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code}.tw",
@@ -100,7 +116,7 @@ GITHUB_DIAG_KEY = "_active_etf_github_diag"
 HOLDINGS_KEEP_DAYS = 60
 MAIN_LOOKBACK_DAYS = 20
 EVENT_LOOKBACK_DAYS = 30
-ACTIVE_ETF_TOP_N = 30
+ACTIVE_ETF_TOP_N = 10
 SIGNIFICANT_SHARE_RATIO = 0.03
 SIGNIFICANT_WEIGHT_PP = 0.3
 MIN_COMPLETE_HOLDINGS = 10
