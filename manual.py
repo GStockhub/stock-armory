@@ -220,6 +220,12 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
+### 🧯 v37.10.2（ETF Actions 推送防衝突版）
+
+* **【修正 push rejected】** GitHub Actions 寫入 `data/active_etf_holdings_history.csv` / `data/active_etf_etl_report.json` 前後若 main 被更新，會先 `fetch + rebase` 再 push。
+* **【避免同時打架】** 新增 workflow concurrency，同一分支的 ETF 更新不會互相搶 push。
+* **【保留分層抓取】** daily 熱門前 15、weekly full 全量抓取邏輯不變。
+
 ### ⚙️ v37.10.1（主動 ETF 分層抓取版）
 
 * **【母清單全保留】** 內建全部主動 ETF。
