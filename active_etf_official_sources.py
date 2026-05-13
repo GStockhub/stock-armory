@@ -42,8 +42,13 @@ class OfficialSource:
 
 # 已確認能從公開搜尋結果看到 PCF / 投資組合內容的官方頁。
 # 其他投信先保留 generic/fallback，不在這裡硬塞未知 URL，避免抓錯基金。
+# V37.10：完整主動 ETF 官方來源母清單。
+# 原則：
+# 1. 投信官網 / PCF / 申購買回清單優先。
+# 2. 未確認可直接解析的官方頁，也先放官方候選；解析不到不寫入。
+# 3. 官方失敗後由 active_etf_etl.py 接第三方備援，不在這裡硬判定成功。
 OFFICIAL_SOURCE_REGISTRY: Dict[str, List[OfficialSource]] = {
-    # 統一投信 ezmoney：Info 是投資組合頁，PCF 是申購買回清單。兩者都試。
+    # 統一投信 ezmoney
     "00981A": [
         OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW", "基金投資組合"),
         OfficialSource("00981A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=49YTW", "PCF"),
@@ -56,14 +61,46 @@ OFFICIAL_SOURCE_REGISTRY: Dict[str, List[OfficialSource]] = {
         OfficialSource("00988A", "統一投信", "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=61YTW", "基金投資組合"),
         OfficialSource("00988A", "統一投信", "https://www.ezmoney.com.tw/ETF/Transaction/PCF?fundCode=61YTW", "PCF"),
     ],
-    # 群益投信：官方 product/detail/{id}/buyback 頁面直接列 PCF 股票、權重、股數。
+
+    # 群益投信：product/detail/{id}/buyback 頁目前可直接解析 PCF。
     "00982A": [OfficialSource("00982A", "群益投信", "https://www.capitalfund.com.tw/etf/product/detail/399/buyback", "PCF")],
     "00992A": [OfficialSource("00992A", "群益投信", "https://www.capitalfund.com.tw/etf/product/detail/500/buyback", "PCF")],
     "00997A": [OfficialSource("00997A", "群益投信", "https://www.capitalfund.com.tw/etf/product/detail/502/buyback", "PCF")],
-    # 野村投信 PCF 入口目前為動態頁；先作為官方候選，解析成功才採用。
+
+    # 野村投信：官方 PCF 入口為動態頁；先列入口，若解析不到交給備援。
     "00980A": [OfficialSource("00980A", "野村投信", "https://www.nomurafunds.com.tw/ETFWEB/pcf", "PCF入口")],
     "00999A": [OfficialSource("00999A", "野村投信", "https://www.nomurafunds.com.tw/ETFWEB/pcf", "PCF入口")],
+    "00985A": [OfficialSource("00985A", "野村投信", "https://www.nomurafunds.com.tw/ETFWEB/pcf", "PCF入口")],
+
+    # 國泰投信
+    "00400A": [
+        OfficialSource("00400A", "國泰投信", "https://www.cathaysite.com.tw/ETF/detail/EEA", "ETF詳情"),
+        OfficialSource("00400A", "國泰投信", "https://www.cathaysite.com.tw/proj/activethdm/", "活動/產品頁"),
+    ],
+
+    # 復華投信
+    "00991A": [
+        OfficialSource("00991A", "復華投信", "https://www.fhtrust.com.tw/ETF", "ETF入口"),
+    ],
+    "00998A": [
+        OfficialSource("00998A", "復華投信", "https://www.fhtrust.com.tw/ETF", "ETF入口"),
+    ],
+
+    # 元大 / 安聯 / 第一金 / 中信 / 兆豐 / 摩根 / 台新
+    # 這些官網 URL 格式可能改版，先列投信 ETF 入口；抓不到完整時用備援。
+    "00990A": [OfficialSource("00990A", "元大投信", "https://www.yuantaetfs.com/", "ETF入口")],
+    "00993A": [OfficialSource("00993A", "安聯投信", "https://tw.allianzgi.com/zh-tw/etf", "ETF入口")],
+    "00984A": [OfficialSource("00984A", "安聯投信", "https://tw.allianzgi.com/zh-tw/etf", "ETF入口")],
+    "00994A": [OfficialSource("00994A", "第一金投信", "https://www.fsitc.com.tw/Fund/ETF", "ETF入口")],
+    "00995A": [OfficialSource("00995A", "中信投信", "https://www.ctbcinvestments.com/", "ETF入口")],
+    "00983A": [OfficialSource("00983A", "中信投信", "https://www.ctbcinvestments.com/", "ETF入口")],
+    "00996A": [OfficialSource("00996A", "兆豐投信", "https://www.megafunds.com.tw/", "ETF入口")],
+    "00401A": [OfficialSource("00401A", "摩根投信", "https://www.jpmrich.com.tw/", "ETF入口")],
+    "00989A": [OfficialSource("00989A", "摩根投信", "https://www.jpmrich.com.tw/", "ETF入口")],
+    "00987A": [OfficialSource("00987A", "台新投信", "https://www.tsit.com.tw/", "ETF入口")],
+    "00986A": [OfficialSource("00986A", "台新投信", "https://www.tsit.com.tw/", "ETF入口")],
 }
+
 
 OUTPUT_COLUMNS = ["日期", "ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "持有股數", "來源"]
 
@@ -358,6 +395,11 @@ def source_quality(df: pd.DataFrame, min_rows: int = 10, min_weight_sum: float =
 
 
 def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.DataFrame, List[Dict[str, object]]]:
+    """官方來源單檔抓取。
+
+    回傳 best df 與每個官方候選來源的報告。
+    best df 不一定完整；active_etf_etl.py 會再判定是否採用或轉備援。
+    """
     code = _clean_code(etf_code)
     sources = OFFICIAL_SOURCE_REGISTRY.get(code, [])
     reports: List[Dict[str, object]] = []
@@ -370,17 +412,32 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
             "ETF代號": code,
             "ETF名稱": etf_name or code,
             "投信": src.issuer,
+            "來源類別": "官方",
             "來源": src.url,
             "類型": src.note,
             "抓到筆數": cnt,
             "權重合計": round(wsum, 4),
             "狀態": "✅ 官方完整" if ok else f"⚠️ {reason}",
+            "採用": bool(ok),
         })
         if len(df) > len(best):
             best = df
         if ok:
             return df, reports
-        time.sleep(0.4)
+        time.sleep(0.35)
+    if not sources:
+        reports.append({
+            "ETF代號": code,
+            "ETF名稱": etf_name or code,
+            "投信": "",
+            "來源類別": "官方",
+            "來源": "",
+            "類型": "未設定官方來源",
+            "抓到筆數": 0,
+            "權重合計": 0.0,
+            "狀態": "⚠️ no_official_source",
+            "採用": False,
+        })
     return best, reports
 
 

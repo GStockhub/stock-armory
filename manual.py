@@ -220,6 +220,12 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
+### 🧩 v37.10.3（ETF Import 同步修正版）
+
+* **【修正 ImportError】** 將 `active_etf_holdings.py` 中的 `fetch_active_etf_holdings_with_report()` 與 `fetch_active_etf_holding_one_with_report()` 一併納入修改檔。
+* **【避免半套更新】** 若只上傳 V37.10.1 / V37.10.2 的部分檔案，`active_etf_etl.py` 會呼叫到舊版不存在的 function；本版將 ETL、官方來源層、持股來源層同步。
+* **【保留分層抓取與防衝突推送】** daily / full 模式與 workflow rebase push 修正皆保留。
+
 ### 🧯 v37.10.2（ETF Actions 推送防衝突版）
 
 * **【修正 push rejected】** GitHub Actions 寫入 `data/active_etf_holdings_history.csv` / `data/active_etf_etl_report.json` 前後若 main 被更新，會先 `fetch + rebase` 再 push。

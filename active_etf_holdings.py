@@ -80,10 +80,10 @@ DEFAULT_ACTIVE_ETFS: Dict[str, Dict[str, str]] = {
 
 # Generic sources. 這些網頁格式可能變動，所以 fetch 會自動 fail-soft。
 GENERIC_SOURCE_TEMPLATES = [
-    # V37.8：ETL 會優先跑 fundholding 級別頁面，不再只抓概覽頁。
+    # V37.10：官方失敗後的備援來源，MoneyDJ 持股頁優先。
+    "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code}.tw",
     "https://www.cmoney.tw/etf/tw/{code}/fundholding",
     "https://www.pocket.tw/etf//tw/{code}/fundholding",
-    "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid={code}.tw",
 ]
 
 CACHE_FILE = "active_etf_holdings_history.csv"
@@ -100,7 +100,7 @@ GITHUB_DIAG_KEY = "_active_etf_github_diag"
 HOLDINGS_KEEP_DAYS = 60
 MAIN_LOOKBACK_DAYS = 20
 EVENT_LOOKBACK_DAYS = 30
-ACTIVE_ETF_TOP_N = 10
+ACTIVE_ETF_TOP_N = 30
 SIGNIFICANT_SHARE_RATIO = 0.03
 SIGNIFICANT_WEIGHT_PP = 0.3
 MIN_COMPLETE_HOLDINGS = 10
@@ -463,6 +463,79 @@ def fetch_active_etf_holding_one(
 
 
 @_maybe_cache_data(ttl=3600, show_spinner=False)
+
+def fetch_active_etf_holding_one_with_report(
+    etf_code: str,
+    etf_name: str = "",
+    custom_sources: Optional[Dict[str, str]] = None,
+    name_map: Optional[Dict[str, str]] = None,
+) -> Tuple[pd.DataFrame, List[Dict[str, object]]]:
+    """第三方備援抓取，帶每個 URL 的結果報告。ETL 用；前端不即時呼叫。"""
+    code = _clean_code(etf_code)
+    name = etf_name or DEFAULT_ACTIVE_ETFS.get(code, {}).get("名稱", code)
+    reports: List[Dict[str, object]] = []
+    best = pd.DataFrame()
+
+    for url in _source_urls_for(code, custom_sources):
+        html_text = _fetch_html(url)
+        local_best = pd.DataFrame()
+
+        for t in _read_html_tables_from_text(html_text):
+            std = _standardize_holding_table(t, code, name, name_map=name_map, source_url=url)
+            if std.empty:
+                continue
+            if len(std) > len(local_best):
+                local_best = std
+
+        if local_best.empty:
+            local_best = _parse_moneydj_text(html_text, code, name, name_map=name_map, source_url=url)
+
+        q = _holding_quality(local_best, industry_map=None)
+        cnt = int(q["持股數"].iloc[0]) if not q.empty else 0
+        wsum = float(q["權重合計"].iloc[0]) if not q.empty else 0.0
+        status = str(q["資料狀態"].iloc[0]) if not q.empty else "⚠️ 不完整"
+        note = str(q["資料備註"].iloc[0]) if not q.empty else "empty"
+        adopted = bool(status.startswith("✅"))
+
+        reports.append({
+            "ETF代號": code,
+            "ETF名稱": name,
+            "投信": DEFAULT_ACTIVE_ETFS.get(code, {}).get("投信", ""),
+            "來源類別": "備援",
+            "來源": url,
+            "類型": "MoneyDJ/CMoney/Pocket",
+            "抓到筆數": cnt,
+            "權重合計": round(wsum, 4),
+            "狀態": status if adopted else f"⚠️ {note}",
+            "採用": adopted,
+        })
+
+        if len(local_best) > len(best):
+            best = local_best
+        if adopted:
+            return local_best, reports
+        time.sleep(0.25)
+
+    return best, reports
+
+
+def fetch_active_etf_holdings_with_report(
+    candidates: Tuple[Tuple[str, str], ...],
+    custom_sources: Optional[Dict[str, str]] = None,
+    name_map: Optional[Dict[str, str]] = None,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """批次備援抓取，並回傳 URL 級報告。"""
+    frames = []
+    all_reports: List[Dict[str, object]] = []
+    for code, name in candidates:
+        df, reports = fetch_active_etf_holding_one_with_report(code, name, custom_sources=custom_sources, name_map=name_map)
+        all_reports.extend(reports)
+        if df is not None and not df.empty:
+            frames.append(df)
+    out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    return out, pd.DataFrame(all_reports)
+
+
 def fetch_active_etf_holdings_auto(
     candidates: Tuple[Tuple[str, str], ...],
     custom_sources: Optional[Dict[str, str]] = None,
