@@ -220,6 +220,21 @@ AAR 是你的真實交易歷史覆盤，不是系統理論回測。
 HISTORY_TEXT = """
 <div style="line-height: 1.6; color: #D1D5DB;">
 
+### ⚙️ v37.10.1（主動 ETF 分層抓取版）
+
+* **【母清單全保留】** 內建全部主動 ETF。
+* **【每日模式 daily】** 平日只抓熱門 / 既有資料前 15 檔，降低 GitHub Actions 與來源網站負擔。
+* **【每週全量 full】** 週六自動全抓全部主動 ETF，補齊低頻觀察名單。
+* **【手動可選】** GitHub Actions 的 `Run workflow` 可選 `daily` 或 `full`，也可調整 daily 的 `top_n`。
+* **【前端維持輕量】** Streamlit 只讀 history / report，不在頁面載入時即時爬官方來源。
+
+### 🧩 v37.10（全主動 ETF 官方優先來源覆蓋版）
+
+* **【全抓主動 ETF】** ETL 預設 `--top-n 30`，涵蓋內建全部主動式 ETF，不再只抓熱門 Top 10。
+* **【官方來源優先】** 每檔 ETF 先跑投信官網 / PCF / 投資組合明細；官方不完整才轉 MoneyDJ / CMoney / Pocket 備援。
+* **【來源報告升級】** `active_etf_etl_report.json` 新增 `source_report`、`fallback_source_report`、`adopted_source`，可看到每檔 ETF 最後採用哪個來源。
+* **【前端不變慢】** Streamlit 仍只讀 `data/active_etf_holdings_history.csv`，抓取工作交給 GitHub Actions。
+
 ### ⚡ v37.9.1（ETF 速度瘦身版）
 
 * **【前端不即時抓取】** ETF 經理人風向只讀 `data/active_etf_holdings_history.csv` 或側邊欄 CSV，不再於 Streamlit 頁面載入時跑官方/第三方 fallback。
