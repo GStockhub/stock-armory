@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-05-13T14:43:11Z",
+  "run_at": "2026-05-14T16:37:41Z",
   "output_path": "data/active_etf_holdings_history.csv",
   "mode": "daily",
   "mode_note": "daily：強制熱門核心 Top 10；其餘交給每週 full 補抓",
@@ -20,7 +20,7 @@
   "keep_days": 60,
   "raw_rows": 31,
   "complete_rows": 30,
-  "history_rows": 315,
+  "history_rows": 335,
   "source_mode": "force_top10_official_tab_urls_weekly_full",
   "official_source_report": [
     {
@@ -102,8 +102,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.ezmoney.com.tw/ETF/Transaction/PCFInfo",
       "類型": "link:href",
-      "抓到筆數": 6,
-      "權重合計": 11.15,
+      "抓到筆數": 2,
+      "權重合計": 10.0,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -330,21 +330,9 @@
       "來源類別": "官方",
       "來源": "https://www.capitalfund.com.tw/etf/product/detail/399/buyback",
       "類型": "PCF",
-      "抓到筆數": 0,
-      "權重合計": 0.0,
-      "狀態": "⚠️ empty",
-      "採用": false
-    },
-    {
-      "ETF代號": "00982A",
-      "ETF名稱": "主動群益台灣強棒",
-      "投信": "群益投信",
-      "來源類別": "官方偵察",
-      "來源": "https://www.capitalfund.com.tw/etf/product/detail/399/buyback?etfCode=00982A",
-      "類型": "query-variant:etfCode",
       "抓到筆數": 10,
-      "權重合計": 50.49,
-      "狀態": "✅ 官方偵察完整",
+      "權重合計": 50.59,
+      "狀態": "✅ 官方完整",
       "採用": true
     },
     {
@@ -355,7 +343,7 @@
       "來源": "https://www.capitalfund.com.tw/etf/product/detail/500/buyback",
       "類型": "PCF",
       "抓到筆數": 10,
-      "權重合計": 42.72,
+      "權重合計": 43.01,
       "狀態": "✅ 官方完整",
       "採用": true
     },
@@ -702,21 +690,9 @@
       "來源類別": "官方",
       "來源": "https://www.yuantaetfs.com/",
       "類型": "ETF入口",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
-      "採用": false
-    },
-    {
-      "ETF代號": "00990A",
-      "ETF名稱": "主動元大AI新經濟",
-      "投信": "元大投信",
-      "來源類別": "官方偵察",
-      "來源": "https://www.yuantaetfs.com/product/detail/00990A/",
-      "類型": "link:href",
-      "抓到筆數": 0,
-      "權重合計": 0.0,
-      "狀態": "⚠️ empty",
       "採用": false
     },
     {
@@ -726,8 +702,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.yuantaetfs.com/?etfCode=00990A",
       "類型": "query-variant:etfCode",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -738,8 +714,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.yuantaetfs.com/?stockNo=00990A",
       "類型": "query-variant:stockNo",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -750,8 +726,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.yuantaetfs.com/?fundCode=00990A",
       "類型": "query-variant:fundCode",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -762,8 +738,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.yuantaetfs.com/?code=00990A",
       "類型": "query-variant:code",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -921,7 +897,7 @@
       "來源": "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid=00981A.tw",
       "類型": "MoneyDJ/CMoney/Pocket",
       "抓到筆數": 1,
-      "權重合計": 4.4,
+      "權重合計": 3.94,
       "狀態": "⚠️ 持股數<10、權重合計<20%、產業過少",
       "採用": false
     },
@@ -1246,8 +1222,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.ezmoney.com.tw/ETF/Transaction/PCFInfo",
       "類型": "link:href",
-      "抓到筆數": 6,
-      "權重合計": 11.15,
+      "抓到筆數": 2,
+      "權重合計": 10.0,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -1474,21 +1450,9 @@
       "來源類別": "官方",
       "來源": "https://www.capitalfund.com.tw/etf/product/detail/399/buyback",
       "類型": "PCF",
-      "抓到筆數": 0,
-      "權重合計": 0.0,
-      "狀態": "⚠️ empty",
-      "採用": false
-    },
-    {
-      "ETF代號": "00982A",
-      "ETF名稱": "主動群益台灣強棒",
-      "投信": "群益投信",
-      "來源類別": "官方偵察",
-      "來源": "https://www.capitalfund.com.tw/etf/product/detail/399/buyback?etfCode=00982A",
-      "類型": "query-variant:etfCode",
       "抓到筆數": 10,
-      "權重合計": 50.49,
-      "狀態": "✅ 官方偵察完整",
+      "權重合計": 50.59,
+      "狀態": "✅ 官方完整",
       "採用": true
     },
     {
@@ -1499,7 +1463,7 @@
       "來源": "https://www.capitalfund.com.tw/etf/product/detail/500/buyback",
       "類型": "PCF",
       "抓到筆數": 10,
-      "權重合計": 42.72,
+      "權重合計": 43.01,
       "狀態": "✅ 官方完整",
       "採用": true
     },
@@ -1846,21 +1810,9 @@
       "來源類別": "官方",
       "來源": "https://www.yuantaetfs.com/",
       "類型": "ETF入口",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
-      "採用": false
-    },
-    {
-      "ETF代號": "00990A",
-      "ETF名稱": "主動元大AI新經濟",
-      "投信": "元大投信",
-      "來源類別": "官方偵察",
-      "來源": "https://www.yuantaetfs.com/product/detail/00990A/",
-      "類型": "link:href",
-      "抓到筆數": 0,
-      "權重合計": 0.0,
-      "狀態": "⚠️ empty",
       "採用": false
     },
     {
@@ -1870,8 +1822,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.yuantaetfs.com/?etfCode=00990A",
       "類型": "query-variant:etfCode",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -1882,8 +1834,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.yuantaetfs.com/?stockNo=00990A",
       "類型": "query-variant:stockNo",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -1894,8 +1846,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.yuantaetfs.com/?fundCode=00990A",
       "類型": "query-variant:fundCode",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -1906,8 +1858,8 @@
       "來源類別": "官方偵察",
       "來源": "https://www.yuantaetfs.com/?code=00990A",
       "類型": "query-variant:code",
-      "抓到筆數": 2,
-      "權重合計": 3.8,
+      "抓到筆數": 1,
+      "權重合計": 0.56,
       "狀態": "⚠️ 持股數<10、權重合計<20%",
       "採用": false
     },
@@ -2063,7 +2015,7 @@
       "來源": "https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid=00981A.tw",
       "類型": "MoneyDJ/CMoney/Pocket",
       "抓到筆數": 1,
-      "權重合計": 4.4,
+      "權重合計": 3.94,
       "狀態": "⚠️ 持股數<10、權重合計<20%、產業過少",
       "採用": false
     },
@@ -2309,7 +2261,7 @@
     }
   ],
   "adopted_source": {
-    "00982A": "官方偵察: https://www.capitalfund.com.tw/etf/product/detail/399/buyback?etfCode=00982A",
+    "00982A": "官方: https://www.capitalfund.com.tw/etf/product/detail/399/buyback",
     "00992A": "官方: https://www.capitalfund.com.tw/etf/product/detail/500/buyback",
     "00991A": "官方: https://www.fhtrust.com.tw/ETF/etf_detail/ETF24#nav"
   },
@@ -2324,7 +2276,7 @@
       "ETF代號": "00981A",
       "ETF名稱": "主動統一台股增長",
       "持股數": 1,
-      "權重合計": 4.4,
+      "權重合計": 3.94,
       "產業數": 1,
       "資料狀態": "⚠️ 不完整",
       "資料備註": "持股數<10、權重合計<20%、產業過少"
@@ -2333,7 +2285,7 @@
       "ETF代號": "00982A",
       "ETF名稱": "主動群益台灣強棒",
       "持股數": 10,
-      "權重合計": 50.489999999999995,
+      "權重合計": 50.59,
       "產業數": 5,
       "資料狀態": "✅ 完整",
       "資料備註": "可納入分析"
@@ -2351,7 +2303,7 @@
       "ETF代號": "00992A",
       "ETF名稱": "主動群益科技創新",
       "持股數": 10,
-      "權重合計": 42.72,
+      "權重合計": 43.01,
       "產業數": 5,
       "資料狀態": "✅ 完整",
       "資料備註": "可納入分析"
