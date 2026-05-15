@@ -8,7 +8,7 @@ import ssl
 import html
 from streamlit_cookies_controller import CookieController
 
-from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, read_remote_csv, convert_gsheet_url
+from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, read_remote_csv, convert_gsheet_url, ACTIVE_ETF_NAME_MAP
 from quant_engine import run_sandbox_sim, level2_quant_engine
 from decision_logic import get_institution_state, get_decision_label, get_next_action, calc_refined_safety_score, is_institution_observation
 from backtest_engine import BacktestConfig, run_portfolio_backtest
@@ -47,7 +47,7 @@ except Exception:
     auth_status = st.session_state.get("v3_auth_token", None)
 
 if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 - 軍事管制區</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 v35.2 - 軍事管制區</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
@@ -96,7 +96,7 @@ MODE_PROFILE = {
 table_style = {"text-align": "center", "background-color": COLORS["card"], "color": COLORS["text"], "border-color": COLORS["border"]}
 
 st.markdown(f"<h1 style='text-align: center;' class='highlight-primary'>💰️讓我賺大錢</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;' class='text-sub'>—— V37.12 </p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>—— V37.9.1 主動ETF官方公告追蹤版｜投信官網PCF優先 ✕ 不逐檔抓價 ——</p>", unsafe_allow_html=True)
 
 TWSE_IND_MAP, TWSE_NAME_MAP = load_industry_map()
 
@@ -587,8 +587,15 @@ if sheet_url and auth_status == "admin_auth":
             h_intel = level2_quant_engine(tuple(h_df["代號"].tolist()), TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
             if h_intel is not None and not h_intel.empty:
                 m_df = pd.merge(h_df, h_intel, on="代號", how="left")
-                if "名稱_x" in m_df.columns: m_df = m_df.rename(columns={"名稱_x": "名稱"}).drop(columns=["名稱_y"], errors='ignore')
-                else: m_df["名稱"] = m_df["代號"].map(TWSE_NAME_MAP).fillna("未知")
+                if "名稱_x" in m_df.columns:
+                    m_df = m_df.rename(columns={"名稱_x": "名稱"}).drop(columns=["名稱_y"], errors='ignore')
+                else:
+                    m_df["名稱"] = m_df["代號"].map(lambda x: TWSE_NAME_MAP.get(str(x), ACTIVE_ETF_NAME_MAP.get(str(x), "未知")))
+            else:
+                # V37.9.1：新掛牌主動 ETF 可能還沒有足夠 K 線；持股卡片仍應顯示成本與名稱，
+                # 不應整區消失或顯示「未知」。技術欄位留空，由卡片顯示「資料暖機」。
+                m_df = h_df.copy()
+                m_df["名稱"] = m_df["代號"].map(lambda x: TWSE_NAME_MAP.get(str(x), ACTIVE_ETF_NAME_MAP.get(str(x), "未知")))
     except Exception as e: st.error(f"❌ 讀取持股部位失敗：{e}")
 
 if aar_sheet_url:
@@ -602,6 +609,14 @@ if aar_sheet_url:
         aar_read_ok = False
 
 if not m_df.empty and "代號" in m_df.columns:
+    # V37.9.1：補齊新主動 ETF 名稱，例如 00403A，避免顯示未知。
+    if "名稱" not in m_df.columns:
+        m_df["名稱"] = ""
+    m_df["名稱"] = m_df.apply(
+        lambda r: ACTIVE_ETF_NAME_MAP.get(str(r.get("代號", "")).strip(), TWSE_NAME_MAP.get(str(r.get("代號", "")).strip(), str(r.get("名稱", ""))))
+        if str(r.get("名稱", "")).strip() in ["", "nan", "None", "未知"] else r.get("名稱", ""),
+        axis=1,
+    )
     rescue_residual_map = build_rescue_residual_map(aar_probe_df, m_df["代號"].astype(str).tolist())
 
 # 資料健康燈號移至 Sidebar，主畫面不再佔用 S/A/B 空間。
@@ -1528,13 +1543,24 @@ with t_cmd:
                         border_col = conf_color
                         ret_col = COLORS['red'] if pnl > 0 else (COLORS['green'] if pnl < 0 else COLORS['text'])
                     
-                        if p_now == 0.0 or m10 == 0.0: struct, coach, border_col, glow_class = "⚪ 訊號不足", "無法取得完整均線數據，請手動確認走勢。", COLORS['border'], ""
+                        sid_hold_upper = str(sid_hold).strip().upper()
+                        is_new_active_etf = sid_hold_upper in ACTIVE_ETF_NAME_MAP or sid_hold_upper.endswith("A")
+                        if p_now == 0.0:
+                            if is_new_active_etf:
+                                struct, coach, border_col, glow_class = "🟣 新掛牌 ETF｜報價暖機", "新主動 ETF 可能尚未被 Yahoo / FinMind 收錄；先顯示持股與成本，不判定技術強弱。", COLORS['border'], ""
+                            else:
+                                struct, coach, border_col, glow_class = "⚪ 訊號不足", "無法取得完整價格數據，請手動確認走勢。", COLORS['border'], ""
+                        elif m10 == 0.0 or pd.isna(m10):
+                            if is_new_active_etf:
+                                struct, coach, border_col, glow_class = "🟣 新掛牌 ETF｜均線暖機", "已取得現價，但上市天數不足，M10 / M20 尚未成熟；暫用成本與手動趨勢確認。", COLORS['border'], ""
+                            else:
+                                struct, coach, border_col, glow_class = "⚪ 訊號不足", "無法取得完整均線數據，請手動確認走勢。", COLORS['border'], ""
                         else:
                             struct = f"📈 趨勢：現價 > M5" if p_now > m5 else (f"📉 跌破M5" if p_now >= dynamic_sl else f"💀 貫穿防線")
                             coach = f"<strong style='color:{conf_color}; font-size:14px;'>🛡️ 續抱信心【{conf_level}】</strong><br>{conf_text}"
 
-                        if p_now == 0.0 or m10 == 0.0:
-                            next_action = "手動確認資料"
+                        if p_now == 0.0 or m10 == 0.0 or pd.isna(m10):
+                            next_action = "新ETF先手動確認" if is_new_active_etf else "手動確認資料"
                         elif p_now < dynamic_sl or p_now < m10:
                             next_action = "破防：減碼/停損"
                         elif p_now < m5:
@@ -1584,7 +1610,9 @@ with t_cmd:
                             coach = f"<strong style='color:{conf_color}; font-size:14px;'>🚑 救援殘倉【{conf_level}】</strong><br>{rescue_note}<br>原則：反彈減碼優先，站回成本區前不加碼；再破 M5/M10 執行二次處理。"
 
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
-                        display_p_now = f"{p_now:.2f}" if p_now > 0 else "抓取中"
+                        if str(name_display).strip() in ["", "nan", "None", "未知"]:
+                            name_display = ACTIVE_ETF_NAME_MAP.get(str(r.get('代號','')).strip().upper(), str(r.get('代號','')).strip())
+                        display_p_now = f"{p_now:.2f}" if p_now > 0 else ("新ETF待收錄" if str(r.get('代號','')).strip().upper() in ACTIVE_ETF_NAME_MAP else "抓取中")
                         timer_html = f"<span style='color:{timer_color}; font-size:12px;'>{timer_warning}</span>" if timer_warning else ""
                         rescue_badge = f" <span style='font-size:12px; color:{COLORS['red']}; font-weight:700;'>🚑救援殘倉</span>" if is_rescue_residual else ""
                     
@@ -1624,4 +1652,4 @@ with t_book:
         st.markdown(HISTORY_TEXT, unsafe_allow_html=True)
 
 st.divider()
-st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;' class='text-sub'>© 游擊隊軍火部 - v35.0 </p>", unsafe_allow_html=True)

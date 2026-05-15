@@ -15,6 +15,21 @@ from urllib3.util.retry import Retry
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+# 新掛牌主動 ETF 常常不在本機 industry_map.csv 內；先補靜態名稱，避免持股卡片顯示「未知」。
+ACTIVE_ETF_NAME_MAP = {
+    "00980A": "主動野村臺灣優選",
+    "00981A": "主動統一台股增長",
+    "00982A": "主動群益台灣強棒",
+    "00985A": "主動野村臺灣優選",
+    "00988A": "主動統一全球創新",
+    "00991A": "主動復華未來50",
+    "00992A": "主動群益科技創新",
+    "00999A": "主動野村臺灣高息",
+    "00400A": "主動國泰動能高息",
+    "00403A": "主動統一升級50",
+}
+
 def get_retry_session():
     session = requests.Session()
     retry = Retry(
@@ -73,10 +88,17 @@ def load_industry_map():
         
         ind_map = dict(zip(df["代號"], df["產業"]))
         name_map = dict(zip(df["代號"], df["名稱"]))
+
+        # V37.9.1：補上新掛牌主動 ETF。官方產業地圖更新會慢於 ETF 上市，
+        # 若不補，持股風控會顯示「未知（00403A）」甚至被當成普通個股。
+        for code, name in ACTIVE_ETF_NAME_MAP.items():
+            name_map.setdefault(code, name)
+            ind_map.setdefault(code, "主動ETF")
         return ind_map, name_map
     except Exception as e:
         print(f"❌ 讀取自建產業地圖失敗: {e}")
-        return {}, {}
+        # 地圖失敗時仍保留新主動 ETF 名稱，避免持股卡片變未知。
+        return {code: "主動ETF" for code in ACTIVE_ETF_NAME_MAP}, ACTIVE_ETF_NAME_MAP.copy()
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_macro_dashboard():
@@ -187,7 +209,8 @@ def safe_download(sid, fm_token=None, period="60d", min_bars=None):
     """
     sid_clean = str(sid).strip().upper()
     if min_bars is None:
-        min_bars = 5 if _is_etf_like_code(sid_clean) else 20
+        # 新掛牌 ETF 可能只有 1~3 根 K 棒；持股風控至少要先能取到現價。
+        min_bars = 1 if _is_etf_like_code(sid_clean) else 20
     try:
         df = safe_download_price(sid_clean, fm_token=fm_token, period=period, min_bars=int(min_bars))
         if df is not None and not df.empty:

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import concurrent.futures
-from data_center import fetch_single_stock_batch, safe_download
+from data_center import fetch_single_stock_batch, safe_download, ACTIVE_ETF_NAME_MAP
 
 
 def _is_etf_like(sid):
@@ -87,8 +87,8 @@ def _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s, max_hold_bars=1
 @st.cache_data(ttl=900, show_spinner=False)
 def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     sid = str(sid).strip()
-    df = safe_download(sid, fm_token, min_bars=(5 if _is_etf_like(sid) else 20))
-    if df is None or df.empty or len(df) < (5 if _is_etf_like(sid) else 20): return None
+    df = safe_download(sid, fm_token, min_bars=(1 if _is_etf_like(sid) else 20))
+    if df is None or df.empty or len(df) < (1 if _is_etf_like(sid) else 20): return None
     
     df = df[~df.index.duplicated(keep="last")].copy()
     if "Volume" not in df.columns: df["Volume"] = 0
@@ -102,7 +102,7 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     vol_s = pd.to_numeric(df["Volume"], errors="coerce")
 
     valid_close = close_s.dropna()
-    min_need = 5 if _is_etf_like(sid) else 20
+    min_need = 1 if _is_etf_like(sid) else 20
     if close_s.isna().all() or len(valid_close) < min_need: return None
 
     p_now = float(valid_close.iloc[-1])
@@ -142,7 +142,7 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
 
     return {
         "代號": sid,
-        "名稱": TWSE_NAME_MAP.get(sid, sid),
+        "名稱": TWSE_NAME_MAP.get(sid, ACTIVE_ETF_NAME_MAP.get(sid, sid)),
         "現價": p_now,
         "M5": m5,
         "M10": m10,
@@ -181,7 +181,7 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             vol_s = pd.to_numeric(df["Volume"], errors="coerce")
 
             valid_close = close_s.dropna()
-            min_need = 5 if _is_etf_like(sid) else 20
+            min_need = 1 if _is_etf_like(sid) else 20
             if close_s.isna().all() or len(valid_close) < min_need: continue
 
             p_now = float(valid_close.iloc[-1])
@@ -280,7 +280,7 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             raw_risk = max(p_now - stop_price, 0.01)
 
             intel_results.append({
-                "代號": sid, "名稱": TWSE_NAME_MAP.get(sid, sid), "產業": ind, "現價": p_now, "成交量": vol_now, "今日放量": (vol_now > vol_ma5 * 1.4),
+                "代號": sid, "名稱": TWSE_NAME_MAP.get(sid, ACTIVE_ETF_NAME_MAP.get(sid, sid)), "產業": ind, "現價": p_now, "成交量": vol_now, "今日放量": (vol_now > vol_ma5 * 1.4),
                 "日漲幅(%)": day_return, "3日漲幅(%)": ret_3d, "5日漲幅(%)": ret_5d,
                 "乖離(%)": bias, "M5": m5, "M10": m10, "勝率(%)": win_rate, "均報(%)": avg_ret, "戰術型態": tactic,
                 "停損價": stop_price, "原始風險差額": raw_risk, "基本達標": (s_score >= 6 and bias <= 8), "安全指數": s_score,
