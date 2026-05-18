@@ -18,6 +18,7 @@ from __future__ import annotations
 import html as html_lib
 import io
 import json
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -32,6 +33,17 @@ try:
 except Exception:
     probe_official_urls = None
     probe_fetch_url = None
+
+try:
+    from active_etf_source_registry import get_sources_for_etf
+except Exception:
+    get_sources_for_etf = None
+
+try:
+    from active_etf_playwright_probe import is_enabled as playwright_enabled, render_and_capture
+except Exception:
+    playwright_enabled = None
+    render_and_capture = None
 
 try:
     from bs4 import BeautifulSoup
@@ -488,6 +500,28 @@ def _short_url_for_report(url: str, max_len: int = 220) -> str:
     return s[:max_len] + "...[truncated]"
 
 
+
+def _source_needs_playwright(etf_code: str, url: str) -> bool:
+    if get_sources_for_etf is None:
+        return False
+    try:
+        for s in get_sources_for_etf(etf_code):
+            if str(getattr(s, "url", "")).strip() == str(url).strip():
+                return bool(getattr(s, "needs_playwright", False))
+    except Exception:
+        return False
+    return False
+
+
+def _playwright_is_enabled() -> bool:
+    if playwright_enabled is None or render_and_capture is None:
+        return False
+    try:
+        return bool(playwright_enabled())
+    except Exception:
+        return False
+
+
 def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.DataFrame, List[Dict[str, object]]]:
     """官方來源單檔抓取。
 
@@ -519,6 +553,7 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
             "權重合計": round(wsum, 4),
             "狀態": "✅ 官方完整" if ok else f"⚠️ {reason}",
             "採用": bool(ok),
+            "需要Playwright": bool(_source_needs_playwright(code, src.url)),
         })
         if len(df) > len(best):
             best = df
@@ -590,6 +625,58 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
             if ok:
                 return df, reports
             time.sleep(0.25)
+
+
+
+    # V37.11：一般 requests / probe 都失敗後，才啟用 Playwright 攻堅。
+    # 只在 GitHub Actions / 本機 ETL 設定 ACTIVE_ETF_ENABLE_PLAYWRIGHT=1 時執行；Streamlit 前端不會跑。
+    if sources and _playwright_is_enabled():
+        pw_urls = [src.url for src in sources if _source_needs_playwright(code, src.url)]
+        # 如果 registry 只有入口但沒標記，仍允許對來源做一次保守渲染。
+        if not pw_urls:
+            pw_urls = [src.url for src in sources[:2]]
+        try:
+            rendered_items = render_and_capture(pw_urls, etf_code=code)
+        except Exception as exc:
+            rendered_items = []
+            reports.append({
+                "ETF代號": code,
+                "ETF名稱": etf_name or code,
+                "投信": sources[0].issuer if sources else "",
+                "來源類別": "官方Playwright",
+                "來源": " / ".join(pw_urls[:3]),
+                "類型": "playwright-error",
+                "抓到筆數": 0,
+                "權重合計": 0.0,
+                "狀態": f"⚠️ playwright_failed:{type(exc).__name__}",
+                "採用": False,
+                "需要Playwright": True,
+            })
+
+        for item in rendered_items:
+            df = parse_official_response(item.text, code, etf_name or code, item.url, item.content_type)
+            ok, reason, cnt, wsum = source_quality(df)
+            if _is_rejected_holding_source(item.url):
+                ok = False
+                reason = "疑似非持股來源頁"
+            reports.append({
+                "ETF代號": code,
+                "ETF名稱": etf_name or code,
+                "投信": sources[0].issuer if sources else "",
+                "來源類別": "官方Playwright",
+                "來源": _short_url_for_report(item.url),
+                "類型": item.kind,
+                "抓到筆數": cnt,
+                "權重合計": round(wsum, 4),
+                "狀態": "✅ Playwright完整" if ok else f"⚠️ {reason}",
+                "採用": bool(ok),
+                "需要Playwright": True,
+            })
+            if len(df) > len(best):
+                best = df
+            if ok:
+                return df, reports
+            time.sleep(0.15)
 
     if not sources:
         reports.append({
