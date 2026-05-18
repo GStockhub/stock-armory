@@ -5,12 +5,12 @@ on:
     # 平日每日模式：台灣時間 17:45 與 18:45，只抓熱門前 10，速度較穩。
     - cron: "45 9 * * 1-5"
     - cron: "45 10 * * 1-5"
-    # 每週全量模式：台灣時間週六 09:30，補抓全部主動 ETF。
+    # 每週全量攻堅：台灣時間週六 09:30，全量掃描並啟用 Playwright。
     - cron: "30 1 * * 6"
   workflow_dispatch:
     inputs:
       mode:
-        description: "ETL mode: daily=熱門前N；full=全主動ETF"
+        description: "ETL mode: daily=熱門前N；full=全主動ETF攻堅"
         required: true
         default: "daily"
         type: choice
@@ -21,6 +21,15 @@ on:
         description: "daily 模式抓取檔數；full 模式會忽略此值並全抓"
         required: true
         default: "10"
+      use_playwright:
+        description: "Playwright攻堅：auto=full啟用；true=強制；false=關閉"
+        required: true
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - true
+          - false
 
 permissions:
   contents: write
@@ -43,20 +52,36 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MODE="${{ github.event.inputs.mode }}"
             TOP_N="${{ github.event.inputs.top_n }}"
+            USE_PW="${{ github.event.inputs.use_playwright }}"
           else
-            # 週六排程跑 full，其餘平日跑 daily。
             DOW=$(date -u +%u)
             if [ "$DOW" = "6" ]; then
               MODE="full"
               TOP_N="30"
+              USE_PW="auto"
             else
               MODE="daily"
               TOP_N="10"
+              USE_PW="auto"
             fi
           fi
+
+          if [ "$USE_PW" = "auto" ]; then
+            if [ "$MODE" = "full" ]; then
+              ENABLE_PW="1"
+            else
+              ENABLE_PW="0"
+            fi
+          elif [ "$USE_PW" = "true" ]; then
+            ENABLE_PW="1"
+          else
+            ENABLE_PW="0"
+          fi
+
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "top_n=$TOP_N" >> "$GITHUB_OUTPUT"
-          echo "Resolved mode=$MODE top_n=$TOP_N"
+          echo "enable_playwright=$ENABLE_PW" >> "$GITHUB_OUTPUT"
+          echo "Resolved mode=$MODE top_n=$TOP_N enable_playwright=$ENABLE_PW"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -68,9 +93,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Active ETF layered ETL
+      - name: Install Playwright Chromium
+        if: steps.mode.outputs.enable_playwright == '1'
         run: |
-          # V37.10：同一個 workflow 完成 registry / scout / ETL；預設不抓個股收盤價，也不在 Streamlit 前端爬資料。
+          pip install playwright
+          python -m playwright install chromium
+
+      - name: Run Active ETF layered ETL
+        env:
+          ACTIVE_ETF_ENABLE_PLAYWRIGHT: ${{ steps.mode.outputs.enable_playwright }}
+        run: |
           python active_etf_etl.py --mode "${{ steps.mode.outputs.mode }}" --output data/active_etf_holdings_history.csv --report data/active_etf_etl_report.json --scout-report data/active_etf_source_scout.json --top-n "${{ steps.mode.outputs.top_n }}" --keep-days 60
 
       - name: Commit updated ETF holdings history
@@ -87,8 +119,6 @@ jobs:
 
           git commit -m "Update active ETF holdings history"
 
-          # V37.10.2：避免 main 在 workflow 執行期間被你手動更新，導致 push 被 rejected。
-          # 先把遠端 main rebase 進來，再 push；若剛好又有人更新，最多重試 3 次。
           for i in 1 2 3; do
             git fetch origin main
             git rebase origin/main || {
