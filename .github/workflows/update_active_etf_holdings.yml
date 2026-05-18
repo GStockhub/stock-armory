@@ -70,8 +70,8 @@ jobs:
 
       - name: Run Active ETF layered ETL
         run: |
-          # V37.10.1：daily 抓熱門前 N；full 全抓。預設不抓個股收盤價。
-          python active_etf_etl.py --mode "${{ steps.mode.outputs.mode }}" --output data/active_etf_holdings_history.csv --report data/active_etf_etl_report.json --top-n "${{ steps.mode.outputs.top_n }}" --keep-days 60
+          # V37.10：同一個 workflow 完成 registry / scout / ETL；預設不抓個股收盤價，也不在 Streamlit 前端爬資料。
+          python active_etf_etl.py --mode "${{ steps.mode.outputs.mode }}" --output data/active_etf_holdings_history.csv --report data/active_etf_etl_report.json --scout-report data/active_etf_source_scout.json --top-n "${{ steps.mode.outputs.top_n }}" --keep-days 60
 
       - name: Commit updated ETF holdings history
         shell: bash
