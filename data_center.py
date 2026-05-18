@@ -63,8 +63,28 @@ def convert_gsheet_url(url: str) -> str:
     return url
 
 def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
+    """讀取遠端或本機 CSV。
+
+    V37.10.1：ETF 經理人風向會讀 GitHub Actions 產出的
+    data/active_etf_holdings_history.csv。這是 repo 內的本機檔案，
+    不能用 requests.get() 當網址讀，否則會回空表，導致前端誤判
+    「目前沒有可用的主動 ETF history」。
+    """
+    url = str(url or "").strip()
+    if not url:
+        return pd.DataFrame()
+
+    # 本機 / repo 內 CSV：給 Streamlit 直接讀 data/*.csv 使用。
+    try:
+        if os.path.exists(url):
+            return pd.read_csv(url, dtype=dtype, encoding="utf-8-sig")
+    except Exception as e:
+        print(f"Read Local CSV Error: {e}")
+        return pd.DataFrame()
+
     url = convert_gsheet_url(url)
-    if not url: return pd.DataFrame()
+    if not url:
+        return pd.DataFrame()
     session = get_retry_session()
     try:
         resp = session.get(url, timeout=20, verify=False)
