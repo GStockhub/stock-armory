@@ -119,6 +119,15 @@ OFFICIAL_SOURCE_REGISTRY: Dict[str, List[OfficialSource]] = {
 }
 
 
+
+# V37.10：以 active_etf_source_registry.py 作為單一來源地圖。
+# 保留上方舊表只是為了回溯相容；實際執行時用 registry 覆蓋，避免多處 mapping 不同步。
+try:
+    from active_etf_source_registry import build_official_source_registry
+    OFFICIAL_SOURCE_REGISTRY = build_official_source_registry(OfficialSource)
+except Exception:
+    pass
+
 OUTPUT_COLUMNS = ["日期", "ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "持有股數", "來源"]
 
 

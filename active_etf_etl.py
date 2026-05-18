@@ -50,6 +50,7 @@ from active_etf_holdings import (
 )
 from github_history_store import normalize_history_df
 from active_etf_official_sources import fetch_official_holdings_auto
+from active_etf_source_registry import ACTIVE_ETF_META, iter_registry, get_sources_for_etf
 
 OUTPUT_COLUMNS = ["日期", "ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "持有股數", "收盤價", "產業", "來源"]
 
@@ -213,7 +214,130 @@ def select_etf_candidates(mode: str, top_n: int, output_path: str):
     return selected, "daily", f"daily：強制熱門核心 Top {top_n}；其餘交給每週 full 補抓"
 
 
-def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_prices: bool = True, mode: str = 'daily') -> int:
+
+
+def _load_previous_report(report_path: str) -> Dict[str, object]:
+    p = Path(report_path)
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _latest_complete_snapshot_dates(history: pd.DataFrame) -> Dict[str, str]:
+    """從 merged history 推估每檔 ETF 最近一次完整快照日期。"""
+    if history is None or history.empty:
+        return {}
+    df = history.copy()
+    for c in ["日期", "ETF代號", "成分股代號", "權重"]:
+        if c not in df.columns:
+            return {}
+    df["_d"] = pd.to_datetime(df["日期"], errors="coerce")
+    df["ETF代號"] = df["ETF代號"].astype(str).str.upper().str.strip()
+    df["權重"] = pd.to_numeric(df["權重"], errors="coerce").fillna(0.0)
+    g = df.dropna(subset=["_d"]).groupby(["ETF代號", "_d"]).agg(
+        持股數=("成分股代號", "nunique"),
+        權重合計=("權重", "sum"),
+    ).reset_index()
+    g = g[(g["持股數"] >= 10) & (g["權重合計"] >= 20.0) & (g["權重合計"] <= 105.0)]
+    if g.empty:
+        return {}
+    last = g.sort_values("_d").groupby("ETF代號").tail(1)
+    return {str(r["ETF代號"]): pd.Timestamp(r["_d"]).strftime("%Y-%m-%d") for _, r in last.iterrows()}
+
+
+def _previous_failure_map(previous_report: Dict[str, object]) -> Dict[str, int]:
+    out: Dict[str, int] = {}
+    rows = previous_report.get("etl_health", []) if isinstance(previous_report, dict) else []
+    if isinstance(rows, list):
+        for r in rows:
+            try:
+                out[str(r.get("ETF代號", "")).upper()] = int(r.get("連續失敗天數", 0) or 0)
+            except Exception:
+                continue
+    return out
+
+
+def _build_etl_health(cand_tuple, latest: pd.DataFrame, merged: pd.DataFrame, source_reports, previous_report: Dict[str, object]) -> list:
+    now = pd.Timestamp(datetime.utcnow().date())
+    complete_today = set()
+    if latest is not None and not latest.empty and "ETF代號" in latest.columns:
+        complete_today = set(latest["ETF代號"].dropna().astype(str).str.upper())
+    last_success = _latest_complete_snapshot_dates(merged)
+    prev_fail = _previous_failure_map(previous_report)
+
+    by_code_reports = {}
+    for r in source_reports or []:
+        code = str(r.get("ETF代號", "")).upper().strip()
+        if not code:
+            continue
+        by_code_reports.setdefault(code, []).append(r)
+
+    rows = []
+    for code, name in cand_tuple:
+        code = str(code).upper().strip()
+        meta = ACTIVE_ETF_META.get(code, {})
+        reports = by_code_reports.get(code, [])
+        adopted = [r for r in reports if bool(r.get("採用", False))]
+        needs_playwright = any(bool(r.get("需要Playwright", False)) for r in reports) or any(bool(getattr(src, "needs_playwright", False)) for src in get_sources_for_etf(code))
+        is_success = code in complete_today
+        lf_date = last_success.get(code, "")
+        if is_success:
+            consecutive = 0
+        else:
+            consecutive = int(prev_fail.get(code, 0) or 0) + 1
+        stale_days = None
+        if lf_date:
+            try:
+                stale_days = int((now - pd.Timestamp(lf_date)).days)
+            except Exception:
+                stale_days = None
+        if is_success:
+            light = "🟢 今日成功更新"
+        elif stale_days is not None and stale_days <= 2:
+            light = f"🟡 今日未更新，沿用 {lf_date} 快照"
+        elif consecutive >= 3:
+            light = "🔴 連續失敗，資料可能過期"
+        else:
+            light = "🟡 尚未取得完整快照"
+        last_status = str(reports[-1].get("狀態", "")) if reports else "no_source_report"
+        rows.append({
+            "ETF代號": code,
+            "ETF名稱": name or meta.get("名稱", code),
+            "投信": meta.get("投信", ""),
+            "健康燈號": light,
+            "今日成功": bool(is_success),
+            "連續失敗天數": int(consecutive),
+            "最後成功日期": lf_date,
+            "資料過期天數": stale_days if stale_days is not None else "",
+            "採用來源": adopted[0].get("來源", "") if adopted else "",
+            "嘗試來源數": len(reports),
+            "需要Playwright": bool(needs_playwright),
+            "最後狀態": last_status,
+        })
+    return rows
+
+
+def _write_scout_report(path: str, cand_tuple, source_reports, health_rows, report: Dict[str, object]) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    registry_codes = [c for c, _n in cand_tuple]
+    payload = {
+        "run_at": report.get("run_at"),
+        "mode": report.get("mode"),
+        "candidate_count": len(cand_tuple),
+        "complete_etfs": report.get("complete_etfs", []),
+        "needs_playwright_etfs": sorted({r.get("ETF代號") for r in health_rows if r.get("需要Playwright") and not r.get("今日成功")}),
+        "registry": iter_registry(registry_codes),
+        "etl_health": health_rows,
+        "source_report": source_reports or [],
+    }
+    p.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_prices: bool = True, mode: str = 'daily', scout_report_path: str = 'data/active_etf_source_scout.json') -> int:
+    previous_report = _load_previous_report(report_path)
     industry_map, name_map = load_industry_map()
     candidates, resolved_mode, mode_note = select_etf_candidates(mode, top_n, output_path)
     cand_tuple = tuple((c["ETF代號"], c["ETF名稱"]) for c in candidates)
@@ -269,6 +393,8 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
     else:
         print("[WARN] 沒有完整快照，也沒有可沿用歷史；不產生有效歷史資料。")
 
+    health_rows = _build_etl_health(cand_tuple, latest, merged, source_reports, previous_report)
+
     report = {
         "run_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "output_path": str(outp),
@@ -286,6 +412,8 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         "fallback_source_report": [] if fallback_report is None or fallback_report.empty else fallback_report.to_dict(orient="records"),
         "source_report": source_reports,
         "adopted_source": adopted_source,
+        "etl_health": health_rows,
+        "source_registry": iter_registry([c for c, _n in cand_tuple]),
         "price_mode": "skipped" if no_prices else "fetched",
         "complete_etfs": [] if latest is None or latest.empty else sorted(latest["ETF代號"].dropna().astype(str).unique().tolist()),
         "quality": [] if quality is None or quality.empty else quality.to_dict(orient="records"),
@@ -294,6 +422,8 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
     rp.parent.mkdir(parents=True, exist_ok=True)
     rp.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[INFO] ETL 報告：{rp}")
+    _write_scout_report(scout_report_path, cand_tuple, source_reports, health_rows, report)
+    print(f"[INFO] Scout 報告：{scout_report_path}")
     # 抓不到完整資料不視為 Action 失敗；避免每天紅燈，但會在 report 記錄。
     return 0
 
@@ -302,12 +432,13 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Active ETF holdings ETL")
     ap.add_argument("--output", default=os.environ.get("ACTIVE_ETF_HISTORY_PATH", "data/active_etf_holdings_history.csv"))
     ap.add_argument("--report", default=os.environ.get("ACTIVE_ETF_REPORT_PATH", "data/active_etf_etl_report.json"))
+    ap.add_argument("--scout-report", default=os.environ.get("ACTIVE_ETF_SCOUT_REPORT_PATH", "data/active_etf_source_scout.json"))
     ap.add_argument("--mode", choices=["daily", "full", "auto"], default=os.environ.get("ACTIVE_ETF_ETL_MODE", "daily"), help="daily=每日熱門前N；full=全主動ETF；auto=依日期自動判斷")
     ap.add_argument("--top-n", type=int, default=int(os.environ.get("ACTIVE_ETF_TOP_N", 10)))
     ap.add_argument("--keep-days", type=int, default=int(os.environ.get("ACTIVE_ETF_KEEP_DAYS", HOLDINGS_KEEP_DAYS)))
     ap.add_argument("--with-prices", action="store_true", help="補抓個股收盤價；預設關閉，避免逐檔訪問 Yahoo")
     args = ap.parse_args()
-    return run_etl(args.output, args.report, args.top_n, args.keep_days, no_prices=not args.with_prices, mode=args.mode)
+    return run_etl(args.output, args.report, args.top_n, args.keep_days, no_prices=not args.with_prices, mode=args.mode, scout_report_path=args.scout_report)
 
 
 if __name__ == "__main__":

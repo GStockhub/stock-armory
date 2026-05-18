@@ -294,8 +294,15 @@ def _render_manager_header_compact(summary, holdings, COLORS, history_status=Non
             <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">ETL：raw {raw_rows}｜complete {complete_rows}｜完整 ETF：{_safe_text('、'.join(map(str, complete_etfs)) if complete_etfs else '-')}</div>
         </div>
         """, unsafe_allow_html=True)
+        health = report.get("etl_health", []) if isinstance(report, dict) else []
+        if health:
+            st.markdown("##### 🚦 ETL 健康燈號")
+            hdf = pd.DataFrame(health)
+            cols = ["ETF代號", "ETF名稱", "投信", "健康燈號", "連續失敗天數", "最後成功日期", "資料過期天數", "需要Playwright", "最後狀態"]
+            st.dataframe(hdf[[c for c in cols if c in hdf.columns]], use_container_width=True, hide_index=True, height=260)
         quality = report.get("quality", []) if isinstance(report, dict) else []
         if quality:
+            st.markdown("##### 📋 快照完整度")
             st.dataframe(pd.DataFrame(quality), use_container_width=True, hide_index=True, height=260)
 
 
