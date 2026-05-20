@@ -34,7 +34,50 @@ DATA_KEYWORDS = [
 
 BAD_EXT_RE = re.compile(r"\.(css|ico|jpg|jpeg|png|gif|svg|webp|woff2?|ttf|eot|map|mp4|mp3)(\?|$)", re.I)
 BINARY_CT_RE = re.compile(r"(image/|font/|video/|audio/|pdf|octet-stream)", re.I)
-CLICK_TEXTS = ["投資組合", "基金投資組合", "持股", "成分", "申購買回", "PCF", "買回清單", "投組"]
+CLICK_TEXTS = [
+    "投資組合", "基金投資組合", "持股", "成分", "申購買回", "PCF", "買回清單", "投組",
+    "投資明細", "持股明細", "基金資料", "產品資料", "申購", "買回", "下載",
+]
+
+
+def _extract_interesting_links(page, base_url: str, etf_code: str = "", limit: int = 10) -> list[str]:
+    """從渲染頁面擷取可能的 ETF/PCF/持股連結，再由 browser 逐一打開。
+
+    這用來處理只給投信入口頁的來源，例如安聯/中信/台新/摩根等。
+    """
+    try:
+        links = page.locator("a").evaluate_all(
+            "els => els.map(a => ({href: a.href || '', text: (a.innerText || a.textContent || '')})).filter(x => x.href)"
+        )
+    except Exception:
+        return []
+    out = []
+    seen = set()
+    code = str(etf_code or "").lower()
+    for item in links or []:
+        href = str(item.get("href", "") or "")
+        text = str(item.get("text", "") or "")
+        blob = (href + " " + text).lower()
+        if href in seen:
+            continue
+        if not _same_domain(base_url, href):
+            continue
+        if BAD_EXT_RE.search(href):
+            continue
+        hit = False
+        if code and code in blob:
+            hit = True
+        if any(k.lower() in blob for k in DATA_KEYWORDS):
+            hit = True
+        if any(k in text for k in ["主動", "ETF", "申購", "買回", "持股", "投資組合", "成分", "PCF"]):
+            hit = True
+        if not hit:
+            continue
+        seen.add(href)
+        out.append(href)
+        if len(out) >= limit:
+            break
+    return out
 
 
 @dataclass(frozen=True)
@@ -92,9 +135,9 @@ def _safe_response_text(resp, max_chars: int) -> tuple[str, str]:
 def render_and_capture(
     urls: Iterable[str],
     etf_code: str = "",
-    wait_ms: int = 4500,
-    max_responses: int = 18,
-    max_chars: int = 650_000,
+    wait_ms: int = 5500,
+    max_responses: int = 60,
+    max_chars: int = 900_000,
 ) -> List[RenderedCandidate]:
     """渲染官方頁並收集候選 response。
 
@@ -170,6 +213,30 @@ def render_and_capture(
                     except Exception:
                         pass
                     add(base_url, "playwright-rendered-page", "text/html", page.content())
+
+                    # 入口頁攻堅：若 registry 只給投信首頁/ETF入口，嘗試開啟頁面中
+                    # 跟 ETF/PCF/持股有關的連結，讓 XHR 監聽器抓到真正 API。
+                    for href in _extract_interesting_links(page, base_url, etf_code=etf_code, limit=10):
+                        if captured >= max_responses:
+                            break
+                        try:
+                            page.goto(href, wait_until="domcontentloaded", timeout=25_000)
+                            page.wait_for_timeout(max(1800, wait_ms // 2))
+                            for label in CLICK_TEXTS:
+                                try:
+                                    loc = page.get_by_text(label, exact=False)
+                                    if loc.count() > 0:
+                                        loc.first.click(timeout=1200)
+                                        page.wait_for_timeout(900)
+                                except Exception:
+                                    continue
+                            try:
+                                page.wait_for_load_state("networkidle", timeout=3500)
+                            except Exception:
+                                pass
+                            add(href, "playwright-linked-page", "text/html", page.content())
+                        except Exception:
+                            continue
                 except Exception as exc:
                     print(f"[WARN] Playwright 渲染失敗 {base_url}: {type(exc).__name__}: {exc}")
                 finally:

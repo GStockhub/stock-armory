@@ -224,17 +224,30 @@ def _norm_col(c: object) -> str:
 
 
 def _pick_col(cols: Iterable[str], keys: List[str], exclude: Optional[List[str]] = None) -> Optional[str]:
+    """寬鬆欄位對應。
+
+    各投信/第三方 API 常混用中文、英文、駝峰與大小寫；這裡用大小寫不敏感與
+    去空白比對，降低「抓到 JSON 但欄位對不上」的失敗率。
+    """
     exclude = exclude or []
     cols = [_norm_col(c) for c in cols]
+    key_norm = [str(k).replace(" ", "").replace("_", "").lower() for k in keys]
+    exc_norm = [str(x).replace(" ", "").replace("_", "").lower() for x in exclude]
+
+    def _canon(v: str) -> str:
+        return str(v).replace(" ", "").replace("_", "").lower()
+
     for c in cols:
-        if any(x in c for x in exclude):
+        cc = _canon(c)
+        if any(x and x in cc for x in exc_norm):
             continue
-        if c in keys:
+        if cc in key_norm or c in keys:
             return c
     for c in cols:
-        if any(x in c for x in exclude):
+        cc = _canon(c)
+        if any(x and x in cc for x in exc_norm):
             continue
-        if any(k in c for k in keys):
+        if any(k and k in cc for k in key_norm) or any(k in c for k in keys):
             return c
     return None
 
@@ -246,10 +259,27 @@ def _standardize_table(raw: pd.DataFrame, etf_code: str, etf_name: str, date: pd
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = ["".join([str(x) for x in tup if str(x) != "nan"]) for tup in df.columns]
     df.columns = [_norm_col(c) for c in df.columns]
-    code_col = _pick_col(df.columns, ["股票代號", "證券代號", "成分股代號", "代號", "股票代碼", "Code"])
-    name_col = _pick_col(df.columns, ["股票名稱", "證券名稱", "成分股名稱", "名稱", "Name"])
-    weight_col = _pick_col(df.columns, ["持股權重(%)", "持股權重", "權重", "比重", "比例", "Weight"])
-    share_col = _pick_col(df.columns, ["股數", "持有股數", "持股股數", "持股數", "Shares"])
+    code_col = _pick_col(df.columns, [
+        "股票代號", "證券代號", "成分股代號", "代號", "股票代碼", "Code",
+        "stock_code", "stockCode", "stockNo", "StockNo", "symbol", "ticker",
+        "securityCode", "SecurityCode", "holdingCode", "fundStockCode", "FundStockCode",
+    ])
+    name_col = _pick_col(df.columns, [
+        "股票名稱", "證券名稱", "成分股名稱", "名稱", "Name",
+        "stock_name", "stockName", "StockName", "securityName", "SecurityName",
+        "symbolName", "tickerName", "holdingName", "fundStockName", "FundStockName",
+    ])
+    weight_col = _pick_col(df.columns, [
+        "持股權重(%)", "持股權重", "權重", "比重", "比例", "投資比例", "投資比率", "Weight",
+        "weight", "weight_pct", "weightPct", "WeightPct", "stockWeight", "StockWeight",
+        "ratio", "Ratio", "percent", "percentage", "Percentage", "holdingRatio", "HoldingRatio",
+        "valueRatio", "ValueRatio", "marketValueRatio", "MarketValueRatio",
+    ])
+    share_col = _pick_col(df.columns, [
+        "股數", "持有股數", "持股股數", "持股數", "Shares",
+        "shares", "share_count", "shareCount", "ShareCount", "numberOfShares", "NumberOfShares",
+        "qty", "quantity", "Quantity", "volume", "Volume", "unit", "units",
+    ])
     if code_col is None or name_col is None or (weight_col is None and share_col is None):
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
     out = pd.DataFrame({
@@ -278,12 +308,26 @@ def _looks_number(tok: str) -> bool:
     return bool(re.fullmatch(r"-?\d+(?:,\d{3})*(?:\.\d+)?%?", str(tok).strip()))
 
 
+FOREIGN_HOLDING_ETFS = {"00988A", "00997A", "00983A", "00989A"}
+_BAD_TICKER_WORDS = {
+    "ETF", "PCF", "NAV", "TWD", "USD", "API", "HTML", "JSON", "NULL", "TRUE", "FALSE",
+    "TOP", "BUY", "SELL", "DATE", "NAME", "CODE", "SHARE", "SHARES", "WEIGHT",
+}
+
+
 def _is_stock_code(tok: str, etf_code: str) -> bool:
     s = _clean_code(tok)
-    if not s or s == _clean_code(etf_code):
+    code = _clean_code(etf_code)
+    if not s or s == code:
         return False
-    # 目前主力是台股主動 ETF，官方 PCF 台股持股多為 4 碼；允許 ETF/特別股 4碼+字母。
-    return bool(re.fullmatch(r"\d{4}[A-Z]?", s))
+    # 台股官方 PCF 多為 4 碼；部分新金融商品/特別股允許 4 碼 + 字母。
+    if re.fullmatch(r"\d{4}[A-Z]?", s):
+        return True
+    # 海外型主動 ETF 會出現 NVDA/MSFT/TSLA/BRKB 等英文 ticker；只對海外 ETF 開放，
+    # 避免把 PCF、ETF、NAV 之類文字誤判為成分股。
+    if code in FOREIGN_HOLDING_ETFS and re.fullmatch(r"[A-Z]{1,5}[A-Z0-9]?", s) and s not in _BAD_TICKER_WORDS:
+        return True
+    return False
 
 
 def _parse_text_rows(html_text: str, etf_code: str, etf_name: str, source_url: str) -> pd.DataFrame:
@@ -384,9 +428,17 @@ def _clean_rows(df: pd.DataFrame, etf_code: str) -> pd.DataFrame:
     out["ETF代號"] = out["ETF代號"].map(_clean_code)
     out["權重"] = pd.to_numeric(out["權重"], errors="coerce").fillna(0.0)
     out["持有股數"] = pd.to_numeric(out["持有股數"], errors="coerce").fillna(0.0)
-    bad_name = out["成分股名稱"].astype(str).str.contains("合計|小計|現金|期貨|備註|申購|買回|債券|保證金|應收|應付|基金淨資產|ETF首頁", na=False)
-    out = out[~bad_name]
-    out = out[(out["成分股代號"] != "") & (out["成分股代號"] != _clean_code(etf_code)) & (out["權重"] > 0)]
+    bad_name = out["成分股名稱"].astype(str).str.contains(
+        "合計|小計|現金|期貨|備註|申購|買回|債券|保證金|應收|應付|基金淨資產|ETF首頁|"
+        "收益|費用|總價金|差額|預收|付款|幣別|交易日|基準日|淨值|單位數",
+        na=False,
+    )
+    bad_code = out["成分股代號"].astype(str).str.contains(
+        "ETF|PCF|NAV|TWD|USD|DATE|TOTAL|AMOUNT|CASH|PRICE|VALUE",
+        na=False,
+    )
+    out = out[~bad_name & ~bad_code]
+    out = out[(out["成分股代號"] != "") & (out["成分股代號"] != _clean_code(etf_code)) & (out["權重"] > 0) & (out["權重"] <= 100)]
     if out.empty:
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
     # 同頁常有桌機/手機兩份重複資料；同一代號保留股數較完整的一筆。
@@ -463,9 +515,14 @@ def source_quality(
     df: pd.DataFrame,
     min_rows: int = 10,
     min_weight_sum: float = 20.0,
-    max_weight_sum: float = 105.0,
+    max_weight_sum: float = 110.0,
 ) -> Tuple[bool, str, int, float]:
-    """來源品質門檻。V37.11 新增權重上限，避免 parser 吃到重複或污染區塊。"""
+    """來源品質門檻。
+
+    V37.11.1：把上限從 105% 放寬到 110%。統一 PCF/投資組合頁有時會
+    把現金或四捨五入後的總和推到 105% 左右；這不應直接視為污染。真正混表
+    通常會超過 120% 甚至 200%。
+    """
     if df is None or df.empty:
         return False, "empty", 0, 0.0
     cnt = int(df["成分股代號"].nunique()) if "成分股代號" in df.columns else int(len(df))

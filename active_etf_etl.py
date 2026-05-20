@@ -261,7 +261,12 @@ def _previous_failure_map(previous_report: Dict[str, object]) -> Dict[str, int]:
 
 
 def _build_etl_health(cand_tuple, latest: pd.DataFrame, merged: pd.DataFrame, source_reports, previous_report: Dict[str, object]) -> list:
-    now = pd.Timestamp(datetime.utcnow().date())
+    # 以台灣日期為準，並把官方快照日期落在「明日」的情況視為 0 天過期，
+    # 避免 GitHub Actions UTC 時間造成資料過期天數 = -1。
+    try:
+        now = pd.Timestamp.now(tz="Asia/Taipei").normalize().tz_localize(None)
+    except Exception:
+        now = pd.Timestamp(datetime.utcnow().date())
     complete_today = set()
     if latest is not None and not latest.empty and "ETF代號" in latest.columns:
         complete_today = set(latest["ETF代號"].dropna().astype(str).str.upper())
@@ -291,7 +296,7 @@ def _build_etl_health(cand_tuple, latest: pd.DataFrame, merged: pd.DataFrame, so
         stale_days = None
         if lf_date:
             try:
-                stale_days = int((now - pd.Timestamp(lf_date)).days)
+                stale_days = max(0, int((now - pd.Timestamp(lf_date)).days))
             except Exception:
                 stale_days = None
         if is_success:
