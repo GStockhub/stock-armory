@@ -169,6 +169,20 @@ def _clean_code(v) -> str:
     return s
 
 
+def _split_name_code(v) -> tuple[str, str]:
+    """從 MoneyDJ / 第三方常見的「台積電(2330.TW)」格式拆出名稱與代號。"""
+    raw = str(v or "").strip()
+    # 台股：台積電(2330.TW)、旺矽(6223.TW)；海外：NVDA(或 NVDA.US) 也盡量保留。
+    m = re.search(r"(.+?)[（(]\s*([0-9A-Z]{1,8})(?:\.(?:TW|TWO|US|O|N|K|HK))?\s*[)）]", raw, flags=re.I)
+    if m:
+        return m.group(1).strip(), _clean_code(m.group(2))
+    m = re.search(r"\b(\d{4}[A-Z]?)\.(?:TW|TWO)\b", raw, flags=re.I)
+    if m:
+        name = re.sub(r"[（(]?\s*" + re.escape(m.group(0)) + r"\s*[)）]?", "", raw, flags=re.I).strip()
+        return name or raw, _clean_code(m.group(1))
+    return raw, ""
+
+
 def _to_float(v, default=0.0) -> float:
     try:
         if pd.isna(v):
@@ -265,29 +279,39 @@ def _standardize_table(raw: pd.DataFrame, etf_code: str, etf_name: str, date: pd
         "securityCode", "SecurityCode", "holdingCode", "fundStockCode", "FundStockCode",
     ])
     name_col = _pick_col(df.columns, [
-        "股票名稱", "證券名稱", "成分股名稱", "名稱", "Name",
+        "股票名稱", "證券名稱", "成分股名稱", "個股名稱", "持股名稱", "名稱", "Name",
         "stock_name", "stockName", "StockName", "securityName", "SecurityName",
         "symbolName", "tickerName", "holdingName", "fundStockName", "FundStockName",
     ])
     weight_col = _pick_col(df.columns, [
-        "持股權重(%)", "持股權重", "權重", "比重", "比例", "投資比例", "投資比率", "Weight",
+        "持股權重(%)", "持股權重", "權重", "比重", "比例", "投資比例", "投資比例(%)", "投資比率", "Weight",
         "weight", "weight_pct", "weightPct", "WeightPct", "stockWeight", "StockWeight",
         "ratio", "Ratio", "percent", "percentage", "Percentage", "holdingRatio", "HoldingRatio",
         "valueRatio", "ValueRatio", "marketValueRatio", "MarketValueRatio",
     ])
     share_col = _pick_col(df.columns, [
-        "股數", "持有股數", "持股股數", "持股數", "Shares",
+        "股數", "持有股數", "持股股數", "持股數", "持有股數", "Shares",
         "shares", "share_count", "shareCount", "ShareCount", "numberOfShares", "NumberOfShares",
         "qty", "quantity", "Quantity", "volume", "Volume", "unit", "units",
     ])
-    if code_col is None or name_col is None or (weight_col is None and share_col is None):
+    if name_col is None or (weight_col is None and share_col is None):
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
+
+    if code_col is not None:
+        codes = df[code_col].map(_clean_code)
+        names = df[name_col].astype(str).str.strip()
+    else:
+        # MoneyDJ 等第三方持股表常把代號放在名稱欄：台積電(2330.TW)
+        split = df[name_col].map(_split_name_code)
+        names = split.map(lambda x: x[0])
+        codes = split.map(lambda x: x[1])
+
     out = pd.DataFrame({
         "日期": date,
         "ETF代號": _clean_code(etf_code),
         "ETF名稱": etf_name or etf_code,
-        "成分股代號": df[code_col].map(_clean_code),
-        "成分股名稱": df[name_col].astype(str).str.strip(),
+        "成分股代號": codes,
+        "成分股名稱": names,
         "權重": df[weight_col].map(_to_float) if weight_col else 0.0,
         "持有股數": df[share_col].map(_to_float) if share_col else 0.0,
         "來源": source_url,
@@ -489,6 +513,41 @@ def parse_official_response(text: str, etf_code: str, etf_name: str, source_url:
 
 
 
+def _parse_moneydj_text(text: str, etf_code: str, etf_name: str, source_url: str) -> pd.DataFrame:
+    """解析 MoneyDJ 持股頁常見的：台積電(2330.TW)4.54 138,000.00。"""
+    if "moneydj.com" not in str(source_url).lower():
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+    plain = _text_from_html(text)
+    date = _parse_date(plain)
+    rows = []
+    # 先鎖定持股區之後，避免基本資料/配息表誤入。
+    start = plain.find("個股名稱")
+    if start < 0:
+        start = plain.find("持股名稱")
+    seg = plain[start if start >= 0 else 0:]
+    # 台股/海外 ticker 都支援；權重後面常接持有股數。
+    pat = re.compile(
+        r"([^\n\r()（）]{1,30})[（(]\s*([0-9A-Z]{1,8})(?:\.(?:TW|TWO|US|O|N|K|HK))?\s*[)）]\s*"
+        r"(-?\d+(?:\.\d+)?)\s*(?:%|％)?\s+([0-9,]+(?:\.\d+)?)",
+        flags=re.I,
+    )
+    for name, code, weight, shares in pat.findall(seg):
+        code = _clean_code(code)
+        if not code or code == _clean_code(etf_code):
+            continue
+        rows.append({
+            "日期": date,
+            "ETF代號": _clean_code(etf_code),
+            "ETF名稱": etf_name or etf_code,
+            "成分股代號": code,
+            "成分股名稱": str(name).strip(),
+            "權重": _to_float(weight),
+            "持有股數": _to_float(shares),
+            "來源": source_url,
+        })
+    return _clean_rows(pd.DataFrame(rows, columns=OUTPUT_COLUMNS), etf_code)
+
+
 def parse_official_holdings_html(html_text: str, etf_code: str, etf_name: str, source_url: str) -> pd.DataFrame:
     if not html_text:
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
@@ -504,7 +563,11 @@ def parse_official_holdings_html(html_text: str, etf_code: str, etf_name: str, s
         std = _standardize_table(t, etf_code, etf_name, date, source_url)
         if len(std) > len(best):
             best = std
-    # 2) 官方頁常是 div/span 排版，不一定有 table；用文字序列解析。
+    # 2) MoneyDJ 備援頁名稱欄常含代號，另外用專門 regex 補強。
+    mdj_df = _parse_moneydj_text(html_text, etf_code, etf_name, source_url)
+    if len(mdj_df) > len(best):
+        best = mdj_df
+    # 3) 官方頁常是 div/span 排版，不一定有 table；用文字序列解析。
     txt_df = _parse_text_rows(html_text, etf_code, etf_name, source_url)
     if len(txt_df) > len(best):
         best = txt_df

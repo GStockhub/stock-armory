@@ -128,6 +128,26 @@ ACTIVE_ETF_SOURCE_REGISTRY: Dict[str, List[SourceCandidate]] = {
 }
 
 
+# V37.11.2：MoneyDJ 持股頁作為「公開第三方備援」。
+# 用途：只在官方/Playwright 失敗後才嘗試，幫助安聯/中信/台新/摩根/兆豐/第一金等
+# 入口頁尚未打穿的 ETF 先取得可用的前十大持股。成功後仍會經過完整度檢查才寫入 history。
+MONEYDJ_HOLDING_URLS: Dict[str, str] = {
+    code: f"https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid={code}.TW&topc="
+    for code in ACTIVE_ETF_META
+}
+
+
+def _attach_moneydj_fallbacks() -> None:
+    for code, url in MONEYDJ_HOLDING_URLS.items():
+        existing = ACTIVE_ETF_SOURCE_REGISTRY.setdefault(code, [])
+        if any("moneydj.com" in s.url.lower() for s in existing):
+            continue
+        existing.append(_src(code, url, "MoneyDJ持股備援", 300, source_type="third_party", needs_playwright=False))
+
+
+_attach_moneydj_fallbacks()
+
+
 def iter_registry(etf_codes: Iterable[str] | None = None) -> List[Dict[str, object]]:
     allowed = {str(c).upper() for c in etf_codes} if etf_codes else None
     rows: List[Dict[str, object]] = []
