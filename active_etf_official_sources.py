@@ -633,6 +633,19 @@ def _source_needs_playwright(etf_code: str, url: str) -> bool:
     return False
 
 
+def _source_category_label(url: str, note: str = "") -> str:
+    text = f"{url or ''} {note or ''}".lower()
+    if "moneydj.com" in text or "cmoney" in text or "pocket" in text or "備援" in str(note):
+        return "第三方備援"
+    return "官方"
+
+
+def _ok_status_for_source(url: str, note: str = "", default: str = "官方完整") -> str:
+    cat = _source_category_label(url, note)
+    if cat == "第三方備援":
+        return "✅ 第三方備援完整"
+    return f"✅ {default}"
+
 def _playwright_is_enabled() -> bool:
     if playwright_enabled is None or render_and_capture is None:
         return False
@@ -666,12 +679,12 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
             "ETF代號": code,
             "ETF名稱": etf_name or code,
             "投信": src.issuer,
-            "來源類別": "官方",
+            "來源類別": _source_category_label(src.url, src.note),
             "來源": src.url,
             "類型": src.note,
             "抓到筆數": cnt,
             "權重合計": round(wsum, 4),
-            "狀態": "✅ 官方完整" if ok else f"⚠️ {reason}",
+            "狀態": _ok_status_for_source(src.url, src.note, "官方完整") if ok else f"⚠️ {reason}",
             "採用": bool(ok),
             "需要Playwright": bool(_source_needs_playwright(code, src.url)),
         })
@@ -737,7 +750,7 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
                 "類型": f"{cand.kind}:{cand.source_hint}",
                 "抓到筆數": cnt,
                 "權重合計": round(wsum, 4),
-                "狀態": "✅ 官方偵察完整" if ok else f"⚠️ {reason}",
+                "狀態": _ok_status_for_source(cand.url, f"{cand.kind}:{cand.source_hint}", "官方偵察完整") if ok else f"⚠️ {reason}",
                 "採用": bool(ok),
             })
             if len(df) > len(best):

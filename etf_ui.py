@@ -280,6 +280,9 @@ def _render_manager_header_compact(summary, holdings, COLORS, history_status=Non
     report = _load_local_etl_report()
     run_at = report.get("run_at", "-") if isinstance(report, dict) else "-"
     complete_etfs = report.get("complete_etfs", []) if isinstance(report, dict) else []
+    official_a = report.get("official_complete", []) if isinstance(report, dict) else []
+    official_b = report.get("official_playwright_complete", []) if isinstance(report, dict) else []
+    fallback_c = report.get("fallback_complete", []) if isinstance(report, dict) else []
     raw_rows = report.get("raw_rows", "-") if isinstance(report, dict) else "-"
     complete_rows = report.get("complete_rows", "-") if isinstance(report, dict) else "-"
     auto_text = str(auto_note or "已讀取本機 ETL 歷史快照；官方抓取交給 GitHub Actions，不在前端即時執行。")
@@ -292,18 +295,21 @@ def _render_manager_header_compact(summary, holdings, COLORS, history_status=Non
             <div style="font-size:14px; color:{COLORS['text']}; line-height:1.65;"><b>狀態：</b>{_safe_text(auto_text)}</div>
             <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">{_safe_text(compact_msg)}</div>
             <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">ETL：raw {raw_rows}｜complete {complete_rows}｜完整 ETF：{_safe_text('、'.join(map(str, complete_etfs)) if complete_etfs else '-')}</div>
+            <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.55; margin-top:3px;">可信度：A官方 {len(official_a)}｜B官方Playwright {len(official_b)}｜C第三方備援 {len(fallback_c)}</div>
         </div>
         """, unsafe_allow_html=True)
         health = report.get("etl_health", []) if isinstance(report, dict) else []
         if health:
             st.markdown("##### 🚦 ETL 健康燈號")
             hdf = pd.DataFrame(health)
-            cols = ["ETF代號", "ETF名稱", "投信", "健康燈號", "連續失敗天數", "最後成功日期", "資料過期天數", "需要Playwright", "最後狀態"]
+            cols = ["ETF代號", "ETF名稱", "投信", "健康燈號", "資料來源等級", "來源可信度", "採用來源類型", "連續失敗天數", "最後成功日期", "資料過期天數", "需要Playwright", "最後狀態"]
             st.dataframe(hdf[[c for c in cols if c in hdf.columns]], use_container_width=True, hide_index=True, height=260)
         quality = report.get("quality", []) if isinstance(report, dict) else []
         if quality:
-            st.markdown("##### 📋 快照完整度")
-            st.dataframe(pd.DataFrame(quality), use_container_width=True, hide_index=True, height=260)
+            st.markdown("##### 📋 快照完整度 / 來源可信度")
+            qdf = pd.DataFrame(quality)
+            qcols = ["ETF代號", "ETF名稱", "持股數", "權重合計", "資料來源等級", "來源可信度", "採用來源類型", "資料狀態", "資料備註"]
+            st.dataframe(qdf[[c for c in qcols if c in qdf.columns]], use_container_width=True, hide_index=True, height=260)
 
 
 def _action_items_html(df, COLORS, title, icon, max_rows=8):

@@ -260,6 +260,49 @@ def _previous_failure_map(previous_report: Dict[str, object]) -> Dict[str, int]:
     return out
 
 
+def _source_trust_info(source_row: Dict[str, object] | None) -> Dict[str, str]:
+    """將 adopted source 壓成交易前端可理解的可信度等級。"""
+    r = source_row or {}
+    src = str(r.get("來源", "") or "")
+    cat = str(r.get("來源類別", "") or "")
+    status = str(r.get("狀態", "") or "")
+    typ = str(r.get("類型", "") or "")
+    text = f"{src} {cat} {status} {typ}".lower()
+
+    if "moneydj.com" in text or "cmoney" in text or "pocket" in text or "第三方" in cat or "備援" in status or "備援" in typ:
+        return {"資料來源等級": "C", "來源可信度": "C級｜第三方備援", "來源類型修正": "第三方備援"}
+    if "playwright" in cat.lower() or "playwright" in status.lower() or "playwright" in typ.lower():
+        return {"資料來源等級": "B", "來源可信度": "B級｜官方 Playwright", "來源類型修正": "官方Playwright"}
+    if "官方" in cat or "official" in text:
+        return {"資料來源等級": "A", "來源可信度": "A級｜官方完整", "來源類型修正": "官方"}
+    return {"資料來源等級": "D", "來源可信度": "D級｜未確認", "來源類型修正": cat or "未確認"}
+
+
+def _adopted_report_map(source_reports) -> Dict[str, Dict[str, object]]:
+    out: Dict[str, Dict[str, object]] = {}
+    for r in source_reports or []:
+        if bool(r.get("採用", False)):
+            code = str(r.get("ETF代號", "")).upper().strip()
+            if code and code not in out:
+                out[code] = r
+    return out
+
+
+def _trust_groups_from_adopted(adopted: Dict[str, Dict[str, object]]) -> Dict[str, list]:
+    groups = {"official_complete": [], "official_playwright_complete": [], "fallback_complete": [], "unknown_complete": []}
+    for code, row in adopted.items():
+        lvl = _source_trust_info(row).get("資料來源等級")
+        if lvl == "A":
+            groups["official_complete"].append(code)
+        elif lvl == "B":
+            groups["official_playwright_complete"].append(code)
+        elif lvl == "C":
+            groups["fallback_complete"].append(code)
+        else:
+            groups["unknown_complete"].append(code)
+    return {k: sorted(v) for k, v in groups.items()}
+
+
 def _build_etl_health(cand_tuple, latest: pd.DataFrame, merged: pd.DataFrame, source_reports, previous_report: Dict[str, object]) -> list:
     # 以台灣日期為準，並把官方快照日期落在「明日」的情況視為 0 天過期，
     # 避免 GitHub Actions UTC 時間造成資料過期天數 = -1。
@@ -308,6 +351,7 @@ def _build_etl_health(cand_tuple, latest: pd.DataFrame, merged: pd.DataFrame, so
         else:
             light = "🟡 尚未取得完整快照"
         last_status = str(reports[-1].get("狀態", "")) if reports else "no_source_report"
+        trust = _source_trust_info(adopted[0] if adopted else None)
         rows.append({
             "ETF代號": code,
             "ETF名稱": name or meta.get("名稱", code),
@@ -318,6 +362,9 @@ def _build_etl_health(cand_tuple, latest: pd.DataFrame, merged: pd.DataFrame, so
             "最後成功日期": lf_date,
             "資料過期天數": stale_days if stale_days is not None else "",
             "採用來源": adopted[0].get("來源", "") if adopted else "",
+            "資料來源等級": trust.get("資料來源等級", "D"),
+            "來源可信度": trust.get("來源可信度", "D級｜未確認"),
+            "採用來源類型": trust.get("來源類型修正", "未確認"),
             "嘗試來源數": len(reports),
             "需要Playwright": bool(needs_playwright),
             "最後狀態": last_status,
@@ -334,6 +381,10 @@ def _write_scout_report(path: str, cand_tuple, source_reports, health_rows, repo
         "mode": report.get("mode"),
         "candidate_count": len(cand_tuple),
         "complete_etfs": report.get("complete_etfs", []),
+        "official_complete": report.get("official_complete", []),
+        "official_playwright_complete": report.get("official_playwright_complete", []),
+        "fallback_complete": report.get("fallback_complete", []),
+        "unknown_complete": report.get("unknown_complete", []),
         "needs_playwright_etfs": sorted({r.get("ETF代號") for r in health_rows if r.get("需要Playwright") and not r.get("今日成功")}),
         "registry": iter_registry(registry_codes),
         "etl_health": health_rows,
@@ -379,10 +430,14 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
     if fallback_report is not None and not fallback_report.empty:
         source_reports.extend(fallback_report.to_dict(orient="records"))
 
+    adopted_report_by_code = _adopted_report_map(source_reports)
+    trust_groups = _trust_groups_from_adopted(adopted_report_by_code)
     adopted_source = {}
-    for r in source_reports:
-        if bool(r.get("採用", False)):
-            adopted_source.setdefault(str(r.get("ETF代號", "")).upper(), f"{r.get('來源類別','')}: {r.get('來源','')}")
+    adopted_source_trust = {}
+    for code, r in adopted_report_by_code.items():
+        trust = _source_trust_info(r)
+        adopted_source.setdefault(code, f"{trust.get('來源類型修正', r.get('來源類別',''))}: {r.get('來源','')}")
+        adopted_source_trust.setdefault(code, trust)
 
     complete_raw, quality = _filter_complete_holdings(raw, industry_map=industry_map)
     if no_prices:
@@ -399,6 +454,11 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         print("[WARN] 沒有完整快照，也沒有可沿用歷史；不產生有效歷史資料。")
 
     health_rows = _build_etl_health(cand_tuple, latest, merged, source_reports, previous_report)
+    if quality is not None and not quality.empty and "ETF代號" in quality.columns:
+        quality = quality.copy()
+        quality["資料來源等級"] = quality["ETF代號"].astype(str).str.upper().map(lambda c: adopted_source_trust.get(c, {}).get("資料來源等級", "D"))
+        quality["來源可信度"] = quality["ETF代號"].astype(str).str.upper().map(lambda c: adopted_source_trust.get(c, {}).get("來源可信度", "D級｜未確認"))
+        quality["採用來源類型"] = quality["ETF代號"].astype(str).str.upper().map(lambda c: adopted_source_trust.get(c, {}).get("來源類型修正", "未確認"))
 
     report = {
         "run_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
@@ -417,6 +477,11 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         "fallback_source_report": [] if fallback_report is None or fallback_report.empty else fallback_report.to_dict(orient="records"),
         "source_report": source_reports,
         "adopted_source": adopted_source,
+        "adopted_source_trust": adopted_source_trust,
+        "official_complete": trust_groups.get("official_complete", []),
+        "official_playwright_complete": trust_groups.get("official_playwright_complete", []),
+        "fallback_complete": trust_groups.get("fallback_complete", []),
+        "unknown_complete": trust_groups.get("unknown_complete", []),
         "etl_health": health_rows,
         "source_registry": iter_registry([c for c, _n in cand_tuple]),
         "price_mode": "skipped" if no_prices else "fetched",

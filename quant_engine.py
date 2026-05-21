@@ -21,6 +21,70 @@ def _last_roll(series, window, fallback=None):
         return fallback if fallback is not None else float(s.iloc[-1])
     return float(v)
 
+def _liquidity_profile(price, today_volume, avg_volume_20):
+    """短線流動性濾網。
+
+    price_provider 可能回傳「股」或「張」。這裡用數量級自動判斷並統一換算成張與成交金額。
+    - 地雷級 / 不適合短線：不應進 S/A/B 主推薦。
+    - 可交易：最多 B 級。
+    - 理想短線：可依原本分數進 S/A/B。
+    """
+    try:
+        price = float(price or 0)
+        today_volume = float(today_volume or 0)
+        avg_volume_20 = float(avg_volume_20 or 0)
+    except Exception:
+        price, today_volume, avg_volume_20 = 0.0, 0.0, 0.0
+
+    # TWSE 官方為股，部分來源可能已是張；用 100,000 作為保守分界。
+    unit_is_shares = max(today_volume, avg_volume_20) >= 100000
+    today_lots = today_volume / 1000.0 if unit_is_shares else today_volume
+    avg_lots_20 = avg_volume_20 / 1000.0 if unit_is_shares else avg_volume_20
+    avg_amount_20 = avg_volume_20 * price if unit_is_shares else avg_volume_20 * 1000.0 * price
+
+    if avg_lots_20 < 300 or avg_amount_20 < 20_000_000:
+        tier = "地雷級"
+        status = "⛔ 地雷級：流動性不足"
+        tradable = False
+        max_grade = "排除"
+        penalty = 45
+    elif avg_lots_20 < 500 or avg_amount_20 < 30_000_000:
+        tier = "不適合短線"
+        status = "⛔ 不適合短線：量/成交金額不足"
+        tradable = False
+        max_grade = "觀察"
+        penalty = 35
+    elif avg_lots_20 < 1000 or avg_amount_20 < 80_000_000:
+        tier = "可交易"
+        status = "🟡 可交易但不理想"
+        tradable = True
+        max_grade = "B"
+        penalty = 10
+    else:
+        tier = "理想短線"
+        status = "🟢 理想短線流動性"
+        tradable = True
+        max_grade = "S"
+        penalty = 0
+
+    return {
+        "今日量(張)": round(today_lots, 1),
+        "20日均量(張)": round(avg_lots_20, 1),
+        "20日均成交金額": round(avg_amount_20, 0),
+        "流動性分級": tier,
+        "流動性狀態": status,
+        "短線可交易": bool(tradable),
+        "最高評級限制": max_grade,
+        "流動性扣分": penalty,
+    }
+
+
+def _is_fake_volume_spike(vol_ratio, today_lots):
+    try:
+        return float(vol_ratio or 0) >= 2.0 and float(today_lots or 0) < 500
+    except Exception:
+        return False
+
 def _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s, max_hold_bars=10):
     """用接近你真實SOP的方式估算：隔日開盤進、跳空>4.5%不追、+5.5%先出半、M5/M10控風險。"""
     df_bt = pd.DataFrame({"Close": close_s, "Open": open_s, "High": high_s, "Low": low_s, "Volume": vol_s}).dropna()
@@ -203,6 +267,8 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             vol_ma20 = _last_roll(vol_s, 20, vol_ma5)
 
             vol_ratio = vol_now / vol_ma5 if vol_ma5 > 0 else 1
+            liq = _liquidity_profile(p_now, vol_now, vol_ma20)
+            fake_volume_spike = _is_fake_volume_spike(vol_ratio, liq.get("今日量(張)", 0))
             close_position = (p_now - float(low_s.iloc[-1])) / (float(high_s.iloc[-1]) - float(low_s.iloc[-1])) if float(high_s.iloc[-1]) != float(low_s.iloc[-1]) else 0.5
 
             try:
@@ -275,6 +341,10 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
 
             if tactic_a_strong: s_score += 1
             elif tactic_a_weak: s_score -= 1
+            if fake_volume_spike:
+                s_score -= 2
+            if not liq.get("短線可交易", True):
+                s_score -= 3
 
             stop_price = max(m10, p_now - 1.5 * atr_now)
             raw_risk = max(p_now - stop_price, 0.01)
@@ -286,6 +356,11 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
                 "停損價": stop_price, "原始風險差額": raw_risk, "基本達標": (s_score >= 6 and bias <= 8), "安全指數": s_score,
                 "vol_ratio": vol_ratio, "close_position": close_position,
                 "vol_ma20": vol_ma20, "atr_percent": atr_percent,
+                "今日量(張)": liq.get("今日量(張)", 0), "20日均量(張)": liq.get("20日均量(張)", 0),
+                "20日均成交金額": liq.get("20日均成交金額", 0), "流動性分級": liq.get("流動性分級", ""),
+                "流動性狀態": liq.get("流動性狀態", ""), "短線可交易": liq.get("短線可交易", True),
+                "最高評級限制": liq.get("最高評級限制", "S"), "流動性扣分": liq.get("流動性扣分", 0),
+                "假放量警告": bool(fake_volume_spike),
                 "ATR": atr_now, "BB_Upper": bb_upper, "RSI": rsi_now, "MACD_Cross": macd_cross # 🚀 新增指標輸出
             })
         except Exception as e:
