@@ -7,8 +7,8 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from etf_engine import load_active_etf_holdings, run_etf_momentum_radar, summarize_active_etf_holdings
-from active_etf_holdings import get_history_status
+from etf_engine import load_active_etf_holdings, run_etf_momentum_radar
+from active_etf_holdings import get_history_status, summarize_holdings as summarize_active_etf_holdings
 
 
 # =========================
@@ -458,7 +458,26 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
             st.metric(label, f"{val} 筆")
 
     if shared_actions is None or shared_actions.empty:
-        st.info("近 30 天沒有 2 檔以上主動 ETF 對同一個股出現同步動作；或目前完整快照不足。")
+        st.info("近 30 天沒有 2 檔以上主動 ETF 對同一個股出現同步動作；先顯示最新持股方向，不讓畫面空白。")
+        common_holdings = summary.get("common_holdings", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+        manager_profiles = summary.get("manager_profiles", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("###### 🤝 最新共同重倉 Top 12")
+            if common_holdings is None or common_holdings.empty:
+                st.caption("目前沒有 2 檔以上 ETF 的共同重倉。")
+            else:
+                show_cols = ["成分股代號", "成分股名稱", "產業", "出現ETF數", "合計權重", "持有ETF"]
+                disp = common_holdings[[c for c in show_cols if c in common_holdings.columns]].head(12).copy()
+                st.dataframe(disp.style.set_properties(**table_style).format({"合計權重": "{:.2f}%"}), use_container_width=True, hide_index=True, height=300)
+        with c2:
+            st.markdown("###### 📦 各 ETF 最新持股方向")
+            if manager_profiles is None or manager_profiles.empty:
+                st.caption("目前沒有 ETF 最新持股摘要。")
+            else:
+                show_cols = ["ETF代號", "ETF名稱", "快照日期", "持股數", "集中度", "主要產業", "重點持股"]
+                disp = manager_profiles[[c for c in show_cols if c in manager_profiles.columns]].head(12).copy()
+                st.dataframe(disp.style.set_properties(**table_style).format({"集中度": "{:.2f}%"}), use_container_width=True, hide_index=True, height=300)
     else:
         action_order = [("新增", "🆕"), ("加碼", "➕"), ("減碼", "➖"), ("刪除", "❌")]
         for row_start in range(0, 4, 2):
@@ -491,7 +510,7 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
             if snapshot is None or snapshot.empty:
                 st.info("目前沒有 ETF 快照。")
             else:
-                show_cols = ["熱門名次", "ETF", "名稱", "持股數", "前十集中度", "前十大產業", "前十大個股"]
+                show_cols = ["熱門名次", "ETF", "名稱", "快照日期", "持股數", "前十集中度", "前十大產業", "前十大個股"]
                 disp = snapshot[[c for c in show_cols if c in snapshot.columns]].copy()
                 st.dataframe(disp.style.set_properties(**table_style).format({"前十集中度": "{:.2f}%"}), use_container_width=True, hide_index=True, height=340)
         with tab3:
@@ -506,6 +525,9 @@ def _render_etfedge_like_changes(summary, COLORS, table_style):
 def _render_manager_visuals(summary, holdings, COLORS, table_style, history_status=None, auto_note=""):
     history_status = history_status or get_history_status(holdings, lookback_days=20)
 
+    # V37.11.5：先顯示大方向總結，避免「沒有調倉事件」時主畫面看起來像空白。
+    _render_manager_briefing(summary, COLORS)
+    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
     _render_industry_donut_cards(summary, COLORS, top_n=10)
     st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
     _render_etfedge_like_changes(summary, COLORS, table_style)

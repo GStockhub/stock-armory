@@ -797,11 +797,18 @@ def summarize_holdings(
     if df.empty:
         return empty
 
+    # V37.11.5：不能只拿「全市場最新日期」當快照。
+    # 有些 ETF 來源晚一天或早一天更新；若只取 global max(date)，
+    # 會造成只有當天剛更新的 1~2 檔顯示，其餘明明有資料卻在前端消失。
+    # 因此主畫面 / 大方向總結改用「每檔 ETF 自己的最後有效快照」。
     latest = df["日期"].max()
-    latest_df = df[df["日期"] == latest].copy()
+    latest_key = df.groupby("ETF代號", dropna=False)["日期"].max().reset_index().rename(columns={"日期": "_最新日期"})
+    latest_df = pd.merge(df, latest_key, on="ETF代號", how="inner")
+    latest_df = latest_df[latest_df["日期"].eq(latest_df["_最新日期"])].drop(columns=["_最新日期"], errors="ignore").copy()
     if latest_df.empty:
         return empty
 
+    latest_df["快照日期"] = latest_df["日期"].dt.strftime("%Y-%m-%d")
     latest_df["產業"] = latest_df["成分股代號"].map(lambda x: _industry_of(x, industry_map))
     quality = _holding_quality(latest_df, industry_map=industry_map)
     incomplete_holdings = quality[~quality["資料狀態"].astype(str).str.match(r"^[✅🟡]", na=False)].copy() if not quality.empty else pd.DataFrame()
@@ -824,6 +831,7 @@ def summarize_holdings(
             "ETF": etf_code,
             "名稱": etf_name,
             "熱門名次": int(hot_etfs.loc[hot_etfs["ETF代號"].astype(str).eq(str(etf_code)), "熱門名次"].iloc[0]) if not hot_etfs.empty and hot_etfs["ETF代號"].astype(str).eq(str(etf_code)).any() else "-",
+            "快照日期": str(sub["快照日期"].iloc[0]) if "快照日期" in sub.columns else "-",
             "前十大產業": "、".join([f"{k} {v:.1f}%" for k, v in ind_top.items()]),
             "前十大個股": "、".join([f"{r['成分股名稱']}({r['成分股代號']}) {r['權重']:.1f}%" for _, r in stock_top.iterrows()]),
             "持股數": len(sub),
@@ -843,6 +851,7 @@ def summarize_holdings(
             "ETF代號": etf_code,
             "ETF名稱": etf_name,
             "持股數": int(len(sub)),
+            "快照日期": str(sub["快照日期"].iloc[0]) if "快照日期" in sub.columns else "-",
             "集中度": round(float(stock_top["權重"].sum()), 2),
             "主要產業": "、".join([f"{k} {v:.1f}%" for k, v in ind_top.items()]),
             "重點持股": "、".join([f"{r['成分股名稱']}({r['成分股代號']}) {r['權重']:.1f}%" for _, r in stock_top.iterrows()]),
