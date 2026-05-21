@@ -241,7 +241,9 @@ def _latest_complete_snapshot_dates(history: pd.DataFrame) -> Dict[str, str]:
         持股數=("成分股代號", "nunique"),
         權重合計=("權重", "sum"),
     ).reset_index()
-    g = g[(g["持股數"] >= 10) & (g["權重合計"] >= 20.0) & (g["權重合計"] <= 105.0)]
+    full_mask = (g["持股數"] >= 10) & (g["權重合計"] >= 20.0)
+    ref_mask = (g["持股數"] >= 8) & (g["權重合計"] >= 35.0)
+    g = g[(full_mask | ref_mask) & (g["權重合計"] <= 110.0)]
     if g.empty:
         return {}
     last = g.sort_values("_d").groupby("ETF代號").tail(1)
@@ -269,12 +271,16 @@ def _source_trust_info(source_row: Dict[str, object] | None) -> Dict[str, str]:
     typ = str(r.get("類型", "") or "")
     text = f"{src} {cat} {status} {typ}".lower()
 
+    suffix = "可參考" if "可參考" in status else "完整"
     if "moneydj.com" in text or "cmoney" in text or "pocket" in text or "第三方" in cat or "備援" in status or "備援" in typ:
-        return {"資料來源等級": "C", "來源可信度": "C級｜第三方備援", "來源類型修正": "第三方備援"}
+        label = "C級｜第三方備援" if suffix == "完整" else "C級｜第三方備援可參考"
+        return {"資料來源等級": "C", "來源可信度": label, "來源類型修正": "第三方備援"}
     if "playwright" in cat.lower() or "playwright" in status.lower() or "playwright" in typ.lower():
-        return {"資料來源等級": "B", "來源可信度": "B級｜官方 Playwright", "來源類型修正": "官方Playwright"}
+        label = "B級｜官方 Playwright" if suffix == "完整" else "B級｜官方 Playwright可參考"
+        return {"資料來源等級": "B", "來源可信度": label, "來源類型修正": "官方Playwright"}
     if "官方" in cat or "official" in text:
-        return {"資料來源等級": "A", "來源可信度": "A級｜官方完整", "來源類型修正": "官方"}
+        label = "A級｜官方完整" if suffix == "完整" else "A級｜官方可參考"
+        return {"資料來源等級": "A", "來源可信度": label, "來源類型修正": "官方"}
     return {"資料來源等級": "D", "來源可信度": "D級｜未確認", "來源類型修正": cat or "未確認"}
 
 
@@ -289,10 +295,19 @@ def _adopted_report_map(source_reports) -> Dict[str, Dict[str, object]]:
 
 
 def _trust_groups_from_adopted(adopted: Dict[str, Dict[str, object]]) -> Dict[str, list]:
-    groups = {"official_complete": [], "official_playwright_complete": [], "fallback_complete": [], "unknown_complete": []}
+    groups = {
+        "official_complete": [],
+        "official_playwright_complete": [],
+        "fallback_complete": [],
+        "reference_complete": [],
+        "unknown_complete": [],
+    }
     for code, row in adopted.items():
         lvl = _source_trust_info(row).get("資料來源等級")
-        if lvl == "A":
+        status = str(row.get("狀態", ""))
+        if "可參考" in status:
+            groups["reference_complete"].append(code)
+        elif lvl == "A":
             groups["official_complete"].append(code)
         elif lvl == "B":
             groups["official_playwright_complete"].append(code)
@@ -342,7 +357,10 @@ def _build_etl_health(cand_tuple, latest: pd.DataFrame, merged: pd.DataFrame, so
                 stale_days = max(0, int((now - pd.Timestamp(lf_date)).days))
             except Exception:
                 stale_days = None
-        if is_success:
+        adopted_status = str(adopted[0].get("狀態", "")) if adopted else ""
+        if is_success and "可參考" in adopted_status:
+            light = "🟡 今日取得可參考快照"
+        elif is_success:
             light = "🟢 今日成功更新"
         elif stale_days is not None and stale_days <= 2:
             light = f"🟡 今日未更新，沿用 {lf_date} 快照"
@@ -384,6 +402,7 @@ def _write_scout_report(path: str, cand_tuple, source_reports, health_rows, repo
         "official_complete": report.get("official_complete", []),
         "official_playwright_complete": report.get("official_playwright_complete", []),
         "fallback_complete": report.get("fallback_complete", []),
+        "reference_complete": report.get("reference_complete", []),
         "unknown_complete": report.get("unknown_complete", []),
         "needs_playwright_etfs": sorted({r.get("ETF代號") for r in health_rows if r.get("需要Playwright") and not r.get("今日成功")}),
         "registry": iter_registry(registry_codes),
@@ -481,6 +500,7 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         "official_complete": trust_groups.get("official_complete", []),
         "official_playwright_complete": trust_groups.get("official_playwright_complete", []),
         "fallback_complete": trust_groups.get("fallback_complete", []),
+        "reference_complete": trust_groups.get("reference_complete", []),
         "unknown_complete": trust_groups.get("unknown_complete", []),
         "etl_health": health_rows,
         "source_registry": iter_registry([c for c, _n in cand_tuple]),

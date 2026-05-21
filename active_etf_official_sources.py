@@ -579,6 +579,8 @@ def source_quality(
     min_rows: int = 10,
     min_weight_sum: float = 20.0,
     max_weight_sum: float = 110.0,
+    reference_min_rows: int = 8,
+    reference_min_weight_sum: float = 35.0,
 ) -> Tuple[bool, str, int, float]:
     """來源品質門檻。
 
@@ -590,15 +592,19 @@ def source_quality(
         return False, "empty", 0, 0.0
     cnt = int(df["成分股代號"].nunique()) if "成分股代號" in df.columns else int(len(df))
     wsum = float(pd.to_numeric(df.get("權重", 0), errors="coerce").fillna(0).sum())
-    reasons = []
-    if cnt < min_rows:
-        reasons.append(f"持股數<{min_rows}")
-    if wsum < min_weight_sum:
-        reasons.append(f"權重合計<{min_weight_sum:.0f}%")
     if wsum > max_weight_sum:
-        reasons.append(f"權重合計>{max_weight_sum:.0f}%疑似重複/污染")
-    ok = not reasons
-    return ok, "可用" if ok else "、".join(reasons), cnt, wsum
+        return False, f"權重合計>{max_weight_sum:.0f}%疑似重複/污染", cnt, wsum
+    if cnt >= min_rows and wsum >= min_weight_sum:
+        return True, "完整", cnt, wsum
+    if cnt >= reference_min_rows and wsum >= reference_min_weight_sum:
+        return True, "可參考", cnt, wsum
+
+    reasons = []
+    if cnt < reference_min_rows:
+        reasons.append(f"持股數<{reference_min_rows}")
+    if wsum < reference_min_weight_sum:
+        reasons.append(f"權重合計<{reference_min_weight_sum:.0f}%")
+    return False, "、".join(reasons), cnt, wsum
 
 
 
@@ -640,11 +646,14 @@ def _source_category_label(url: str, note: str = "") -> str:
     return "官方"
 
 
-def _ok_status_for_source(url: str, note: str = "", default: str = "官方完整") -> str:
+def _ok_status_for_source(url: str, note: str = "", default: str = "官方完整", quality_note: str = "完整") -> str:
     cat = _source_category_label(url, note)
+    is_ref = "可參考" in str(quality_note)
     if cat == "第三方備援":
-        return "✅ 第三方備援完整"
-    return f"✅ {default}"
+        return "🟡 第三方備援可參考" if is_ref else "✅ 第三方備援完整"
+    if "Playwright" in str(default):
+        return "🟡 Playwright可參考" if is_ref else "✅ Playwright完整"
+    return f"🟡 {default}可參考" if is_ref else f"✅ {default}"
 
 def _playwright_is_enabled() -> bool:
     if playwright_enabled is None or render_and_capture is None:
@@ -684,7 +693,7 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
             "類型": src.note,
             "抓到筆數": cnt,
             "權重合計": round(wsum, 4),
-            "狀態": _ok_status_for_source(src.url, src.note, "官方完整") if ok else f"⚠️ {reason}",
+            "狀態": _ok_status_for_source(src.url, src.note, "官方完整", reason) if ok else f"⚠️ {reason}",
             "採用": bool(ok),
             "需要Playwright": bool(_source_needs_playwright(code, src.url)),
         })
@@ -750,7 +759,7 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
                 "類型": f"{cand.kind}:{cand.source_hint}",
                 "抓到筆數": cnt,
                 "權重合計": round(wsum, 4),
-                "狀態": _ok_status_for_source(cand.url, f"{cand.kind}:{cand.source_hint}", "官方偵察完整") if ok else f"⚠️ {reason}",
+                "狀態": _ok_status_for_source(cand.url, f"{cand.kind}:{cand.source_hint}", "官方偵察完整", reason) if ok else f"⚠️ {reason}",
                 "採用": bool(ok),
             })
             if len(df) > len(best):
@@ -801,7 +810,7 @@ def fetch_official_holding_one(etf_code: str, etf_name: str = "") -> Tuple[pd.Da
                 "類型": item.kind,
                 "抓到筆數": cnt,
                 "權重合計": round(wsum, 4),
-                "狀態": "✅ Playwright完整" if ok else f"⚠️ {reason}",
+                "狀態": _ok_status_for_source(item.url, item.kind, "Playwright", reason) if ok else f"⚠️ {reason}",
                 "採用": bool(ok),
                 "需要Playwright": True,
             })

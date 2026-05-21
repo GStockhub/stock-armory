@@ -113,6 +113,10 @@ SIGNIFICANT_SHARE_RATIO = 0.03
 SIGNIFICANT_WEIGHT_PP = 0.3
 MIN_COMPLETE_HOLDINGS = 10
 MIN_COMPLETE_WEIGHT_SUM = 20.0
+# V37.11.4：有些新主動 ETF 目前只能拿到前 8~9 大持股。
+# 這種資料不適合當「完整官方資料」，但足夠看經理人大方向，列為可參考快照。
+MIN_REFERENCE_HOLDINGS = 8
+MIN_REFERENCE_WEIGHT_SUM = 35.0
 
 
 def _holding_quality(df: pd.DataFrame, industry_map: Optional[Dict[str, str]] = None) -> pd.DataFrame:
@@ -139,16 +143,26 @@ def _holding_quality(df: pd.DataFrame, industry_map: Optional[Dict[str, str]] = 
     ).reset_index()
 
     def _status(r):
+        cnt = int(r.get("持股數", 0) or 0)
+        wsum = float(r.get("權重合計", 0) or 0)
+        ind_cnt = int(r.get("產業數", 0) or 0)
+
+        # 完整快照：可以納入共同動作與主要統計。
+        if cnt >= MIN_COMPLETE_HOLDINGS and wsum >= MIN_COMPLETE_WEIGHT_SUM:
+            return "✅ 完整", "可納入分析"
+
+        # 可參考快照：通常是前 8~9 大持股，足以看大方向，但不當成高信任共識。
+        if cnt >= MIN_REFERENCE_HOLDINGS and wsum >= MIN_REFERENCE_WEIGHT_SUM:
+            return "🟡 可參考", f"約80~90%持股方向；持股數{cnt}、權重合計{wsum:.1f}%"
+
         reasons = []
-        if int(r.get("持股數", 0) or 0) < MIN_COMPLETE_HOLDINGS:
-            reasons.append(f"持股數<{MIN_COMPLETE_HOLDINGS}")
-        if float(r.get("權重合計", 0) or 0) < MIN_COMPLETE_WEIGHT_SUM:
-            reasons.append(f"權重合計<{MIN_COMPLETE_WEIGHT_SUM:.0f}%")
-        if int(r.get("產業數", 0) or 0) <= 1 and int(r.get("持股數", 0) or 0) < MIN_COMPLETE_HOLDINGS:
+        if cnt < MIN_REFERENCE_HOLDINGS:
+            reasons.append(f"持股數<{MIN_REFERENCE_HOLDINGS}")
+        if wsum < MIN_REFERENCE_WEIGHT_SUM:
+            reasons.append(f"權重合計<{MIN_REFERENCE_WEIGHT_SUM:.0f}%")
+        if ind_cnt <= 1 and cnt < MIN_COMPLETE_HOLDINGS:
             reasons.append("產業過少")
-        if reasons:
-            return "⚠️ 不完整", "、".join(reasons)
-        return "✅ 完整", "可納入分析"
+        return "⚠️ 不完整", "、".join(reasons) if reasons else "資料不足"
 
     pairs = q.apply(_status, axis=1)
     q["資料狀態"] = [x[0] for x in pairs]
@@ -160,7 +174,7 @@ def _filter_complete_holdings(df: pd.DataFrame, industry_map: Optional[Dict[str,
     quality = _holding_quality(df, industry_map=industry_map)
     if df is None or df.empty or quality.empty:
         return pd.DataFrame(), quality
-    good = set(quality[quality["資料狀態"].astype(str).str.startswith("✅", na=False)]["ETF代號"].astype(str))
+    good = set(quality[quality["資料狀態"].astype(str).str.match(r"^[✅🟡]", na=False)]["ETF代號"].astype(str))
     if not good:
         return pd.DataFrame(), quality
     return df[df["ETF代號"].astype(str).isin(good)].copy(), quality
@@ -503,7 +517,7 @@ def fetch_active_etf_holding_one_with_report(
         wsum = float(q["權重合計"].iloc[0]) if not q.empty else 0.0
         status = str(q["資料狀態"].iloc[0]) if not q.empty else "⚠️ 不完整"
         note = str(q["資料備註"].iloc[0]) if not q.empty else "empty"
-        adopted = bool(status.startswith("✅"))
+        adopted = bool(str(status).startswith(("✅", "🟡")))
 
         reports.append({
             "ETF代號": code,
@@ -772,10 +786,11 @@ def summarize_holdings(
         權重合計=("權重", "sum"),
         產業數=("_產業_tmp", "nunique"),
     ).reset_index()
-    good_groups = q[
-        (pd.to_numeric(q["持股數"], errors="coerce").fillna(0) >= MIN_COMPLETE_HOLDINGS)
-        & (pd.to_numeric(q["權重合計"], errors="coerce").fillna(0) >= MIN_COMPLETE_WEIGHT_SUM)
-    ][["日期", "ETF代號"]]
+    q_cnt = pd.to_numeric(q["持股數"], errors="coerce").fillna(0)
+    q_wsum = pd.to_numeric(q["權重合計"], errors="coerce").fillna(0)
+    full_mask = (q_cnt >= MIN_COMPLETE_HOLDINGS) & (q_wsum >= MIN_COMPLETE_WEIGHT_SUM)
+    ref_mask = (q_cnt >= MIN_REFERENCE_HOLDINGS) & (q_wsum >= MIN_REFERENCE_WEIGHT_SUM)
+    good_groups = q[full_mask | ref_mask][["日期", "ETF代號"]]
     if good_groups.empty:
         return empty
     df = pd.merge(df.drop(columns=["_產業_tmp"], errors="ignore"), good_groups, on=["日期", "ETF代號"], how="inner")
@@ -789,7 +804,7 @@ def summarize_holdings(
 
     latest_df["產業"] = latest_df["成分股代號"].map(lambda x: _industry_of(x, industry_map))
     quality = _holding_quality(latest_df, industry_map=industry_map)
-    incomplete_holdings = quality[~quality["資料狀態"].astype(str).str.contains("完整", na=False)].copy() if not quality.empty else pd.DataFrame()
+    incomplete_holdings = quality[~quality["資料狀態"].astype(str).str.match(r"^[✅🟡]", na=False)].copy() if not quality.empty else pd.DataFrame()
 
     hot_etfs = _weighted_hot_candidates(latest_df, momentum_df, top_n=top_n)
     focus = hot_etfs["ETF代號"].astype(str).tolist() if not hot_etfs.empty else latest_df["ETF代號"].astype(str).drop_duplicates().head(top_n).tolist()
@@ -958,7 +973,7 @@ def summarize_holdings(
         "meta": pd.DataFrame([{
             "資料意義": "主動 ETF 經理人持股變化，不代表全市場資金流",
             "事件門檻": "|Δshares/prev_shares|≥3% 且 最大權重≥0.3pp；無股數資料時改用 |Δweight|≥0.3pp",
-            "完整度門檻": f"持股數≥{MIN_COMPLETE_HOLDINGS} 且 權重合計≥{MIN_COMPLETE_WEIGHT_SUM:.0f}%",
+            "完整度門檻": f"完整：持股數≥{MIN_COMPLETE_HOLDINGS} 且 權重≥{MIN_COMPLETE_WEIGHT_SUM:.0f}%；可參考：持股數≥{MIN_REFERENCE_HOLDINGS} 且 權重≥{MIN_REFERENCE_WEIGHT_SUM:.0f}%",
             "快照保留": f"{HOLDINGS_KEEP_DAYS}天",
             "主畫面判讀": f"{lookback_days}天",
             "事件明細": f"{event_days}天",
@@ -981,7 +996,7 @@ def build_active_etf_manager_radar(
     cand_tuple = tuple((c["ETF代號"], c["ETF名稱"]) for c in candidates)
     latest_raw = fetch_active_etf_holdings_auto(cand_tuple, custom_sources=custom_sources, name_map=name_map)
     latest, latest_quality = _filter_complete_holdings(latest_raw, industry_map=industry_map)
-    incomplete_count = 0 if latest_quality is None or latest_quality.empty else int((~latest_quality["資料狀態"].astype(str).str.startswith("✅", na=False)).sum())
+    incomplete_count = 0 if latest_quality is None or latest_quality.empty else int((~latest_quality["資料狀態"].astype(str).str.match(r"^[✅🟡]", na=False)).sum())
     if latest.empty:
         hist = merge_holdings_history(pd.DataFrame(), cache_path=cache_path, max_days=HOLDINGS_KEEP_DAYS)
         summary = summarize_holdings(hist, industry_map, name_map, top_n=top_n, lookback_days=lookback_days, momentum_df=momentum_df, event_days=EVENT_LOOKBACK_DAYS)

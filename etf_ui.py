@@ -267,6 +267,83 @@ def _render_bar_list(df, COLORS, label_col, value_col, subtitle_col=None, max_ro
     components.html(html_doc, height=height, scrolling=False)
 
 
+
+
+def _render_manager_briefing(summary, COLORS):
+    """V37.11.4：把資料可信度與主動 ETF 大方向濃縮成一張前線摘要。"""
+    report = _load_local_etl_report()
+    health = report.get("etl_health", []) if isinstance(report, dict) else []
+    hdf = pd.DataFrame(health) if health else pd.DataFrame()
+    candidate_count = int(report.get("candidate_count", 0) or 0) if isinstance(report, dict) else 0
+    complete_etfs = report.get("complete_etfs", []) if isinstance(report, dict) else []
+    official_a = report.get("official_complete", []) if isinstance(report, dict) else []
+    official_b = report.get("official_playwright_complete", []) if isinstance(report, dict) else []
+    fallback_c = report.get("fallback_complete", []) if isinstance(report, dict) else []
+    reference = report.get("reference_complete", []) if isinstance(report, dict) else []
+
+    unusable = []
+    if not hdf.empty and "ETF代號" in hdf.columns:
+        if "今日成功" in hdf.columns:
+            usable_mask = hdf["今日成功"].astype(bool)
+        else:
+            usable_mask = hdf.get("健康燈號", "").astype(str).str.contains("成功|可參考|沿用", na=False)
+        ref_mask = hdf.get("最後狀態", "").astype(str).str.contains("可參考", na=False) | hdf.get("健康燈號", "").astype(str).str.contains("可參考", na=False)
+        ref_extra = hdf.loc[ref_mask, "ETF代號"].astype(str).tolist()
+        reference = sorted(set(map(str, reference)) | set(ref_extra))
+        usable_mask = usable_mask | ref_mask
+        unusable = hdf.loc[~usable_mask, "ETF代號"].astype(str).tolist()
+
+    usable_count = len(set(map(str, complete_etfs)) | set(map(str, reference)))
+    denom = candidate_count or max(usable_count + len(unusable), 1)
+    coverage = usable_count / denom * 100 if denom else 0
+
+    industries = summary.get("industries", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    common_holdings = summary.get("common_holdings", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    daily_events = summary.get("daily_events", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+    shared_actions = summary.get("shared_actions", pd.DataFrame()) if isinstance(summary, dict) else pd.DataFrame()
+
+    top_ind_txt = "暫無產業摘要"
+    if industries is not None and not industries.empty and "產業" in industries.columns and "權重" in industries.columns:
+        ind = industries.copy()
+        ind["權重"] = pd.to_numeric(ind["權重"], errors="coerce").fillna(0)
+        top_ind = ind.groupby("產業", dropna=False)["權重"].sum().sort_values(ascending=False).head(4)
+        top_ind_txt = "、".join([f"{k} {v:.1f}%" for k, v in top_ind.items()])
+
+    common_txt = "暫無明顯共同持股"
+    if common_holdings is not None and not common_holdings.empty:
+        rows = []
+        for _, r in common_holdings.head(5).iterrows():
+            rows.append(f"{r.get('成分股名稱','')}({r.get('成分股代號','')})×{r.get('出現ETF數','-')}")
+        common_txt = "、".join(rows)
+
+    action_txt = "近 30 天沒有明顯同步調倉；先看最新持股方向。"
+    if shared_actions is not None and not shared_actions.empty and "狀態" in shared_actions.columns:
+        cnts = shared_actions["狀態"].value_counts().to_dict()
+        items = [f"{k}{int(cnts.get(k,0))}" for k in ["新增", "加碼", "減碼", "刪除"] if int(cnts.get(k,0)) > 0]
+        action_txt = "同步動作：" + "、".join(items) if items else action_txt
+    elif daily_events is not None and not daily_events.empty and "狀態" in daily_events.columns:
+        cnts = daily_events["狀態"].value_counts().to_dict()
+        items = [f"{k}{int(cnts.get(k,0))}" for k in ["新增", "加碼", "減碼", "刪除"] if int(cnts.get(k,0)) > 0]
+        action_txt = "個別動作：" + "、".join(items) if items else action_txt
+
+    unusable_txt = "無" if not unusable else "、".join(unusable[:8])
+    source_txt = f"官方 {len(official_a)}｜官方動態 {len(official_b)}｜第三方備援 {len(fallback_c)}｜可參考 {len(reference)}"
+    html = f"""
+    <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {COLORS['primary']}; padding:12px 14px; border-radius:12px; margin:8px 0 14px 0;">
+        <div style="font-size:16px; font-weight:900; color:{COLORS['text']}; margin-bottom:6px;">🧭 主動 ETF 經理人大方向總結</div>
+        <div style="font-size:13px; color:{COLORS['text']}; line-height:1.65;">
+            <b>覆蓋：</b>{usable_count}/{denom} 檔可看方向（約 {coverage:.0f}%）｜<b>來源：</b>{_safe_text(source_txt)}｜<b>未打穿：</b>{_safe_text(unusable_txt)}<br>
+            <b>資金偏好產業：</b>{_safe_text(top_ind_txt)}<br>
+            <b>共同重倉：</b>{_safe_text(common_txt)}<br>
+            <b>調倉訊號：</b>{_safe_text(action_txt)}
+        </div>
+        <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:5px;">
+            判讀：A/B/C 都可以用來看方向；C級與可參考資料不當成精準調倉證據，但足夠掌握主動 ETF 經理人的大方向。
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
 def _render_manager_header_compact(summary, holdings, COLORS, history_status=None, auto_note=""):
     """V37.9.1：只顯示本機 ETL report，不在頁面載入時打 GitHub API 診斷。"""
     history_status = history_status or get_history_status(holdings, lookback_days=20)
@@ -283,6 +360,7 @@ def _render_manager_header_compact(summary, holdings, COLORS, history_status=Non
     official_a = report.get("official_complete", []) if isinstance(report, dict) else []
     official_b = report.get("official_playwright_complete", []) if isinstance(report, dict) else []
     fallback_c = report.get("fallback_complete", []) if isinstance(report, dict) else []
+    reference = report.get("reference_complete", []) if isinstance(report, dict) else []
     raw_rows = report.get("raw_rows", "-") if isinstance(report, dict) else "-"
     complete_rows = report.get("complete_rows", "-") if isinstance(report, dict) else "-"
     auto_text = str(auto_note or "已讀取本機 ETL 歷史快照；官方抓取交給 GitHub Actions，不在前端即時執行。")
@@ -295,20 +373,20 @@ def _render_manager_header_compact(summary, holdings, COLORS, history_status=Non
             <div style="font-size:14px; color:{COLORS['text']}; line-height:1.65;"><b>狀態：</b>{_safe_text(auto_text)}</div>
             <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">{_safe_text(compact_msg)}</div>
             <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.45; margin-top:3px;">ETL：raw {raw_rows}｜complete {complete_rows}｜完整 ETF：{_safe_text('、'.join(map(str, complete_etfs)) if complete_etfs else '-')}</div>
-            <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.55; margin-top:3px;">可信度：A官方 {len(official_a)}｜B官方Playwright {len(official_b)}｜C第三方備援 {len(fallback_c)}</div>
+            <div style="font-size:12px; color:{COLORS['subtext']}; line-height:1.55; margin-top:3px;">來源：官方 {len(official_a)}｜官方動態 {len(official_b)}｜第三方備援 {len(fallback_c)}｜可參考 {len(reference)}</div>
         </div>
         """, unsafe_allow_html=True)
         health = report.get("etl_health", []) if isinstance(report, dict) else []
         if health:
             st.markdown("##### 🚦 ETL 健康燈號")
             hdf = pd.DataFrame(health)
-            cols = ["ETF代號", "ETF名稱", "投信", "健康燈號", "資料來源等級", "來源可信度", "採用來源類型", "連續失敗天數", "最後成功日期", "資料過期天數", "需要Playwright", "最後狀態"]
+            cols = ["ETF代號", "ETF名稱", "投信", "健康燈號", "來源可信度", "採用來源類型", "最後成功日期", "資料過期天數", "最後狀態"]
             st.dataframe(hdf[[c for c in cols if c in hdf.columns]], use_container_width=True, hide_index=True, height=260)
         quality = report.get("quality", []) if isinstance(report, dict) else []
         if quality:
             st.markdown("##### 📋 快照完整度 / 來源可信度")
             qdf = pd.DataFrame(quality)
-            qcols = ["ETF代號", "ETF名稱", "持股數", "權重合計", "資料來源等級", "來源可信度", "採用來源類型", "資料狀態", "資料備註"]
+            qcols = ["ETF代號", "ETF名稱", "持股數", "權重合計", "來源可信度", "採用來源類型", "資料狀態", "資料備註"]
             st.dataframe(qdf[[c for c in qcols if c in qdf.columns]], use_container_width=True, hide_index=True, height=260)
 
 
