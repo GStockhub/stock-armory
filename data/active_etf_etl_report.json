@@ -33,7 +33,7 @@
   "keep_days": 60,
   "raw_rows": 262,
   "complete_rows": 262,
-  "history_rows": 1812,
+  "history_rows": 1509,
   "source_mode": "force_top10_official_tab_urls_weekly_full",
   "official_source_report": [
     {
@@ -3667,5 +3667,13 @@
       "來源可信度": "C級｜第三方備援",
       "採用來源類型": "第三方備援"
     }
-  ]
+  ],
+  "history_cleaning_current_file": {
+    "input_rows": 1812,
+    "output_rows": 1509,
+    "removed_rows": 303,
+    "removed_old_rows": 18,
+    "removed_polluted_rows": 173,
+    "after_manual_clean_rows": 1509
+  }
 }

@@ -48,7 +48,7 @@ from active_etf_holdings import (
     fetch_active_etf_holdings_with_report,
     get_active_etf_candidates,
 )
-from github_history_store import normalize_history_df
+from github_history_store import normalize_history_df, clean_etf_history_df
 from active_etf_official_sources import fetch_official_holdings_auto
 from active_etf_source_registry import ACTIVE_ETF_META, iter_registry, get_sources_for_etf
 
@@ -131,7 +131,7 @@ def standardize_latest(df: pd.DataFrame, industry_map: Dict[str, str], with_pric
     return out[OUTPUT_COLUMNS].drop_duplicates(["日期", "ETF代號", "成分股代號"], keep="last")
 
 
-def merge_with_history(latest: pd.DataFrame, output_path: str, keep_days: int = HOLDINGS_KEEP_DAYS) -> pd.DataFrame:
+def merge_with_history(latest: pd.DataFrame, output_path: str, keep_days: int = HOLDINGS_KEEP_DAYS) -> tuple[pd.DataFrame, Dict[str, object]]:
     frames = []
     p = Path(output_path)
     if p.exists():
@@ -144,13 +144,14 @@ def merge_with_history(latest: pd.DataFrame, output_path: str, keep_days: int = 
     if latest is not None and not latest.empty:
         frames.append(latest)
     if not frames:
-        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+        return pd.DataFrame(columns=OUTPUT_COLUMNS), {"input_rows": 0, "output_rows": 0, "removed_rows": 0}
     merged = pd.concat(frames, ignore_index=True)
-    norm = normalize_history_df(merged, max_days=keep_days)
+    _cleaned, clean_diag = clean_etf_history_df(merged, max_days=keep_days)
+    norm = normalize_history_df(_cleaned, max_days=keep_days)
     for c in OUTPUT_COLUMNS:
         if c not in norm.columns:
             norm[c] = 0 if c in ["權重", "持有股數", "收盤價"] else ""
-    return norm[OUTPUT_COLUMNS]
+    return norm[OUTPUT_COLUMNS], clean_diag
 
 
 
@@ -462,7 +463,9 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
     if no_prices:
         print("[INFO] 跳過個股收盤價補值：收盤價欄保留 0，避免逐檔訪問 Yahoo。")
     latest = standardize_latest(complete_raw, industry_map=industry_map, with_prices=not no_prices)
-    merged = merge_with_history(latest, output_path, keep_days=keep_days)
+    merged, history_clean_diag = merge_with_history(latest, output_path, keep_days=keep_days)
+    if history_clean_diag.get("removed_rows", 0):
+        print(f"[INFO] ETF history 清洗：移除 {history_clean_diag.get('removed_rows')} 筆污染/舊資料。")
 
     outp = Path(output_path)
     outp.parent.mkdir(parents=True, exist_ok=True)
@@ -491,6 +494,7 @@ def run_etl(output_path: str, report_path: str, top_n: int, keep_days: int, no_p
         "raw_rows": 0 if raw is None else int(len(raw)),
         "complete_rows": int(len(latest)) if latest is not None else 0,
         "history_rows": int(len(merged)) if merged is not None else 0,
+        "history_cleaning": history_clean_diag,
         "source_mode": "force_top10_official_tab_urls_weekly_full",
         "official_source_report": [] if official_report is None or official_report.empty else official_report.to_dict(orient="records"),
         "fallback_source_report": [] if fallback_report is None or fallback_report.empty else fallback_report.to_dict(orient="records"),

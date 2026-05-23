@@ -68,6 +68,87 @@ def _headers(cfg: GitHubConfig) -> Dict[str, str]:
     }
 
 
+
+# V40：ETF history 清洗守門員
+# - 防止官方/第三方網頁的 JS、JSON、問卷文字被誤判成持股
+# - 清掉早期誤抓的 2022 舊資料與 FLUCT / 轉到問題等污染列
+_HISTORY_EARLIEST_DATE = pd.Timestamp("2025-01-01")
+_POLLUTION_KEYWORDS = [
+    "FLUCT", "FLUCT_PERCENT", "轉到問題", "dfhc_", "required_info", "question_designed",
+    "問卷", "考卷", "衍生工具", "網上交易", "suitability", "i18n/zh_TW.json",
+    "jsoncallback", "DOCTYPE", "<HTML", "function(", "undefined", "NaN",
+]
+_NON_HOLDING_NAMES = {
+    "考卷", "卷", "考試", "課程之投資單元", "金融學碩士", "金融學學士",
+}
+
+
+def _is_polluted_holding_row(row: pd.Series) -> bool:
+    """判斷 ETF history 單列是否像網頁/JSON 污染資料，而非真正持股。"""
+    try:
+        text = " ".join(str(row.get(c, "")) for c in REQUIRED_COLUMNS).upper()
+        raw_name = str(row.get("成分股名稱", "") or "").strip()
+        code = str(row.get("成分股代號", "") or "").strip().upper()
+        weight = pd.to_numeric(str(row.get("權重", "")).replace("%", "").replace(",", ""), errors="coerce")
+
+        if pd.isna(weight) or float(weight) <= 0 or float(weight) > 100:
+            return True
+        if not code or len(code) > 18:
+            return True
+        # 台股/美股代號多為英數、點或減號；若出現 JSON 符號或中文，通常是解析污染。
+        if not all(ch.isalnum() or ch in {".", "-", "_"} for ch in code):
+            return True
+        if raw_name in _NON_HOLDING_NAMES:
+            return True
+        if raw_name.startswith(('"', "'", ":", ",", "{", "[")):
+            return True
+        if any(k.upper() in text for k in _POLLUTION_KEYWORDS):
+            return True
+        # 這些欄位名常出現在 API / JS 設定檔，不是成分股名稱。
+        if code in {"FORM", "THE", "VIA", "ASSETS"} and any(x in text for x in ["DFHC", "QUESTION", "OPTIONS"]):
+            return True
+    except Exception:
+        return True
+    return False
+
+
+def clean_etf_history_df(df: pd.DataFrame, max_days: int = 60) -> tuple[pd.DataFrame, Dict[str, object]]:
+    """回傳清洗後 ETF history 與診斷資訊。此函式可在 ETL / 手動清檔共用。"""
+    diag = {"input_rows": 0, "output_rows": 0, "removed_rows": 0, "removed_old_rows": 0, "removed_polluted_rows": 0}
+    if df is None or df.empty:
+        return _empty_history(), diag
+
+    work = df.copy()
+    diag["input_rows"] = int(len(work))
+    work.columns = [str(c).replace("\ufeff", "").strip() for c in work.columns]
+    for c in REQUIRED_COLUMNS:
+        if c not in work.columns:
+            work[c] = ""
+    work = work[REQUIRED_COLUMNS].copy()
+    work["日期"] = pd.to_datetime(work["日期"], errors="coerce").dt.normalize()
+
+    old_mask = work["日期"].notna() & (work["日期"] < _HISTORY_EARLIEST_DATE)
+    diag["removed_old_rows"] = int(old_mask.sum())
+    work = work[~old_mask].copy()
+
+    polluted_mask = work.apply(_is_polluted_holding_row, axis=1) if not work.empty else pd.Series(dtype=bool)
+    diag["removed_polluted_rows"] = int(polluted_mask.sum()) if len(polluted_mask) else 0
+    if len(polluted_mask):
+        work = work[~polluted_mask].copy()
+
+    # 若某 ETF 某日清洗後只剩極少列或權重異常，整個快照不要拿來汙染歷史分析。
+    if not work.empty:
+        weight = pd.to_numeric(work["權重"], errors="coerce").fillna(0.0)
+        snap = work.assign(_w=weight).groupby(["日期", "ETF代號"]).agg(持股數=("成分股代號", "nunique"), 權重合計=("_w", "sum")).reset_index()
+        ok_snap = snap[(snap["持股數"] >= 3) & (snap["權重合計"] >= 5) & (snap["權重合計"] <= 110)][["日期", "ETF代號"]]
+        work = work.merge(ok_snap.assign(_ok=1), on=["日期", "ETF代號"], how="left")
+        work = work[work["_ok"].eq(1)].drop(columns=["_ok"]).copy()
+
+    diag["removed_rows"] = int(diag["input_rows"] - len(work))
+    diag["output_rows"] = int(len(work))
+    return work, diag
+
+
 def _empty_history() -> pd.DataFrame:
     return pd.DataFrame(columns=REQUIRED_COLUMNS)
 
@@ -75,7 +156,9 @@ def _empty_history() -> pd.DataFrame:
 def normalize_history_df(df: pd.DataFrame, max_days: int = 60) -> pd.DataFrame:
     if df is None or df.empty:
         return _empty_history()
-    out = df.copy()
+    out, _diag = clean_etf_history_df(df, max_days=max_days)
+    if out is None or out.empty:
+        return _empty_history()
     out.columns = [str(c).replace("\ufeff", "").strip() for c in out.columns]
     for c in REQUIRED_COLUMNS:
         if c not in out.columns:

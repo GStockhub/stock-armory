@@ -439,91 +439,122 @@ def _summary_stats(df: pd.DataFrame) -> pd.DataFrame:
 
 
 
-def build_quality_digest(history: Optional[pd.DataFrame] = None) -> Dict[str, str]:
-    """給總司令部 / 今日作戰摘要使用的濃縮命中率結論。
 
-    這不是另一張大表，而是把訊號追蹤室的結果翻成一句可執行提醒：
-    - 哪一類訊號最近比較準
-    - 樣本是否足夠
-    - 今天要用進攻、保守，或只看沙盤
-    """
-    try:
-        if history is None:
-            history, _ = load_signal_history()
-        history = normalize_signal_history(history)
-        if history.empty:
-            return {
-                "title": "命中率：尚未累積",
-                "body": "尚無足夠訊號紀錄；今日先依 S/A/B、沙盤與停損紀律操作。",
-                "best": "-",
-                "verified": "0",
-                "tone": "neutral",
-            }
-        recent = history.head(300).copy()
-        stats = _summary_stats(recent)
-        verified = int((pd.notna(recent["隔日漲跌%"])
-                        | pd.notna(recent["3日最高漲幅%"])
-                        | pd.notna(recent["5日最高漲幅%"])).sum())
-        if stats.empty or verified <= 0:
-            return {
-                "title": "命中率：等待驗證",
-                "body": "已有作戰快照，但尚未產生隔日 / 3日 / 5日結果；今天仍以風控優先。",
-                "best": "等待驗證",
-                "verified": str(verified),
-                "tone": "neutral",
-            }
-        usable = stats[pd.to_numeric(stats["已驗證筆數"], errors="coerce") >= 3].copy()
-        if usable.empty:
-            usable = stats.copy()
-        usable["score"] = pd.to_numeric(usable["5日達標率%"], errors="coerce").fillna(0) * 0.7 + pd.to_numeric(usable["隔日勝率%"], errors="coerce").fillna(0) * 0.3
-        best = usable.sort_values(["score", "平均5日高點%"], ascending=False).iloc[0]
-        best_type = str(best.get("類型", "-"))
-        hit5 = float(best.get("5日達標率%", 0) or 0)
-        day1 = float(best.get("隔日勝率%", 0) or 0)
-        best_text = f"{best_type}｜5日達標 {hit5:.1f}%｜隔日勝率 {day1:.1f}%"
-        if verified < 20:
-            tone, title = "neutral", "命中率：樣本偏少"
-            body = f"目前已驗證 {verified} 筆，最佳暫為 {best_text}；樣本還不大，適合當輔助，不宜完全放大部位。"
-        elif hit5 >= 55 and day1 >= 50:
-            tone, title = "good", "命中率：可支援進攻"
-            body = f"目前已驗證 {verified} 筆，最佳為 {best_text}；可讓該類訊號優先進沙盤，但仍禁追高。"
-        elif hit5 >= 40:
-            tone, title = "neutral", "命中率：中性可用"
-            body = f"目前已驗證 {verified} 筆，最佳為 {best_text}；可以參考方向，但要縮量與等回踩。"
-        else:
-            tone, title = "caution", "命中率：偏保守"
-            body = f"目前已驗證 {verified} 筆，最佳也只有 {best_text}；今天以防守、沙盤確認與低量股排除為主。"
-        return {"title": title, "body": body, "best": best_text, "verified": str(verified), "tone": tone}
-    except Exception as e:
-        return {"title": "命中率：讀取失敗", "body": f"訊號追蹤摘要暫時無法產生：{e}", "best": "-", "verified": "0", "tone": "neutral"}
+def _verified_rows(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    return out[pd.notna(out["隔日漲跌%"] ) | pd.notna(out["3日最高漲幅%"] ) | pd.notna(out["5日最高漲幅%"] )].copy()
 
 
-def auto_capture_today_snapshot(twse_ind_map: Dict[str, str], fm_token: str, macro_score, overheat_flag, operation_mode) -> str:
-    """完成每日掃描後自動保存一次作戰快照。
+def _recent_window_stats(df: pd.DataFrame, windows=(5, 10, 20)) -> pd.DataFrame:
+    """最近 N 筆已驗證訊號的真實命中率摘要，避免只看長期平均誤判。"""
+    ver = _verified_rows(df)
+    if ver.empty:
+        return pd.DataFrame()
+    ver = ver.sort_values(["日期", "更新時間"], ascending=[False, False])
+    rows = []
+    for n in windows:
+        g = ver.head(int(n)).copy()
+        if g.empty:
+            continue
+        hit = (g["是否達標"].astype(str).str.upper().eq("Y")).mean() * 100
+        fail = (g["是否失敗"].astype(str).str.upper().eq("Y")).mean() * 100
+        h5 = pd.to_numeric(g["5日最高漲幅%"], errors="coerce")
+        d1 = pd.to_numeric(g["隔日漲跌%"], errors="coerce")
+        rows.append({
+            "視窗": f"最近{len(g)}筆",
+            "達標率%": round(hit, 1),
+            "失敗率%": round(fail, 1),
+            "隔日勝率%": round((d1 > 0).mean() * 100, 1),
+            "平均5日高點%": round(h5.mean(), 2),
+        })
+    return pd.DataFrame(rows)
 
-    96 分版重點：不用每天手動按「保存今日作戰快照」。
-    只要 eod_master_list / eod_rank_sorted 已經存在，就自動寫入；同一天已存在則略過。
-    """
-    today = _today_str()
-    guard_key = f"_signal_auto_snapshot_done_{today}"
-    if st.session_state.get(guard_key):
-        return "今日作戰快照已自動保存。"
-    master = st.session_state.get("eod_master_list", pd.DataFrame())
-    ranked = st.session_state.get("eod_rank_sorted", pd.DataFrame())
-    if (not isinstance(master, pd.DataFrame) or master.empty) and (not isinstance(ranked, pd.DataFrame) or ranked.empty):
-        return "尚未產生今日清單，暫不自動保存。"
-    history, _ = load_signal_history()
-    history = normalize_signal_history(history)
-    if not history.empty:
-        today_rows = history[history["日期"].astype(str).eq(today)]
-        if not today_rows.empty:
-            st.session_state[guard_key] = True
-            return "今日作戰快照已存在，略過重複保存。"
-    merged = append_today_snapshot(history, twse_ind_map, fm_token, macro_score, overheat_flag, operation_mode)
-    msg = save_signal_history(merged)
-    st.session_state[guard_key] = True
-    return f"今日作戰快照已自動保存。{msg}"
 
+def _type_power_rank(df: pd.DataFrame, min_samples: int = 5) -> pd.DataFrame:
+    ver = _verified_rows(df)
+    if ver.empty:
+        return pd.DataFrame()
+    rows = []
+    for typ, g in ver.groupby("類型"):
+        if len(g) < min_samples:
+            continue
+        hit = (g["是否達標"].astype(str).str.upper().eq("Y")).mean() * 100
+        fail = (g["是否失敗"].astype(str).str.upper().eq("Y")).mean() * 100
+        h5 = pd.to_numeric(g["5日最高漲幅%"], errors="coerce")
+        score = hit + max(0, float(h5.mean() or 0)) * 5 - fail * 0.6
+        rows.append({
+            "訊號類型": typ,
+            "樣本數": int(len(g)),
+            "達標率%": round(hit, 1),
+            "失敗率%": round(fail, 1),
+            "平均5日高點%": round(h5.mean(), 2),
+            "目前權重建議": "升權" if len(g) >= 10 and hit >= 55 and fail <= 25 else ("保留" if hit >= 40 else "降權觀察"),
+            "_score": round(score, 2),
+        })
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values(["_score", "樣本數"], ascending=[False, False]).drop(columns=["_score"])
+
+
+def render_signal_quality_brief(history: pd.DataFrame, COLORS: Dict[str, str], table_style: Dict[str, str]) -> None:
+    """96分版：用真實樣本告訴使用者哪些訊號該升權/保守。"""
+    if history is None or history.empty:
+        return
+    recent = normalize_signal_history(history, keep_days=60).head(300)
+    verified = _verified_rows(recent)
+    if verified.empty:
+        st.info("🧪 訊號追蹤：已有紀錄，但尚未回填足夠績效；暫不調整任何訊號權重。")
+        return
+
+    total = len(recent)
+    vcnt = len(verified)
+    hit_rate = (verified["是否達標"].astype(str).str.upper().eq("Y")).mean() * 100
+    fail_rate = (verified["是否失敗"].astype(str).str.upper().eq("Y")).mean() * 100
+    rank = _type_power_rank(recent, min_samples=5)
+    top = "樣本不足，暫不升權"
+    if not rank.empty:
+        top_row = rank.iloc[0]
+        top = f"{top_row['訊號類型']}｜{top_row['目前權重建議']}｜達標 {top_row['達標率%']:.1f}%"
+
+    st.markdown("#### 🧭 訊號追蹤結論")
+    c1, c2, c3, c4 = st.columns(4)
+    cards = [
+        ("追蹤筆數", f"{total}", COLORS.get("primary", "#A67C52")),
+        ("已驗證樣本", f"{vcnt}", COLORS.get("green", "#3D8D5A")),
+        ("整體達標率", f"{hit_rate:.1f}%", COLORS.get("green", "#3D8D5A") if hit_rate >= 45 else COLORS.get("accent", "#C47A3A")),
+        ("目前最有效", top, COLORS.get("primary", "#A67C52")),
+    ]
+    for col, (title, value, color) in zip([c1, c2, c3, c4], cards):
+        with col:
+            st.markdown(f"""
+            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:10px; padding:10px 12px; min-height:78px;">
+                <div style="font-size:12.5px; color:{COLORS['subtext']};">{title}</div>
+                <div style="font-size:16px; font-weight:900; color:{COLORS['text']}; line-height:1.35;">{value}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    note = "樣本已可初步參考，但仍以最近 20 筆與分型樣本數一起看。" if vcnt >= 30 else "樣本仍偏少，暫時只當方向參考，不自動放大部位。"
+    st.caption(f"{note}｜整體失敗率 {fail_rate:.1f}%")
+
+    win = _recent_window_stats(recent)
+    if not win.empty:
+        with st.expander("📏 最近 5 / 10 / 20 筆樣本", expanded=False):
+            st.dataframe(
+                win.style.format({"達標率%": "{:.1f}%", "失敗率%": "{:.1f}%", "隔日勝率%": "{:.1f}%", "平均5日高點%": "{:.2f}%"}).set_properties(**table_style),
+                use_container_width=True,
+                hide_index=True,
+                height=145,
+            )
+    if not rank.empty:
+        with st.expander("🏷️ 訊號類型升降權建議", expanded=False):
+            st.dataframe(
+                rank.style.format({"達標率%": "{:.1f}%", "失敗率%": "{:.1f}%", "平均5日高點%": "{:.2f}%"}).set_properties(**table_style),
+                use_container_width=True,
+                hide_index=True,
+                height=min(260, 45 + 36 * len(rank)),
+            )
 
 def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro_score, overheat_flag, operation_mode):
     st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室 V37</span>", unsafe_allow_html=True)
@@ -553,6 +584,8 @@ def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro
     if history.empty:
         st.info("尚無訊號紀錄。請先在個股游擊完成掃描，再按「保存今日作戰快照」。")
         return
+
+    render_signal_quality_brief(history, COLORS, table_style)
 
     recent = history.head(300).copy()
     stats = _summary_stats(recent)
