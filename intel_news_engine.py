@@ -391,6 +391,7 @@ def render_daily_intel_panel(st, COLORS: Dict[str, str], table_style: Dict[str, 
                 </div>
                 """, unsafe_allow_html=True)
 
+    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
     with st.expander("📰 代表新聞與主題分級", expanded=False):
         rows = []
         for t in topics[:8]:

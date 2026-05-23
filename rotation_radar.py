@@ -125,19 +125,43 @@ def render_industry_rotation_radar(colors, table_style, twse_ind_map, today_df=N
     if table.empty:
         st.info("產業輪動資料不足，可能是今日掃描樣本太少或價量欄位不足。")
         return
-    hot = table[table["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫", "🟡 潛伏觀察"])].head(8)
-    cols = st.columns(min(3, max(1, len(hot)))) if not hot.empty else []
-    for idx, (_, r) in enumerate(hot.iterrows()):
-        color = colors["red"] if "主戰場" in r["輪動狀態"] else (colors["accent"] if "升溫" in r["輪動狀態"] else colors["primary"])
-        with cols[idx % len(cols)]:
-            st.markdown(f"""
-            <div style="background:{colors['card']}; border:1px solid {colors['border']}; border-top:5px solid {color}; border-radius:10px; padding:12px 13px; min-height:178px; margin-bottom:10px;">
-                <div style="font-size:13px; color:{colors['subtext']}; font-weight:800;">{html.escape(str(r['輪動狀態']))}</div>
-                <div style="font-size:18px; color:{color}; font-weight:900; line-height:1.25; margin:4px 0;">{html.escape(str(r['產業']))}</div>
-                <div style="font-size:13px; color:{colors['text']}; line-height:1.55;">熱度 <b>{float(r['今日熱度']):.0f}</b>｜升溫 <b>{float(r['5日升溫']):+.1f}</b>｜可信 <b>{html.escape(str(r.get('可信度', '-')))}</b><br>樣本 {int(float(r.get('樣本數', 0) or 0))} 檔｜漲幅 {float(r['平均漲幅%']):+.2f}%｜量比 {float(r['平均量比']):.2f}x｜上漲 {float(r['上漲家數%']):.0f}%</div>
-                <div style="font-size:12.5px; color:{colors['subtext']}; margin-top:7px; line-height:1.45;">{html.escape(str(r['熱度原因']))}<br><b>代表：</b>{html.escape(str(r['代表股']))}</div>
+    hot = table[table["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫", "🟡 潛伏觀察"])].head(10)
+    if not hot.empty:
+        status_order = ["🔥 主戰場", "🟠 資金升溫", "🟡 潛伏觀察", "⚠️ 退潮警戒", "⚪ 普通"]
+        group_blocks = []
+        for state in status_order:
+            g = hot[hot["輪動狀態"] == state]
+            if g.empty:
+                continue
+            color = colors["red"] if "主戰場" in state else (colors["accent"] if "升溫" in state else colors["primary"])
+            items = []
+            for _, r in g.head(6).iterrows():
+                reps = str(r.get("代表股", ""))
+                if len(reps) > 34:
+                    reps = reps[:34] + "…"
+                items.append(
+                    f"<span style='display:inline-block; margin:3px 6px 3px 0; padding:5px 8px; border-radius:999px; background:{colors['bg']}; border:1px solid {colors['border']}; color:{colors['text']}; font-size:12.5px;'>"
+                    f"<b>{html.escape(str(r['產業']))}</b>｜熱度 {float(r['今日熱度']):.0f}｜升溫 {float(r['5日升溫']):+.1f}｜可信 {html.escape(str(r.get('可信度', '-')))}"
+                    f"</span>"
+                )
+            rep_line = html.escape(str(g.iloc[0].get("代表股", "")))
+            if len(rep_line) > 80:
+                rep_line = rep_line[:80] + "…"
+            group_blocks.append(f"""
+            <div style="margin:8px 0 10px 0;">
+                <div style="font-size:14px; font-weight:900; color:{color}; margin-bottom:4px;">{html.escape(state)}｜{len(g)} 個產業</div>
+                <div>{''.join(items)}</div>
+                <div style="font-size:12px; color:{colors['subtext']}; line-height:1.45; margin-top:4px;"><b>代表股：</b>{rep_line}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
+        blocks_html = "".join(group_blocks)
+        st.markdown(f"""
+        <div style="background:{colors['card']}; border:1px solid {colors['border']}; border-left:5px solid {colors['primary']}; border-radius:12px; padding:12px 14px; margin:8px 0 14px 0;">
+            <div style="font-size:16px; font-weight:900; color:{colors['text']}; margin-bottom:4px;">🧭 今日輪動總覽</div>
+            <div style="font-size:12.5px; color:{colors['subtext']}; margin-bottom:8px;">把同一種輪動狀態合併顯示；細節看下方表格即可。</div>
+            {blocks_html}
+        </div>
+        """, unsafe_allow_html=True)
     show_cols = ["產業", "輪動狀態", "可信度", "樣本數", "今日熱度", "5日升溫", "平均漲幅%", "上漲家數%", "平均量比", "強勢股數", "法人合計", "代表股", "操作建議"]
     view_df = table[[c for c in show_cols if c in table.columns]].copy()
     fmt_map = {
