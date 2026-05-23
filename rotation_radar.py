@@ -127,41 +127,39 @@ def render_industry_rotation_radar(colors, table_style, twse_ind_map, today_df=N
         return
     hot = table[table["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫", "🟡 潛伏觀察"])].head(10)
     if not hot.empty:
+        # 不再組大段 HTML。避免 Streamlit 在某些環境把 HTML 當文字吐出來。
+        # 這裡改用原生 markdown/text 顯示：更穩、更乾淨、手機也比較好讀。
+        st.markdown("##### 🧭 今日輪動總覽")
+        st.caption("同一種輪動狀態合併顯示；下方表格保留完整細節。")
+
         status_order = ["🔥 主戰場", "🟠 資金升溫", "🟡 潛伏觀察", "⚠️ 退潮警戒", "⚪ 普通"]
-        group_blocks = []
         for state in status_order:
             g = hot[hot["輪動狀態"] == state]
             if g.empty:
                 continue
-            color = colors["red"] if "主戰場" in state else (colors["accent"] if "升溫" in state else colors["primary"])
-            items = []
-            for _, r in g.head(6).iterrows():
-                reps = str(r.get("代表股", ""))
-                if len(reps) > 34:
-                    reps = reps[:34] + "…"
-                items.append(
-                    f"<span style='display:inline-block; margin:3px 6px 3px 0; padding:5px 8px; border-radius:999px; background:{colors['bg']}; border:1px solid {colors['border']}; color:{colors['text']}; font-size:12.5px;'>"
-                    f"<b>{html.escape(str(r['產業']))}</b>｜熱度 {float(r['今日熱度']):.0f}｜升溫 {float(r['5日升溫']):+.1f}｜可信 {html.escape(str(r.get('可信度', '-')))}"
-                    f"</span>"
-                )
-            rep_line = html.escape(str(g.iloc[0].get("代表股", "")))
-            if len(rep_line) > 80:
-                rep_line = rep_line[:80] + "…"
-            group_blocks.append(f"""
-            <div style="margin:8px 0 10px 0;">
-                <div style="font-size:14px; font-weight:900; color:{color}; margin-bottom:4px;">{html.escape(state)}｜{len(g)} 個產業</div>
-                <div>{''.join(items)}</div>
-                <div style="font-size:12px; color:{colors['subtext']}; line-height:1.45; margin-top:4px;"><b>代表股：</b>{rep_line}</div>
-            </div>
-            """)
-        blocks_html = "".join(group_blocks)
-        st.markdown(f"""
-        <div style="background:{colors['card']}; border:1px solid {colors['border']}; border-left:5px solid {colors['primary']}; border-radius:12px; padding:12px 14px; margin:8px 0 14px 0;">
-            <div style="font-size:16px; font-weight:900; color:{colors['text']}; margin-bottom:4px;">🧭 今日輪動總覽</div>
-            <div style="font-size:12.5px; color:{colors['subtext']}; margin-bottom:8px;">把同一種輪動狀態合併顯示；細節看下方表格即可。</div>
-            {blocks_html}
-        </div>
-        """, unsafe_allow_html=True)
+
+            labels = []
+            reps_all = []
+            for _, r in g.head(10).iterrows():
+                ind = str(r.get("產業", "-"))
+                heat = float(r.get("今日熱度", 0) or 0)
+                delta = float(r.get("5日升溫", 0) or 0)
+                conf = str(r.get("可信度", "-"))
+                labels.append(f"{ind}（熱度{heat:.0f}／升溫{delta:+.1f}／可信{conf}）")
+                reps = str(r.get("代表股", "")).strip()
+                if reps:
+                    reps_all.extend([x.strip() for x in reps.split("、") if x.strip()])
+
+            st.markdown(f"**{state}｜{len(g)} 個產業**")
+            st.write("　｜　".join(labels))
+            if reps_all:
+                # 去重並限制長度，避免又變成一大坨。
+                seen = []
+                for x in reps_all:
+                    if x not in seen:
+                        seen.append(x)
+                st.caption("代表股：" + "、".join(seen[:8]))
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     show_cols = ["產業", "輪動狀態", "可信度", "樣本數", "今日熱度", "5日升溫", "平均漲幅%", "上漲家數%", "平均量比", "強勢股數", "法人合計", "代表股", "操作建議"]
     view_df = table[[c for c in show_cols if c in table.columns]].copy()
     fmt_map = {
