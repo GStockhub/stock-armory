@@ -1,0 +1,54 @@
+name: Update Daily Intel
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_changes:
+        description: "Commit generated intel files"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+  schedule:
+    # Taiwan 15:20 / 18:20 on weekdays; after market close and after evening news settles.
+    - cron: "20 7 * * 1-5"
+    - cron: "20 10 * * 1-5"
+
+permissions:
+  contents: write
+
+jobs:
+  update-daily-intel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests
+
+      - name: Generate daily intel
+        run: |
+          python intel_news_engine.py data/intel_daily.json data/intel_news_raw.csv
+
+      - name: Commit generated intel
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.commit_changes == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/intel_daily.json data/intel_news_raw.csv
+          if git diff --cached --quiet; then
+            echo "No intel changes"
+          else
+            git commit -m "Update daily intel"
+            git pull --rebase origin ${{ github.ref_name }} || true
+            git push
+          fi
