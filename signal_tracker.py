@@ -438,6 +438,93 @@ def _summary_stats(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("類型")
 
 
+
+def build_quality_digest(history: Optional[pd.DataFrame] = None) -> Dict[str, str]:
+    """給總司令部 / 今日作戰摘要使用的濃縮命中率結論。
+
+    這不是另一張大表，而是把訊號追蹤室的結果翻成一句可執行提醒：
+    - 哪一類訊號最近比較準
+    - 樣本是否足夠
+    - 今天要用進攻、保守，或只看沙盤
+    """
+    try:
+        if history is None:
+            history, _ = load_signal_history()
+        history = normalize_signal_history(history)
+        if history.empty:
+            return {
+                "title": "命中率：尚未累積",
+                "body": "尚無足夠訊號紀錄；今日先依 S/A/B、沙盤與停損紀律操作。",
+                "best": "-",
+                "verified": "0",
+                "tone": "neutral",
+            }
+        recent = history.head(300).copy()
+        stats = _summary_stats(recent)
+        verified = int((pd.notna(recent["隔日漲跌%"])
+                        | pd.notna(recent["3日最高漲幅%"])
+                        | pd.notna(recent["5日最高漲幅%"])).sum())
+        if stats.empty or verified <= 0:
+            return {
+                "title": "命中率：等待驗證",
+                "body": "已有作戰快照，但尚未產生隔日 / 3日 / 5日結果；今天仍以風控優先。",
+                "best": "等待驗證",
+                "verified": str(verified),
+                "tone": "neutral",
+            }
+        usable = stats[pd.to_numeric(stats["已驗證筆數"], errors="coerce") >= 3].copy()
+        if usable.empty:
+            usable = stats.copy()
+        usable["score"] = pd.to_numeric(usable["5日達標率%"], errors="coerce").fillna(0) * 0.7 + pd.to_numeric(usable["隔日勝率%"], errors="coerce").fillna(0) * 0.3
+        best = usable.sort_values(["score", "平均5日高點%"], ascending=False).iloc[0]
+        best_type = str(best.get("類型", "-"))
+        hit5 = float(best.get("5日達標率%", 0) or 0)
+        day1 = float(best.get("隔日勝率%", 0) or 0)
+        best_text = f"{best_type}｜5日達標 {hit5:.1f}%｜隔日勝率 {day1:.1f}%"
+        if verified < 20:
+            tone, title = "neutral", "命中率：樣本偏少"
+            body = f"目前已驗證 {verified} 筆，最佳暫為 {best_text}；樣本還不大，適合當輔助，不宜完全放大部位。"
+        elif hit5 >= 55 and day1 >= 50:
+            tone, title = "good", "命中率：可支援進攻"
+            body = f"目前已驗證 {verified} 筆，最佳為 {best_text}；可讓該類訊號優先進沙盤，但仍禁追高。"
+        elif hit5 >= 40:
+            tone, title = "neutral", "命中率：中性可用"
+            body = f"目前已驗證 {verified} 筆，最佳為 {best_text}；可以參考方向，但要縮量與等回踩。"
+        else:
+            tone, title = "caution", "命中率：偏保守"
+            body = f"目前已驗證 {verified} 筆，最佳也只有 {best_text}；今天以防守、沙盤確認與低量股排除為主。"
+        return {"title": title, "body": body, "best": best_text, "verified": str(verified), "tone": tone}
+    except Exception as e:
+        return {"title": "命中率：讀取失敗", "body": f"訊號追蹤摘要暫時無法產生：{e}", "best": "-", "verified": "0", "tone": "neutral"}
+
+
+def auto_capture_today_snapshot(twse_ind_map: Dict[str, str], fm_token: str, macro_score, overheat_flag, operation_mode) -> str:
+    """完成每日掃描後自動保存一次作戰快照。
+
+    96 分版重點：不用每天手動按「保存今日作戰快照」。
+    只要 eod_master_list / eod_rank_sorted 已經存在，就自動寫入；同一天已存在則略過。
+    """
+    today = _today_str()
+    guard_key = f"_signal_auto_snapshot_done_{today}"
+    if st.session_state.get(guard_key):
+        return "今日作戰快照已自動保存。"
+    master = st.session_state.get("eod_master_list", pd.DataFrame())
+    ranked = st.session_state.get("eod_rank_sorted", pd.DataFrame())
+    if (not isinstance(master, pd.DataFrame) or master.empty) and (not isinstance(ranked, pd.DataFrame) or ranked.empty):
+        return "尚未產生今日清單，暫不自動保存。"
+    history, _ = load_signal_history()
+    history = normalize_signal_history(history)
+    if not history.empty:
+        today_rows = history[history["日期"].astype(str).eq(today)]
+        if not today_rows.empty:
+            st.session_state[guard_key] = True
+            return "今日作戰快照已存在，略過重複保存。"
+    merged = append_today_snapshot(history, twse_ind_map, fm_token, macro_score, overheat_flag, operation_mode)
+    msg = save_signal_history(merged)
+    st.session_state[guard_key] = True
+    return f"今日作戰快照已自動保存。{msg}"
+
+
 def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro_score, overheat_flag, operation_mode):
     st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室 V37</span>", unsafe_allow_html=True)
     st.caption("取代原回測室：每天保存 S/A/B、特殊關注、產業輪動、主動 ETF 前五，之後檢查隔日 / 3 日 / 5 日命中率。")
