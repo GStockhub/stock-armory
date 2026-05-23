@@ -18,7 +18,11 @@ try:
 except AttributeError: pass
 else: ssl._create_default_https_context = _create_unverified_https_context
 
-from manual import QUICK_MANUAL_TEXT, MANUAL_TEXT, HISTORY_TEXT, CONTEXT_MANUAL_TEXT
+import manual as manual_module
+MANUAL_TEXT = getattr(manual_module, "MANUAL_TEXT", "")
+HISTORY_TEXT = getattr(manual_module, "HISTORY_TEXT", "")
+QUICK_MANUAL_TEXT = getattr(manual_module, "QUICK_MANUAL_TEXT", MANUAL_TEXT)
+CONTEXT_MANUAL_TEXT = getattr(manual_module, "CONTEXT_MANUAL_TEXT", "")
 import aar
 import sidebar
 import etf_ui
