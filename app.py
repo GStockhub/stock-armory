@@ -194,6 +194,26 @@ def _to_float_safe(v, default=0.0):
         return default
 
 
+
+
+def _parse_tw_date_safe(v):
+    """解析 AAR / 持股表常見日期格式：YYYY-MM-DD、YYYY/MM/DD、民國年、MM-DD。失敗回傳 NaT。"""
+    try:
+        raw = str(v).strip().replace("/", "-").replace(".", "-")
+        if raw in ["", "nan", "NaN", "None"]:
+            return pd.NaT
+        parts = raw.split("-")
+        if len(parts) == 2:
+            return pd.to_datetime(f"{datetime.now().year}-{parts[0]}-{parts[1]}", errors="coerce")
+        if len(parts) == 3:
+            y = int(float(parts[0]))
+            if y < 1911:
+                y += 1911
+            return pd.to_datetime(f"{y}-{parts[1]}-{parts[2]}", errors="coerce")
+        return pd.to_datetime(raw, errors="coerce")
+    except Exception:
+        return pd.NaT
+
 def build_rescue_residual_map(aar_df, current_codes):
     """從 AAR 交易日誌找出：同代號近期/歷史已有認賠紀錄，但目前仍持有的救援殘倉。"""
     rescue = {}
@@ -229,12 +249,18 @@ def build_rescue_residual_map(aar_df, current_codes):
                 "loss_sum": 0.0,
                 "worst_pct": 0.0,
                 "last_date": "",
+                "last_dt": pd.NaT,
                 "labels": set(),
             })
             item["count"] += 1
             item["loss_sum"] += raw_pnl
             item["worst_pct"] = min(item["worst_pct"], loss_pct)
-            item["last_date"] = sell_date or item["last_date"]
+            sell_dt = _parse_tw_date_safe(sell_date)
+            if pd.notna(sell_dt) and (pd.isna(item.get("last_dt")) or sell_dt > item.get("last_dt")):
+                item["last_dt"] = sell_dt
+                item["last_date"] = sell_date or item["last_date"]
+            elif not item.get("last_date"):
+                item["last_date"] = sell_date or item["last_date"]
             if label:
                 item["labels"].add(label.split("(")[0].strip())
 
@@ -1586,11 +1612,6 @@ with t_cmd:
                 elif float_loss_pct <= -1.0:
                     st.warning(f"⚠️ **組合風控預警**：持倉總浮虧 {float_loss_pct:.1f}%，接近 2% 底線，請謹慎評估是否繼續加倉。")
 
-                if rescue_residual_map:
-                    rescue_names = []
-                    for code, info in rescue_residual_map.items():
-                        rescue_names.append(f"{TWSE_NAME_MAP.get(code, code)}({code})")
-                    st.warning(f"**救援殘倉模式啟動：{len(rescue_residual_map)} 檔**｜{ '、'.join(rescue_names[:5]) }。這些是已在 AAR 出現認賠/停損紀錄但目前仍持有的標的；反彈減碼優先，站回結構前不加碼。", icon="🚑")
 
                 render_mainstream_exposure_alert(m_df, COLORS, TWSE_IND_MAP, TWSE_NAME_MAP)
 
@@ -1606,6 +1627,7 @@ with t_cmd:
                         is_rescue_residual = bool(rescue_info)
 
                         buy_date_raw = ""
+                        hold_buy_dt = pd.NaT
                         for col in r.index:
                             if any(k in str(col) for k in ["買進日期", "買進日", "建倉日", "日期"]) and "賣" not in str(col):
                                 v = r[col]
@@ -1618,14 +1640,8 @@ with t_cmd:
                         timer_warning = ""
                         if buy_date_raw:
                             try:
-                                raw_d = buy_date_raw.replace("/", "-").replace(".", "-")
-                                parts_d = raw_d.split("-")
-                                if len(parts_d) == 2: buy_dt = pd.to_datetime(f"{datetime.now().year}-{parts_d[0]}-{parts_d[1]}", errors="coerce")
-                                elif len(parts_d) == 3:
-                                    y_d = int(parts_d[0])
-                                    if y_d < 1911: y_d += 1911
-                                    buy_dt = pd.to_datetime(f"{y_d}-{parts_d[1]}-{parts_d[2]}", errors="coerce")
-                                else: buy_dt = pd.NaT
+                                buy_dt = _parse_tw_date_safe(buy_date_raw)
+                                hold_buy_dt = buy_dt
                                 if pd.notna(buy_dt):
                                     held_days_now = (pd.Timestamp(datetime.now()) - buy_dt).days
                                     if held_days_now > 5:
@@ -1701,45 +1717,80 @@ with t_cmd:
                             rescue_loss = abs(float(rescue_info.get("loss_sum", 0)))
                             rescue_count = int(rescue_info.get("count", 0))
                             rescue_worst = float(rescue_info.get("worst_pct", 0))
-                            rescue_note = f"AAR 已急救 {rescue_count} 次，已認賠約 {rescue_loss:,.0f} 元，最差單筆 {rescue_worst:.1f}%。"
+                            last_rescue_dt = rescue_info.get("last_dt", pd.NaT)
+                            last_rescue_date = rescue_info.get("last_date", "")
+                            is_new_episode = pd.notna(hold_buy_dt) and pd.notna(last_rescue_dt) and hold_buy_dt > last_rescue_dt
+                            is_repaired_episode = (not is_new_episode) and ret >= 0
+                            rescue_note = f"歷史 AAR 有 {rescue_count} 次認賠/停損紀錄，已認賠約 {rescue_loss:,.0f} 元，最差單筆 {rescue_worst:.1f}%"
+                            if last_rescue_date:
+                                rescue_note += f"；最近結案 {last_rescue_date}"
                             glow_class = ""
-                            if p_now == 0.0 or m10 == 0.0:
+
+                            if is_new_episode:
+                                conf_level = "新戰役"
+                                conf_color = COLORS.get('primary', '#58A6FF')
+                                border_col = conf_color
+                                struct = "🆕 新戰役｜曾救援成功"
+                                next_action = "依本次成本與M5/M10判斷"
+                                coach = f"<strong style='color:{conf_color}; font-size:14px;'>🆕 新戰役【曾救援成功】</strong><br>{rescue_note}<br>判定：目前買進日晚於 AAR 最近結案日，不再視為舊殘倉；照新部位紀律管理。"
+                            elif is_repaired_episode:
+                                conf_level = "結案"
+                                conf_color = COLORS.get('green', '#3FB950')
+                                border_col = conf_color
+                                struct = "✅ 修復完成｜可視為結案"
+                                next_action = "回到一般持股紀律"
+                                coach = f"<strong style='color:{conf_color}; font-size:14px;'>✅ 修復完成【可結案】</strong><br>{rescue_note}<br>判定：目前持倉已轉正，不再標成修復中；後續用 M5/M10 與停利規則管理。"
+                            elif p_now == 0.0 or m10 == 0.0:
                                 conf_level = "救援"
                                 conf_color = COLORS.get('accent', '#79C0FF')
                                 struct = "🚑 救援殘倉｜資料待確認"
                                 next_action = "先確認報價/均線，不加碼"
+                                coach = f"<strong style='color:{conf_color}; font-size:14px;'>🚑 救援殘倉【{conf_level}】</strong><br>{rescue_note}<br>原則：資料不完整時不做加碼判斷。"
                             elif ret <= -10:
                                 conf_level = "急救"
                                 conf_color = COLORS.get('red', '#FF7B72')
                                 border_col = conf_color
                                 struct = "🚨 救援殘倉｜深虧破口"
                                 next_action = "反彈減碼優先，不再凹"
+                                coach = f"<strong style='color:{conf_color}; font-size:14px;'>🚑 救援殘倉【{conf_level}】</strong><br>{rescue_note}<br>原則：反彈減碼優先，站回成本區前不加碼。"
                             elif ret <= -5:
                                 conf_level = "救援"
                                 conf_color = COLORS.get('red', '#FF7B72')
                                 border_col = conf_color
                                 struct = "🚑 救援殘倉｜風險未解除"
                                 next_action = "反彈減碼；站回M10前不加碼"
+                                coach = f"<strong style='color:{conf_color}; font-size:14px;'>🚑 救援殘倉【{conf_level}】</strong><br>{rescue_note}<br>原則：反彈減碼優先，站回 M10 前不加碼。"
                             elif p_now < m5:
                                 conf_level = "觀察"
                                 conf_color = COLORS.get('accent', '#79C0FF')
                                 border_col = conf_color
                                 struct = "🚑 救援殘倉｜跌破M5"
                                 next_action = "站不回M5就二次處理"
+                                coach = f"<strong style='color:{conf_color}; font-size:14px;'>🚑 救援殘倉【{conf_level}】</strong><br>{rescue_note}<br>原則：站不回 M5/M10 就處理，不攤平。"
                             else:
                                 conf_level = "修復中"
                                 conf_color = COLORS.get('primary', '#58A6FF')
                                 border_col = conf_color
                                 struct = "🚑 救援殘倉｜修復中"
                                 next_action = "守M5/M10；先不加碼"
-                            coach = f"<strong style='color:{conf_color}; font-size:14px;'>🚑 救援殘倉【{conf_level}】</strong><br>{rescue_note}<br>原則：反彈減碼優先，站回成本區前不加碼；再破 M5/M10 執行二次處理。"
+                                coach = f"<strong style='color:{conf_color}; font-size:14px;'>🚑 救援殘倉【{conf_level}】</strong><br>{rescue_note}<br>原則：仍未轉正，先等修復，不主動攤平。"
 
                         name_display = r['名稱'] if '名稱' in r else r.get('代號','')
                         if str(name_display).strip() in ["", "nan", "None", "未知"]:
                             name_display = ACTIVE_ETF_NAME_MAP.get(str(r.get('代號','')).strip().upper(), str(r.get('代號','')).strip())
                         display_p_now = f"{p_now:.2f}" if p_now > 0 else ("新ETF待收錄" if str(r.get('代號','')).strip().upper() in ACTIVE_ETF_NAME_MAP else "抓取中")
                         timer_html = f"<span style='color:{timer_color}; font-size:12px;'>{timer_warning}</span>" if timer_warning else ""
-                        rescue_badge = f" <span style='font-size:12px; color:{COLORS['red']}; font-weight:700;'>🚑救援殘倉</span>" if is_rescue_residual else ""
+                        badge_text = ""
+                        if is_rescue_residual:
+                            last_rescue_dt_badge = rescue_info.get("last_dt", pd.NaT)
+                            is_new_badge = pd.notna(hold_buy_dt) and pd.notna(last_rescue_dt_badge) and hold_buy_dt > last_rescue_dt_badge
+                            if is_new_badge:
+                                badge_text = "🆕新戰役"
+                            elif ret >= 0:
+                                badge_text = "✅修復完成"
+                            else:
+                                badge_text = "🚑救援殘倉"
+                        rescue_badge = f" <span style='font-size:12px; color:{COLORS['red']}; font-weight:700;'>{badge_text}</span>" if badge_text else ""
                     
                         html_cards += f"<div class='holding-card {glow_class}' style='border-left: 5px solid {border_col}; padding: 10px 15px; background-color: {COLORS['card']}; border-radius: 4px; margin-bottom: 8px;'><div class='rwd-flex-header' style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><div class='rwd-flex-title' style='display: flex; align-items: baseline; gap: 15px;'><h3 style='margin: 0; font-size: 20px; font-weight: bold; color: {COLORS['text']};'>{name_display} ({r['代號']}){rescue_badge}</h3><div style='font-size: 13.5px; color: {COLORS['subtext']};'>現價: <strong style='color:{COLORS['text']}'>{display_p_now}</strong> | 成本: {p_cost:.2f} {timer_html}</div></div><div class='rwd-flex-profit' style='text-align: right;'><span style='font-size: 16px; font-weight: bold; color: {ret_col};'>{ret:.2f}%</span><span style='font-size: 16px; font-weight: bold; color: {ret_col}; margin-left: 10px;'>{pnl:,.0f} 元</span></div></div><div class='rwd-flex-info' style='background-color: {COLORS['bg']}; padding: 6px 12px; border-radius: 6px; font-size: 13.5px; display: flex; gap: 20px;'><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>📊 結構：</span><span style='color:{COLORS['text']}; font-weight:500;'>{struct}</span></div><div><span style='color:{COLORS['subtext']}'>💡 教練：</span><span style='color:{COLORS['text']}'>{coach}</span></div><div style='white-space: nowrap;'><span style='color:{COLORS['subtext']}'>🎯 建議：</span><span style='color:{conf_color}; font-weight:700;'>{next_action}</span></div></div></div>"
                     except Exception as e: continue
