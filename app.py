@@ -606,42 +606,70 @@ chips_data_source = st.session_state.get("chips_data_source", "即時")
 
 if chip_data_available:
     dates = sorted(list(chip_db.keys()), reverse=True)
-    today_df = _sanitize_today_df(chip_db[dates[0]].copy())
 
-    for i, d in enumerate(dates):
-        day_df = _sanitize_today_df(chip_db[d])
-        if day_df.empty or "投信(張)" not in day_df.columns:
-            today_df[f"D{i}"] = 0
-        else:
-            today_df = pd.merge(today_df, day_df[["代號", "投信(張)"]].rename(columns={"投信(張)": f"D{i}"}), on="代號", how="left").fillna(0)
+    # V40.4：籌碼快取有 key，但第一天資料可能被清洗成空表或沒有「代號」。
+    # 不能直接 merge，否則 pandas 會 KeyError: '代號'。先找第一個可用日當底表。
+    today_df = pd.DataFrame()
+    base_date = None
+    for d0 in dates:
+        base_df = _sanitize_today_df(chip_db.get(d0, pd.DataFrame()))
+        if isinstance(base_df, pd.DataFrame) and (not base_df.empty) and "代號" in base_df.columns:
+            today_df = base_df.copy()
+            base_date = d0
+            break
 
-    def get_streak(r):
-        s = 0
-        for i in range(len(dates)):
-            if r.get(f"D{i}", 0) > 0: s += 1
-            else: break
-        return s
-
-    def get_sell_streak(r):
-        s = 0
-        for i in range(len(dates)):
-            if r.get(f"D{i}", 0) < 0: s += 1
-            else: break
-        return s
-
-    today_df["連買"] = today_df.apply(get_streak, axis=1)
-    today_df["投信連賣"] = today_df.apply(get_sell_streak, axis=1)
-    today_df["法人狀態"] = today_df.apply(get_institution_state, axis=1)
-    top_80_chips = _valid_stock_codes(today_df.sort_values("投信(張)", ascending=False).head(80)["代號"].tolist() if "投信(張)" in today_df.columns else today_df["代號"].head(80).tolist())
-
-    # V37.2：防止 chip_db 有 key 但最新 DataFrame 為空 / 只剩 NaN、0，導致 S/A/B 與情報局整區無資料。
-    if today_df.empty or "代號" not in today_df.columns or len(top_80_chips) < 20:
+    if today_df.empty or "代號" not in today_df.columns:
         st.toast("法人籌碼快取格式異常；啟用技術面備援，避免個股游擊與情報局空白。", icon="⚠️")
         today_df = _build_technical_fallback_chips(max_rows=350)
         dates = ["TECH"]
-        top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist()) if not today_df.empty else []
+        top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist()) if not today_df.empty and "代號" in today_df.columns else []
         chip_data_available = False
         chips_data_source = "技術備援"
+    else:
+        if base_date and dates and dates[0] != base_date:
+            dates = [base_date] + [d for d in dates if d != base_date]
+
+        for i, d in enumerate(dates):
+            day_df = _sanitize_today_df(chip_db.get(d, pd.DataFrame()))
+            if day_df.empty or "代號" not in day_df.columns or "投信(張)" not in day_df.columns:
+                today_df[f"D{i}"] = 0
+            else:
+                merge_df = day_df[["代號", "投信(張)"]].rename(columns={"投信(張)": f"D{i}"})
+                today_df = pd.merge(today_df, merge_df, on="代號", how="left").fillna(0)
+
+        def get_streak(r):
+            s = 0
+            for i in range(len(dates)):
+                if r.get(f"D{i}", 0) > 0: s += 1
+                else: break
+            return s
+
+        def get_sell_streak(r):
+            s = 0
+            for i in range(len(dates)):
+                if r.get(f"D{i}", 0) < 0: s += 1
+                else: break
+            return s
+
+        today_df["連買"] = today_df.apply(get_streak, axis=1)
+        today_df["投信連賣"] = today_df.apply(get_sell_streak, axis=1)
+        today_df["法人狀態"] = today_df.apply(get_institution_state, axis=1)
+        if "代號" in today_df.columns:
+            if "投信(張)" in today_df.columns:
+                top_80_chips = _valid_stock_codes(today_df.sort_values("投信(張)", ascending=False).head(80)["代號"].tolist())
+            else:
+                top_80_chips = _valid_stock_codes(today_df["代號"].head(80).tolist())
+        else:
+            top_80_chips = []
+
+        # V37.2：防止 chip_db 有 key 但最新 DataFrame 為空 / 只剩 NaN、0，導致 S/A/B 與情報局整區無資料。
+        if today_df.empty or "代號" not in today_df.columns or len(top_80_chips) < 20:
+            st.toast("法人籌碼快取格式異常；啟用技術面備援，避免個股游擊與情報局空白。", icon="⚠️")
+            today_df = _build_technical_fallback_chips(max_rows=350)
+            dates = ["TECH"]
+            top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist()) if not today_df.empty and "代號" in today_df.columns else []
+            chip_data_available = False
+            chips_data_source = "技術備援"
 else:
     st.toast("籌碼連線失敗；啟用技術面備援，S/A/B 仍可掃描但法人欄位暫缺。", icon="⚠️")
     today_df = _build_technical_fallback_chips(max_rows=350)
