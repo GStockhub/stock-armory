@@ -243,80 +243,31 @@ def build_rescue_residual_map(aar_df, current_codes):
     return rescue
 
 
-def _grade_counts(df):
-    if df is None or getattr(df, "empty", True) or "評級" not in df.columns:
-        return {"S": 0, "A": 0, "B": 0}
-    g = df["評級"].astype(str).str.replace("級", "", regex=False)
-    return {"S": int((g == "S").sum()), "A": int((g == "A").sum()), "B": int((g == "B").sum())}
-
-
-def render_battle_summary(master_list, rank_sorted, auto_save_msg=""):
-    """96分版：每天第一眼只回答四件事：能不能打、打哪裡、哪些禁碰、訊號最近準不準。"""
-    master_list = master_list if isinstance(master_list, pd.DataFrame) else pd.DataFrame()
-    rank_sorted = rank_sorted if isinstance(rank_sorted, pd.DataFrame) else pd.DataFrame()
-    attack_df = master_list[master_list["評級"].isin(["S", "A"])] if not master_list.empty and "評級" in master_list.columns else pd.DataFrame()
-    b_df = master_list[master_list["評級"].eq("B")] if not master_list.empty and "評級" in master_list.columns else pd.DataFrame()
-    counts = _grade_counts(master_list)
+def render_battle_summary(master_list, rank_sorted):
+    attack_df = master_list[master_list["評級"].isin(["S", "A"])] if not master_list.empty else pd.DataFrame()
+    b_df = master_list[master_list["評級"].eq("B")] if not master_list.empty else pd.DataFrame()
     top_names = "、".join((attack_df["名稱"].astype(str) + "(" + attack_df["代號"].astype(str) + ")").head(3).tolist()) if not attack_df.empty else "今日無主攻標的"
-
     caution_cnt = 0
-    low_liq_cnt = 0
-    fake_vol_cnt = 0
     if rank_sorted is not None and not rank_sorted.empty:
-        caution_cnt = int(((rank_sorted.get("RSI", 50) > 75) | (rank_sorted.get("乖離(%)", 0) > 8) | (rank_sorted.get("生命週期", "").astype(str).str.contains("第三段|末升|爆量出貨", na=False))).sum())
-        if "短線可交易" in rank_sorted.columns:
-            low_liq_cnt = int((~rank_sorted["短線可交易"].fillna(True).astype(bool)).sum())
-        if "假放量警告" in rank_sorted.columns:
-            fake_vol_cnt = int(rank_sorted["假放量警告"].fillna(False).astype(bool).sum())
-
-    if MACRO_SCORE > 6 and not OVERHEAT_FLAG and len(attack_df) > 0:
-        command_title = "🟢 可打，但只打精準球"
-        command_body = f"S/A 共 {len(attack_df)} 檔；先沙盤，再看 1:00 後是否守開盤價與 M5。"
-        command_color = COLORS["green"]
-    elif MACRO_SCORE > 5 and len(attack_df) > 0:
-        command_title = "🟡 可小打，禁追高"
-        command_body = f"S/A 共 {len(attack_df)} 檔；B 級只等回踩，不做早盤追價。"
-        command_color = COLORS["accent"]
-    else:
-        command_title = "🔴 防守優先"
-        command_body = "主攻條件不足或大盤安全墊不夠；今天以持股處理、沙盤觀察為主。"
-        command_color = COLORS["red"]
-
-    try:
-        sig = signal_tracker.build_quality_digest()
-    except Exception:
-        sig = {"title": "命中率：暫無", "body": "訊號追蹤摘要暫時無法讀取。", "tone": "neutral", "best": "-", "verified": "0"}
-    sig_color = COLORS["green"] if sig.get("tone") == "good" else (COLORS["red"] if sig.get("tone") == "caution" else COLORS["accent"])
-
-    ban_bits = []
-    if low_liq_cnt:
-        ban_bits.append(f"低量/成交金額不足 {low_liq_cnt} 檔已擋")
-    if fake_vol_cnt:
-        ban_bits.append(f"假放量 {fake_vol_cnt} 檔不加分")
-    if caution_cnt:
-        ban_bits.append(f"過熱/第三段 {caution_cnt} 檔禁追")
-    if OVERHEAT_FLAG:
-        ban_bits.append("大盤過熱，新倉縮量")
-    ban_text = "｜".join(ban_bits) if ban_bits else "低量、假放量、過熱追高目前未成主要干擾。"
-
-    st.markdown("#### 🧭 今日作戰結論")
+        caution_cnt = int(((rank_sorted.get("RSI", 50) > 75) | (rank_sorted.get("乖離(%)", 0) > 8) | (rank_sorted.get("生命週期", "").astype(str).str.contains("第三段", na=False))).sum())
+    market_msg = "可小量作戰" if MACRO_SCORE > 5 and not OVERHEAT_FLAG else "防守優先、降低倉位"
+    st.markdown("#### 🧭 今日作戰摘要")
+    c1, c2, c3, c4 = st.columns(4)
     cards = [
-        (command_title, command_body, command_color),
-        (f"🎯 個股游擊｜S {counts['S']} / A {counts['A']} / B {counts['B']}", top_names, COLORS["primary"]),
-        ("⛔ 今日禁令", ban_text, COLORS["red"] if ban_bits else COLORS["green"]),
-        (f"🧪 {sig.get('title','命中率')}", sig.get("body", ""), sig_color),
+        (MODE_PROFILE["label"], MODE_PROFILE["note"], COLORS["primary"]),
+        (f"可出手 {len(attack_df)} 檔", top_names, COLORS["green"] if len(attack_df) else COLORS["accent"]),
+        (f"B級備選 {len(b_df)} 檔", "只回踩低接，不追高", COLORS["accent"]),
+        (f"禁追/警戒 {caution_cnt} 檔", market_msg, COLORS["red"] if caution_cnt else COLORS["green"]),
     ]
-    cols = st.columns(4)
-    for col, (title, sub, color) in zip(cols, cards):
+    for col, (title, sub, color) in zip([c1, c2, c3, c4], cards):
         with col:
             st.markdown(f"""
-            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:10px; padding:12px 14px; min-height:108px;">
-                <div style="font-size:15.5px; font-weight:900; color:{COLORS['text']}; margin-bottom:6px; line-height:1.35;">{html.escape(str(title))}</div>
-                <div style="font-size:12.5px; line-height:1.5; color:{COLORS['subtext']};">{html.escape(str(sub))}</div>
+            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:10px; padding:12px 14px; min-height:86px;">
+                <div style="font-size:16px; font-weight:800; color:{COLORS['text']}; margin-bottom:6px;">{title}</div>
+                <div style="font-size:12.5px; line-height:1.35; color:{COLORS['subtext']};">{sub}</div>
             </div>
             """, unsafe_allow_html=True)
-    if auto_save_msg:
-        st.caption(f"📌 {auto_save_msg}")
+
 
 def _macro_to_float(val):
     try:
@@ -1107,15 +1058,6 @@ with t_rank:
                 special_watch = pd.DataFrame()
             st.session_state["eod_special_watch"] = special_watch.copy() if isinstance(special_watch, pd.DataFrame) else pd.DataFrame()
 
-            auto_snapshot_msg = ""
-            try:
-                auto_snapshot_msg = signal_tracker.auto_capture_today_snapshot(
-                    TWSE_IND_MAP, FM_TOKEN, MACRO_SCORE, OVERHEAT_FLAG, operation_mode
-                )
-            except Exception as _auto_e:
-                auto_snapshot_msg = f"訊號快照自動保存略過：{_auto_e}"
-            render_battle_summary(master_list, rank_sorted, auto_snapshot_msg)
-
             if master_list.empty:
                 st.warning("今日沒有通過 S/A/B 條件的標的。這通常不是壞掉，而是分數、基本達標、停損線、乖離或資料源限流造成清單被過濾。")
                 diag_cols = ["代號", "名稱", "Quant_Score", "基本達標", "流動性分級", "20日均量(張)", "20日均成交金額", "假放量警告", "現價", "停損價", "生命週期", "戰術型態", "決策標籤"]
@@ -1740,6 +1682,7 @@ with t_cmd:
             table_style=table_style,
             fm_token=FM_TOKEN,
             twse_ind_map=TWSE_IND_MAP,
+            twse_name_map=TWSE_NAME_MAP,
             macro_score=MACRO_SCORE,
             overheat_flag=OVERHEAT_FLAG,
             operation_mode=operation_mode,

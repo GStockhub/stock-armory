@@ -4,7 +4,8 @@ V37 訊號追蹤室
 ---------------
 目的：
 - 取代原本較少使用的回測室。
-- 每日保存系統實際產出的 S/A/B、特殊關注、產業輪動、主動 ETF 前五訊號。
+- 第一階段只保存系統實際產出的 S/A/B 候選，不再混入產業輪動、主動 ETF 或手動觀察。
+- 保存當下自動補一份沙盤體檢結果，檢查「原始訊號 + 沙盤通過」的命中率。
 - 後續用隔日 / 3 日 / 5 日結果檢查最近訊號品質。
 - 採「滾動保存」：明細預設只留 180 天，避免 CSV 與 GitHub 變肥。
 """
@@ -22,15 +23,18 @@ import requests
 import streamlit as st
 
 from data_center import safe_download
-from etf_engine import run_etf_momentum_radar
-import rotation_radar
+from quant_engine import run_sandbox_sim
 
 
 SIGNAL_COLUMNS = [
     "日期", "類型", "代號", "名稱", "評級", "分數", "產業", "狀態", "來源摘要",
-    "基準價", "樣本代號", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%",
+    "基準價",
+    "沙盤狀態", "沙盤等級", "沙盤建議", "沙盤現價", "沙盤M5", "沙盤M10", "沙盤乖離", "沙盤勝率", "沙盤停損價", "沙盤檢查時間",
+    "樣本代號", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%",
     "是否達標", "是否失敗", "更新時間",
 ]
+
+TRACKED_SIGNAL_TYPES = ["S級", "A級", "B級"]
 
 DEFAULT_SIGNAL_PATH = "data/signal_history.csv"
 LOCAL_SIGNAL_PATH = "signal_history.csv"
@@ -77,9 +81,9 @@ def normalize_signal_history(df: pd.DataFrame, keep_days: int = 180) -> pd.DataF
     if keep_days:
         cutoff = (datetime.now() - timedelta(days=int(keep_days))).strftime("%Y-%m-%d")
         out = out[out["日期"] >= cutoff].copy()
-    for c in ["分數", "基準價", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%"]:
+    for c in ["分數", "基準價", "沙盤現價", "沙盤M5", "沙盤M10", "沙盤乖離", "沙盤勝率", "沙盤停損價", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%"]:
         out[c] = pd.to_numeric(out[c], errors="coerce")
-    for c in ["類型", "代號", "名稱", "評級", "產業", "狀態", "來源摘要", "樣本代號", "是否達標", "是否失敗", "更新時間"]:
+    for c in ["類型", "代號", "名稱", "評級", "產業", "狀態", "來源摘要", "沙盤狀態", "沙盤等級", "沙盤建議", "沙盤檢查時間", "樣本代號", "是否達標", "是否失敗", "更新時間"]:
         out[c] = out[c].astype(str).replace("nan", "")
     out["代號"] = out["代號"].map(_clean_code)
     out = out.drop_duplicates(subset=["日期", "類型", "代號", "名稱"], keep="last")
@@ -229,94 +233,85 @@ def _rows_from_signal_df(df: pd.DataFrame, signal_type: str, limit: int) -> List
     return rows
 
 
-def _current_signal_rows(twse_ind_map: Dict[str, str], fm_token: str, macro_score, overheat_flag, operation_mode) -> pd.DataFrame:
+def _sandbox_assessment(res: Optional[dict]) -> Dict[str, object]:
+    """把沙盤結果壓成可追蹤欄位。這不是交易紀錄，只是系統候選的第二道體檢。"""
+    if not res:
+        return {
+            "沙盤狀態": "未取得",
+            "沙盤等級": "資料不足",
+            "沙盤建議": "沙盤資料不足，暫不納入通過樣本。",
+            "沙盤現價": np.nan,
+            "沙盤M5": np.nan,
+            "沙盤M10": np.nan,
+            "沙盤乖離": np.nan,
+            "沙盤勝率": np.nan,
+            "沙盤停損價": np.nan,
+            "沙盤檢查時間": _now_str(),
+        }
+    p_now = _to_float(res.get("現價", np.nan), np.nan)
+    m5 = _to_float(res.get("M5", np.nan), np.nan)
+    m10 = _to_float(res.get("M10", np.nan), np.nan)
+    bias = _to_float(res.get("乖離", np.nan), np.nan)
+    win_rate = _to_float(res.get("勝率", np.nan), np.nan)
+    stop_price = _to_float(res.get("停損價", np.nan), np.nan)
+
+    if pd.isna(p_now) or pd.isna(m5) or pd.isna(m10):
+        status, level, advice = "未取得", "資料不足", "沙盤資料不足，暫不納入通過樣本。"
+    elif p_now < m10:
+        status, level, advice = "不通過", "跌破M10", "短線結構轉弱；系統候選先觀察，不列入沙盤通過。"
+    elif p_now < m5:
+        status, level, advice = "觀察", "等站回M5", "未站回 M5，等 13:00 後或隔日站回再看。"
+    elif pd.notna(bias) and bias > 7:
+        status, level, advice = "觀察", "乖離偏高", "結構偏強但追高風險高；等回踩 M5 或隔日不跳空。"
+    elif pd.notna(win_rate) and win_rate >= 50:
+        status, level, advice = "通過", "結構合格", "S/A/B 候選通過沙盤第二道體檢，可納入後續命中率追蹤。"
+    else:
+        status, level, advice = "觀察", "勝率普通", "站上均線但歷史勝率普通；可追蹤，不視為高把握通過。"
+
+    return {
+        "沙盤狀態": status,
+        "沙盤等級": level,
+        "沙盤建議": advice,
+        "沙盤現價": p_now,
+        "沙盤M5": m5,
+        "沙盤M10": m10,
+        "沙盤乖離": bias,
+        "沙盤勝率": win_rate,
+        "沙盤停損價": stop_price,
+        "沙盤檢查時間": _now_str(),
+    }
+
+
+def _attach_sandbox_to_rows(rows: List[Dict], twse_name_map: Optional[Dict[str, str]], fm_token: str) -> List[Dict]:
+    twse_name_map = twse_name_map or {}
+    enriched = []
+    for row in rows:
+        code = _clean_code(row.get("代號", ""))
+        res = None
+        if code:
+            try:
+                res = run_sandbox_sim(code, twse_name_map, fm_token)
+            except Exception:
+                res = None
+        row.update(_sandbox_assessment(res))
+        enriched.append(row)
+    return enriched
+
+
+def _current_signal_rows(twse_ind_map: Dict[str, str], twse_name_map: Optional[Dict[str, str]], fm_token: str, macro_score, overheat_flag, operation_mode) -> pd.DataFrame:
     rows = []
 
+    # 第一階段只追蹤系統自動產出的 S/A/B 候選。
+    # 不再把產業輪動、主動 ETF、特殊關注、手動觀察混進同一張命中率表，避免樣本污染。
     master = st.session_state.get("eod_master_list", pd.DataFrame())
-    if isinstance(master, pd.DataFrame) and not master.empty:
+    if isinstance(master, pd.DataFrame) and not master.empty and "評級" in master.columns:
         for grade in ["S", "A", "B"]:
-            part = master[master.get("評級", "").astype(str).str.replace("級", "", regex=False).eq(grade)].copy() if "評級" in master.columns else pd.DataFrame()
+            part = master[master["評級"].astype(str).str.replace("級", "", regex=False).eq(grade)].copy()
             rows.extend(_rows_from_signal_df(part, f"{grade}級", 10))
-    else:
-        # V37.1：若主清單剛好為空，仍從 rank_sorted 補一份保守 B 級觀察紀錄，
-        # 避免當日完全沒有訊號可追蹤。
-        ranked = st.session_state.get("eod_rank_sorted", pd.DataFrame())
-        if isinstance(ranked, pd.DataFrame) and not ranked.empty and "代號" in ranked.columns:
-            fallback = ranked.head(10).copy()
-            fallback["評級"] = "B"
-            rows.extend(_rows_from_signal_df(fallback, "B級", 10))
 
-    special = st.session_state.get("eod_special_watch", pd.DataFrame())
-    if isinstance(special, pd.DataFrame) and not special.empty:
-        rows.extend(_rows_from_signal_df(special, "特殊關注", 5))
-
-    # 產業輪動：融合第一/第二/第四優先。只保存主戰場、升溫、退潮，並帶樣本代碼方便後續驗證。
-    frames = []
-    for key in ["eod_master_list", "eod_special_watch", "eod_rank_sorted"]:
-        df = st.session_state.get(key)
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            frames.append(df.copy())
-    if frames:
-        pool = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["代號"], keep="first")
-        if "產業" not in pool.columns:
-            pool["產業"] = pool["代號"].astype(str).map(lambda x: twse_ind_map.get(str(x), "未分類"))
-        rot = rotation_radar.build_industry_rotation_table(pool, None)
-        if isinstance(rot, pd.DataFrame) and not rot.empty:
-            keep = rot[rot["輪動狀態"].isin(["🔥 主戰場", "🟠 資金升溫", "⚠️ 退潮警戒"])].head(8)
-            for _, r in keep.iterrows():
-                ind = str(r.get("產業", ""))
-                members = pool[pool["產業"].astype(str).eq(ind)]["代號"].astype(str).map(_clean_code).dropna().head(10).tolist()
-                rows.append({
-                    "日期": _today_str(),
-                    "類型": "產業輪動",
-                    "代號": f"IND_{ind}",
-                    "名稱": ind,
-                    "評級": str(r.get("輪動狀態", "")),
-                    "分數": _to_float(r.get("今日熱度", np.nan), np.nan),
-                    "產業": ind,
-                    "狀態": str(r.get("輪動狀態", "")),
-                    "來源摘要": f"可信度 {r.get('可信度','')}｜樣本 {r.get('樣本數','')}｜{r.get('操作建議','')}",
-                    "基準價": np.nan,
-                    "樣本代號": ",".join(members),
-                    "隔日漲跌%": np.nan,
-                    "3日最高漲幅%": np.nan,
-                    "5日最高漲幅%": np.nan,
-                    "是否達標": "",
-                    "是否失敗": "",
-                    "更新時間": _now_str(),
-                })
-
-    # 主動 ETF 前五：不管有沒有進綜合 Top 10 都保存。
-    try:
-        radar = run_etf_momentum_radar(fm_token)
-        if isinstance(radar, pd.DataFrame) and not radar.empty and "類型" in radar.columns:
-            active = radar[radar["類型"].eq("主動ETF")].head(5).copy()
-            for _, r in active.iterrows():
-                rows.append({
-                    "日期": _today_str(),
-                    "類型": "主動ETF",
-                    "代號": _clean_code(r.get("代號", "")),
-                    "名稱": str(r.get("名稱", "")),
-                    "評級": str(r.get("狀態", "")),
-                    "分數": _to_float(r.get("動能分數", np.nan), np.nan),
-                    "產業": "ETF",
-                    "狀態": str(r.get("狀態", "")),
-                    "來源摘要": str(r.get("下一步", ""))[:120],
-                    "基準價": _to_float(r.get("現價", np.nan), np.nan),
-                    "樣本代號": "",
-                    "隔日漲跌%": np.nan,
-                    "3日最高漲幅%": np.nan,
-                    "5日最高漲幅%": np.nan,
-                    "是否達標": "",
-                    "是否失敗": "",
-                    "更新時間": _now_str(),
-                })
-    except Exception:
-        pass
-
+    rows = _attach_sandbox_to_rows(rows, twse_name_map, fm_token)
     out = pd.DataFrame(rows)
     return normalize_signal_history(out, keep_days=9999)
-
 
 def _calc_returns_for_code(code: str, base_date: str, base_price: float, fm_token: str) -> Tuple[float, float, float]:
     code = _clean_code(code)
@@ -387,10 +382,7 @@ def update_signal_outcomes(history: pd.DataFrame, fm_token: str) -> pd.DataFrame
         base_date = str(r.get("日期", ""))
         if not base_date:
             continue
-        if str(r.get("類型", "")) == "產業輪動":
-            d1, h3, h5 = _calc_returns_for_industry(r.get("樣本代號", ""), base_date, fm_token)
-        else:
-            d1, h3, h5 = _calc_returns_for_code(r.get("代號", ""), base_date, r.get("基準價", np.nan), fm_token)
+        d1, h3, h5 = _calc_returns_for_code(r.get("代號", ""), base_date, r.get("基準價", np.nan), fm_token)
         if pd.notna(d1):
             out.at[idx, "隔日漲跌%"] = d1
         if pd.notna(h3):
@@ -405,8 +397,8 @@ def update_signal_outcomes(history: pd.DataFrame, fm_token: str) -> pd.DataFrame
     return normalize_signal_history(out)
 
 
-def append_today_snapshot(history: pd.DataFrame, twse_ind_map: Dict[str, str], fm_token: str, macro_score, overheat_flag, operation_mode) -> pd.DataFrame:
-    today = _current_signal_rows(twse_ind_map, fm_token, macro_score, overheat_flag, operation_mode)
+def append_today_snapshot(history: pd.DataFrame, twse_ind_map: Dict[str, str], twse_name_map: Optional[Dict[str, str]], fm_token: str, macro_score, overheat_flag, operation_mode) -> pd.DataFrame:
+    today = _current_signal_rows(twse_ind_map, twse_name_map, fm_token, macro_score, overheat_flag, operation_mode)
     if today.empty:
         return normalize_signal_history(history)
     old = normalize_signal_history(history)
@@ -418,7 +410,7 @@ def _summary_stats(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
     work = df.copy()
-    work = work[work["類型"].isin(["S級", "A級", "B級", "特殊關注", "產業輪動", "主動ETF"])].copy()
+    work = work[work["類型"].isin(TRACKED_SIGNAL_TYPES)].copy()
     if work.empty:
         return pd.DataFrame()
     rows = []
@@ -438,127 +430,9 @@ def _summary_stats(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("類型")
 
 
-
-
-def _verified_rows(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame()
-    out = df.copy()
-    return out[pd.notna(out["隔日漲跌%"] ) | pd.notna(out["3日最高漲幅%"] ) | pd.notna(out["5日最高漲幅%"] )].copy()
-
-
-def _recent_window_stats(df: pd.DataFrame, windows=(5, 10, 20)) -> pd.DataFrame:
-    """最近 N 筆已驗證訊號的真實命中率摘要，避免只看長期平均誤判。"""
-    ver = _verified_rows(df)
-    if ver.empty:
-        return pd.DataFrame()
-    ver = ver.sort_values(["日期", "更新時間"], ascending=[False, False])
-    rows = []
-    for n in windows:
-        g = ver.head(int(n)).copy()
-        if g.empty:
-            continue
-        hit = (g["是否達標"].astype(str).str.upper().eq("Y")).mean() * 100
-        fail = (g["是否失敗"].astype(str).str.upper().eq("Y")).mean() * 100
-        h5 = pd.to_numeric(g["5日最高漲幅%"], errors="coerce")
-        d1 = pd.to_numeric(g["隔日漲跌%"], errors="coerce")
-        rows.append({
-            "視窗": f"最近{len(g)}筆",
-            "達標率%": round(hit, 1),
-            "失敗率%": round(fail, 1),
-            "隔日勝率%": round((d1 > 0).mean() * 100, 1),
-            "平均5日高點%": round(h5.mean(), 2),
-        })
-    return pd.DataFrame(rows)
-
-
-def _type_power_rank(df: pd.DataFrame, min_samples: int = 5) -> pd.DataFrame:
-    ver = _verified_rows(df)
-    if ver.empty:
-        return pd.DataFrame()
-    rows = []
-    for typ, g in ver.groupby("類型"):
-        if len(g) < min_samples:
-            continue
-        hit = (g["是否達標"].astype(str).str.upper().eq("Y")).mean() * 100
-        fail = (g["是否失敗"].astype(str).str.upper().eq("Y")).mean() * 100
-        h5 = pd.to_numeric(g["5日最高漲幅%"], errors="coerce")
-        score = hit + max(0, float(h5.mean() or 0)) * 5 - fail * 0.6
-        rows.append({
-            "訊號類型": typ,
-            "樣本數": int(len(g)),
-            "達標率%": round(hit, 1),
-            "失敗率%": round(fail, 1),
-            "平均5日高點%": round(h5.mean(), 2),
-            "目前權重建議": "升權" if len(g) >= 10 and hit >= 55 and fail <= 25 else ("保留" if hit >= 40 else "降權觀察"),
-            "_score": round(score, 2),
-        })
-    if not rows:
-        return pd.DataFrame()
-    return pd.DataFrame(rows).sort_values(["_score", "樣本數"], ascending=[False, False]).drop(columns=["_score"])
-
-
-def render_signal_quality_brief(history: pd.DataFrame, COLORS: Dict[str, str], table_style: Dict[str, str]) -> None:
-    """96分版：用真實樣本告訴使用者哪些訊號該升權/保守。"""
-    if history is None or history.empty:
-        return
-    recent = normalize_signal_history(history, keep_days=60).head(300)
-    verified = _verified_rows(recent)
-    if verified.empty:
-        st.info("🧪 訊號追蹤：已有紀錄，但尚未回填足夠績效；暫不調整任何訊號權重。")
-        return
-
-    total = len(recent)
-    vcnt = len(verified)
-    hit_rate = (verified["是否達標"].astype(str).str.upper().eq("Y")).mean() * 100
-    fail_rate = (verified["是否失敗"].astype(str).str.upper().eq("Y")).mean() * 100
-    rank = _type_power_rank(recent, min_samples=5)
-    top = "樣本不足，暫不升權"
-    if not rank.empty:
-        top_row = rank.iloc[0]
-        top = f"{top_row['訊號類型']}｜{top_row['目前權重建議']}｜達標 {top_row['達標率%']:.1f}%"
-
-    st.markdown("#### 🧭 訊號追蹤結論")
-    c1, c2, c3, c4 = st.columns(4)
-    cards = [
-        ("追蹤筆數", f"{total}", COLORS.get("primary", "#A67C52")),
-        ("已驗證樣本", f"{vcnt}", COLORS.get("green", "#3D8D5A")),
-        ("整體達標率", f"{hit_rate:.1f}%", COLORS.get("green", "#3D8D5A") if hit_rate >= 45 else COLORS.get("accent", "#C47A3A")),
-        ("目前最有效", top, COLORS.get("primary", "#A67C52")),
-    ]
-    for col, (title, value, color) in zip([c1, c2, c3, c4], cards):
-        with col:
-            st.markdown(f"""
-            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']}; border-left:5px solid {color}; border-radius:10px; padding:10px 12px; min-height:78px;">
-                <div style="font-size:12.5px; color:{COLORS['subtext']};">{title}</div>
-                <div style="font-size:16px; font-weight:900; color:{COLORS['text']}; line-height:1.35;">{value}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    note = "樣本已可初步參考，但仍以最近 20 筆與分型樣本數一起看。" if vcnt >= 30 else "樣本仍偏少，暫時只當方向參考，不自動放大部位。"
-    st.caption(f"{note}｜整體失敗率 {fail_rate:.1f}%")
-
-    win = _recent_window_stats(recent)
-    if not win.empty:
-        with st.expander("📏 最近 5 / 10 / 20 筆樣本", expanded=False):
-            st.dataframe(
-                win.style.format({"達標率%": "{:.1f}%", "失敗率%": "{:.1f}%", "隔日勝率%": "{:.1f}%", "平均5日高點%": "{:.2f}%"}).set_properties(**table_style),
-                use_container_width=True,
-                hide_index=True,
-                height=145,
-            )
-    if not rank.empty:
-        with st.expander("🏷️ 訊號類型升降權建議", expanded=False):
-            st.dataframe(
-                rank.style.format({"達標率%": "{:.1f}%", "失敗率%": "{:.1f}%", "平均5日高點%": "{:.2f}%"}).set_properties(**table_style),
-                use_container_width=True,
-                hide_index=True,
-                height=min(260, 45 + 36 * len(rank)),
-            )
-
-def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro_score, overheat_flag, operation_mode):
-    st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室 V37</span>", unsafe_allow_html=True)
-    st.caption("取代原回測室：每天保存 S/A/B、特殊關注、產業輪動、主動 ETF 前五，之後檢查隔日 / 3 日 / 5 日命中率。")
+def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, twse_name_map=None, macro_score=None, overheat_flag=False, operation_mode="標準模式"):
+    st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室 V37.2</span>", unsafe_allow_html=True)
+    st.caption("第一階段：只追蹤系統自動產生的 S/A/B 候選，保存時自動補沙盤體檢；不混入產業輪動、ETF、特殊關注或手動觀察。")
 
     history, msg = load_signal_history()
     c1, c2, c3 = st.columns([1, 1, 2])
@@ -570,7 +444,7 @@ def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro
         st.caption(msg)
 
     if save_btn:
-        history = append_today_snapshot(history, twse_ind_map, fm_token, macro_score, overheat_flag, operation_mode)
+        history = append_today_snapshot(history, twse_ind_map, twse_name_map, fm_token, macro_score, overheat_flag, operation_mode)
         save_msg = save_signal_history(history)
         st.success(f"今日快照已保存。{save_msg}")
 
@@ -585,9 +459,11 @@ def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro
         st.info("尚無訊號紀錄。請先在個股游擊完成掃描，再按「保存今日作戰快照」。")
         return
 
-    render_signal_quality_brief(history, COLORS, table_style)
-
-    recent = history.head(300).copy()
+    recent_all = history[history["類型"].isin(TRACKED_SIGNAL_TYPES)].copy()
+    recent = recent_all.head(300).copy()
+    if recent.empty:
+        st.info("目前紀錄裡沒有 S/A/B 候選樣本。請先在個股游擊完成掃描，再按「保存今日作戰快照」。")
+        return
     stats = _summary_stats(recent)
     if not stats.empty:
         m1, m2, m3, m4 = st.columns(4)
@@ -601,7 +477,7 @@ def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro
             ("紀錄筆數", f"{total}", COLORS["primary"]),
             ("已驗證", f"{verified}", COLORS["green"] if verified else COLORS["accent"]),
             ("目前最佳", best_type, COLORS["green"]),
-            ("保存規則", "明細滾動 180 天", COLORS["accent"]),
+            ("保存規則", "只存 S/A/B + 沙盤", COLORS["accent"]),
         ]
         for col, (title, value, color) in zip([m1, m2, m3, m4], cards):
             with col:
@@ -626,12 +502,17 @@ def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro
         )
 
     st.markdown("#### 📜 訊號明細")
-    show_cols = ["日期", "類型", "代號", "名稱", "評級", "分數", "產業", "狀態", "基準價", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%", "是否達標", "是否失敗", "來源摘要"]
+    show_cols = ["日期", "類型", "代號", "名稱", "評級", "分數", "產業", "狀態", "基準價", "沙盤狀態", "沙盤等級", "沙盤現價", "沙盤M5", "沙盤M10", "沙盤乖離", "沙盤勝率", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%", "是否達標", "是否失敗", "來源摘要"]
     view = recent[[c for c in show_cols if c in recent.columns]].copy()
     st.dataframe(
         view.style.format({
             "分數": "{:.1f}",
             "基準價": "{:.2f}",
+            "沙盤現價": "{:.2f}",
+            "沙盤M5": "{:.2f}",
+            "沙盤M10": "{:.2f}",
+            "沙盤乖離": "{:+.1f}%",
+            "沙盤勝率": "{:.0f}%",
             "隔日漲跌%": "{:+.2f}%",
             "3日最高漲幅%": "{:+.2f}%",
             "5日最高漲幅%": "{:+.2f}%",
@@ -643,7 +524,8 @@ def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, macro
 
     with st.expander("🧾 CSV 保存設計", expanded=False):
         st.markdown("""
-        * 只存入選訊號，不存全市場，避免 CSV 變肥。
+        * 第一階段只存 S/A/B 候選，不存產業輪動、ETF、特殊關注或手動觀察，避免樣本污染。
+        * 保存時會自動補沙盤體檢欄位，用來比較「原始 S/A/B」與「S/A/B + 沙盤通過」。
         * `signal_history.csv` 預設只保留最近 180 天。
         * 若設定 `github_token` / `github_repo`，會同步到 `data/signal_history.csv`。
         * 可用 `github_signal_history_path` 自訂路徑。
