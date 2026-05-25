@@ -441,6 +441,54 @@ aar_read_ok = False
 aar_probe_df = pd.DataFrame()
 rescue_residual_map = {}
 
+
+def _clean_stock_code(x):
+    """把候選股代號標準化；排除 NaN、0、空字串、ETF。
+
+    這層是為了避免法人快取或 CSV 欄位被 pandas 轉成 NaN/0，
+    造成 S/A/B 掃描拿 NaN、0 去抓 K 線，整批顯示無技術資料。
+    """
+    try:
+        if pd.isna(x):
+            return ""
+    except Exception:
+        pass
+    s = str(x).strip().upper()
+    if not s or s in {"NAN", "NONE", "NULL", "0", "0.0", "-"}:
+        return ""
+    s = s.replace(".TW", "").replace(".TWO", "")
+    if s.endswith(".0"):
+        s = s[:-2]
+    # 有些來源會把代號存成 2330 台積電，先取第一段。
+    s = s.split()[0].strip()
+    if s.isdigit() and len(s) == 4 and not s.startswith("00"):
+        return s
+    return ""
+
+
+def _valid_stock_codes(values):
+    out = []
+    seen = set()
+    for v in values or []:
+        c = _clean_stock_code(v)
+        if c and c not in seen:
+            out.append(c)
+            seen.add(c)
+    return out
+
+
+def _sanitize_today_df(df):
+    """清掉非法代號；若資料源壞掉只剩 NaN/0，讓外層改走技術備援池。"""
+    if not isinstance(df, pd.DataFrame) or df.empty or "代號" not in df.columns:
+        return pd.DataFrame()
+    x = df.copy()
+    x["代號"] = x["代號"].apply(_clean_stock_code)
+    x = x[x["代號"].astype(str).str.len().eq(4)].copy()
+    if x.empty:
+        return pd.DataFrame()
+    x = x.drop_duplicates(subset=["代號"], keep="first")
+    return x
+
 def _build_technical_fallback_chips(max_rows=350):
     """V37.2：法人籌碼 / 快取異常時，建立技術面候選池，避免個股游擊與情報局整區空白。"""
     fallback_rows = []
@@ -471,7 +519,11 @@ def _ensure_today_candidates(reason=""):
     """V37.3：在頁籤渲染前再次保底，避免 today_df 在初始化後仍為空。"""
     global today_df, top_80_chips, dates, chip_data_available, chips_data_source
     if isinstance(today_df, pd.DataFrame) and not today_df.empty and "代號" in today_df.columns:
-        return
+        cleaned = _sanitize_today_df(today_df)
+        if not cleaned.empty and len(cleaned) >= 20:
+            today_df = cleaned
+            top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist())
+            return
     today_df = _build_technical_fallback_chips(max_rows=350)
     dates = ["TECH"]
     top_80_chips = today_df["代號"].astype(str).head(120).tolist() if not today_df.empty else []
@@ -503,7 +555,7 @@ def _debug_data_chain_box(extra=None):
 
 def _run_level2_rescue(calc_list, label="主掃描"):
     """S/A/B 技術掃描自癒：保留診斷、清快取、縮小候選池重試。"""
-    calc_list = tuple(str(x).strip() for x in calc_list if str(x).strip() and not str(x).startswith("00"))
+    calc_list = tuple(_valid_stock_codes(calc_list))
     st.session_state["sab_scan_diag"] = []
     if not calc_list:
         return pd.DataFrame(), "calc_list 空"
@@ -554,10 +606,14 @@ chips_data_source = st.session_state.get("chips_data_source", "即時")
 
 if chip_data_available:
     dates = sorted(list(chip_db.keys()), reverse=True)
-    today_df = chip_db[dates[0]].copy()
+    today_df = _sanitize_today_df(chip_db[dates[0]].copy())
 
     for i, d in enumerate(dates):
-        today_df = pd.merge(today_df, chip_db[d][["代號", "投信(張)"]].rename(columns={"投信(張)": f"D{i}"}), on="代號", how="left").fillna(0)
+        day_df = _sanitize_today_df(chip_db[d])
+        if day_df.empty or "投信(張)" not in day_df.columns:
+            today_df[f"D{i}"] = 0
+        else:
+            today_df = pd.merge(today_df, day_df[["代號", "投信(張)"]].rename(columns={"投信(張)": f"D{i}"}), on="代號", how="left").fillna(0)
 
     def get_streak(r):
         s = 0
@@ -576,21 +632,21 @@ if chip_data_available:
     today_df["連買"] = today_df.apply(get_streak, axis=1)
     today_df["投信連賣"] = today_df.apply(get_sell_streak, axis=1)
     today_df["法人狀態"] = today_df.apply(get_institution_state, axis=1)
-    top_80_chips = today_df.sort_values("投信(張)", ascending=False).head(80)["代號"].tolist()
+    top_80_chips = _valid_stock_codes(today_df.sort_values("投信(張)", ascending=False).head(80)["代號"].tolist() if "投信(張)" in today_df.columns else today_df["代號"].head(80).tolist())
 
-    # V37.2：防止 chip_db 有 key 但最新 DataFrame 為空，導致 S/A/B 與情報局整區無資料。
-    if today_df.empty or "代號" not in today_df.columns:
+    # V37.2：防止 chip_db 有 key 但最新 DataFrame 為空 / 只剩 NaN、0，導致 S/A/B 與情報局整區無資料。
+    if today_df.empty or "代號" not in today_df.columns or len(top_80_chips) < 20:
         st.toast("法人籌碼快取格式異常；啟用技術面備援，避免個股游擊與情報局空白。", icon="⚠️")
         today_df = _build_technical_fallback_chips(max_rows=350)
         dates = ["TECH"]
-        top_80_chips = today_df["代號"].head(120).tolist() if not today_df.empty else []
+        top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist()) if not today_df.empty else []
         chip_data_available = False
         chips_data_source = "技術備援"
 else:
     st.toast("籌碼連線失敗；啟用技術面備援，S/A/B 仍可掃描但法人欄位暫缺。", icon="⚠️")
     today_df = _build_technical_fallback_chips(max_rows=350)
     dates = ["TECH"]
-    top_80_chips = today_df["代號"].head(120).tolist() if not today_df.empty else []
+    top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist()) if not today_df.empty else []
     chip_data_available = False
     chips_data_source = "技術備援"
 
@@ -880,10 +936,10 @@ with t_rank:
     if not today_df.empty:
         st.caption(f"大盤燈號：{MACRO_SCORE}/10，只作風險提醒，不再阻斷 S/A/B 掃描；是否進場由你自行判斷。")
         if chip_data_available:
-            calc_list = tuple(x for x in set(today_df[today_df["連買"] >= 1]["代號"].tolist() + top_80_chips) if not str(x).startswith("00"))
+            calc_list = tuple(_valid_stock_codes(today_df[today_df["連買"] >= 1]["代號"].tolist() + top_80_chips))
         else:
             st.info("⚠️ 法人籌碼暫缺，已啟用技術面備援掃描；法人狀態、連買天數僅供暫缺標示，不作籌碼判斷。")
-            calc_list = tuple(x for x in top_80_chips if not str(x).startswith("00"))
+            calc_list = tuple(_valid_stock_codes(top_80_chips))
         scan_key = f"{dates[0] if 'dates' in locals() and dates else 'nodate'}_{MACRO_SCORE}_{operation_mode}_{len(calc_list)}_{chips_data_source}"
         needs_eod_scan = force_eod_scan or st.session_state.get("eod_scan_key") != scan_key or "eod_intel_df" not in st.session_state
         if needs_eod_scan:
@@ -1454,7 +1510,7 @@ with t_chip:
     st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     _ensure_today_candidates("進入情報局時 today_df 仍為空")
     if (st.session_state.get("eod_intel_df") is None or getattr(st.session_state.get("eod_intel_df"), "empty", True)) and not today_df.empty:
-        _chip_calc = tuple(today_df["代號"].astype(str).head(80).tolist())
+        _chip_calc = tuple(_valid_stock_codes(today_df["代號"].head(80).tolist()))
         _chip_intel, _chip_msg = _run_level2_rescue(_chip_calc, "情報局技術補掃描")
         if isinstance(_chip_intel, pd.DataFrame) and not _chip_intel.empty:
             st.session_state["eod_intel_df"] = _chip_intel
