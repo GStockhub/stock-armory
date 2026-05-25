@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import concurrent.futures
-from data_center import fetch_single_stock_batch, safe_download, ACTIVE_ETF_NAME_MAP
+from data_center import fetch_single_stock_batch_diag, safe_download, ACTIVE_ETF_NAME_MAP
 
 
 def _is_etf_like(sid):
@@ -220,21 +220,41 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
     if not calc_list: return pd.DataFrame()
 
     bulk_data = {}
+    scan_diag = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_single_stock_batch, sid, fm_token): sid for sid in calc_list}
+        futures = {executor.submit(fetch_single_stock_batch_diag, sid, fm_token): sid for sid in calc_list}
         for future in concurrent.futures.as_completed(futures):
-            sid, df = future.result()
-            if df is not None and not df.empty: bulk_data[sid] = df
+            sid = futures[future]
+            try:
+                sid2, df, diag = future.result()
+                sid = sid2 or sid
+            except Exception as e:
+                df = pd.DataFrame()
+                diag = {"代號": sid, "價格狀態": "🔴 批次例外", "K線筆數": 0, "價格來源": "", "最後日期": "", "失敗原因": str(e)}
+            scan_diag.append(diag)
+            if df is not None and not df.empty:
+                bulk_data[sid] = df
 
-    if not bulk_data: return None
+    if not bulk_data:
+        empty = pd.DataFrame()
+        empty.attrs["scan_diag"] = scan_diag
+        empty.attrs["scan_summary"] = f"價格資料全失敗：{len(scan_diag)} 檔"
+        return empty
 
     intel_results = []
+    row_failures = []
     for sid in calc_list:
         try:
             df = bulk_data.get(sid)
-            if df is None or df.empty: continue
+            if df is None or df.empty:
+                row_failures.append({"代號": sid, "價格狀態": "🔴 無資料", "失敗原因": "批次未取得可用價格表"})
+                continue
             
             df = df[~df.index.duplicated(keep="last")].copy()
+            for need_col in ["Close", "Open", "High", "Low"]:
+                if need_col not in df.columns:
+                    row_failures.append({"代號": sid, "價格狀態": "🔴 欄位缺失", "失敗原因": f"缺少 {need_col}"})
+                    raise ValueError(f"missing {need_col}")
             if "Volume" not in df.columns: df["Volume"] = 0
             df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0).replace(0, np.nan).ffill().fillna(1000)
 
@@ -245,8 +265,10 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             vol_s = pd.to_numeric(df["Volume"], errors="coerce")
 
             valid_close = close_s.dropna()
-            min_need = 1 if _is_etf_like(sid) else 20
-            if close_s.isna().all() or len(valid_close) < min_need: continue
+            min_need = 1 if _is_etf_like(sid) else 10
+            if close_s.isna().all() or len(valid_close) < min_need:
+                row_failures.append({"代號": sid, "價格狀態": "🔴 K線不足", "失敗原因": f"有效 Close {len(valid_close)} 根，低於 {min_need} 根"})
+                continue
 
             p_now = float(valid_close.iloc[-1])
             prev_close = float(valid_close.iloc[-2]) if len(valid_close) >= 2 else p_now
@@ -259,7 +281,9 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             m10 = _last_roll(close_s, 10, m5)
             m20 = _last_roll(close_s, 20, m10)
             
-            if not np.isfinite(m20) or m20 == 0: continue
+            if not np.isfinite(m20) or m20 == 0:
+                row_failures.append({"代號": sid, "價格狀態": "🔴 均線無效", "失敗原因": "M20/M10 無法計算"})
+                continue
             bias = ((p_now - m20) / m20) * 100
 
             vol_now = float(vol_s.iloc[-1])
@@ -364,6 +388,23 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
                 "ATR": atr_now, "BB_Upper": bb_upper, "RSI": rsi_now, "MACD_Cross": macd_cross # 🚀 新增指標輸出
             })
         except Exception as e:
+            row_failures.append({"代號": sid, "價格狀態": "🔴 計算例外", "失敗原因": str(e)[:120]})
             continue
 
-    return pd.DataFrame(intel_results)
+    out = pd.DataFrame(intel_results)
+    # 把價格抓取診斷與列計算診斷掛在 DataFrame attrs，讓 app.py 在失敗時能顯示具體原因。
+    merged_diag = []
+    base_by_sid = {str(x.get("代號", "")): dict(x) for x in scan_diag if isinstance(x, dict)}
+    for rf in row_failures:
+        sid = str(rf.get("代號", ""))
+        d = base_by_sid.get(sid, {}).copy()
+        d.update(rf)
+        merged_diag.append(d)
+    ok_sids = set(out["代號"].astype(str).tolist()) if not out.empty and "代號" in out.columns else set()
+    for d in scan_diag:
+        sid = str(d.get("代號", ""))
+        if sid and sid not in ok_sids and not any(str(x.get("代號", "")) == sid for x in merged_diag):
+            merged_diag.append(d)
+    out.attrs["scan_diag"] = merged_diag or scan_diag
+    out.attrs["scan_summary"] = f"成功 {len(out)} 檔／候選 {len(calc_list)} 檔"
+    return out

@@ -215,6 +215,67 @@ def fetch_single_stock_batch(sid, fm_token=None, period="60d"):
     df = safe_download(sid, fm_token, period=period)
     return sid, df
 
+
+def fetch_single_stock_batch_diag(sid, fm_token=None, period="60d"):
+    """批次技術掃描專用：回傳價格資料 + 可讀診斷。
+
+    S/A/B 掃描最常見的失敗不是候選池空，而是某檔價格資料暫時抓不到、
+    新掛牌 K 棒不足，或 Yahoo/FinMind 被限流。這個函式保留原本 safe_download
+    的多來源邏輯，但額外做一次較低門檻補抓，讓前端能說清楚是哪一檔卡住。
+    """
+    sid = str(sid).strip().upper()
+    min_primary = 1 if _is_etf_like_code(sid) else 20
+    min_rescue = 1 if _is_etf_like_code(sid) else 10
+
+    diag = {
+        "代號": sid,
+        "價格狀態": "待檢查",
+        "K線筆數": 0,
+        "價格來源": "",
+        "最後日期": "",
+        "失敗原因": "",
+    }
+
+    df = None
+    try:
+        df = safe_download(sid, fm_token=fm_token, period=period, min_bars=min_primary)
+    except Exception as e:
+        diag["失敗原因"] = f"主抓取例外：{e}"
+        df = None
+
+    if df is not None and not df.empty:
+        diag.update({
+            "價格狀態": "✅ 正常",
+            "K線筆數": len(df),
+            "價格來源": str(getattr(df, "attrs", {}).get("source", "")),
+            "最後日期": str(getattr(df, "attrs", {}).get("data_date", "")),
+        })
+        return sid, df, diag
+
+    # 第二段：新掛牌或暫時少資料時，允許 10 根以上先進技術掃描，均線在 quant_engine 會降級處理。
+    try:
+        rescue = safe_download(sid, fm_token=fm_token, period=period, min_bars=min_rescue)
+    except Exception as e:
+        rescue = None
+        if not diag.get("失敗原因"):
+            diag["失敗原因"] = f"補抓例外：{e}"
+
+    if rescue is not None and not rescue.empty:
+        diag.update({
+            "價格狀態": "🟡 K線較少但可掃描",
+            "K線筆數": len(rescue),
+            "價格來源": str(getattr(rescue, "attrs", {}).get("source", "")),
+            "最後日期": str(getattr(rescue, "attrs", {}).get("data_date", "")),
+            "失敗原因": f"未滿{min_primary}根，已降級用{len(rescue)}根計算",
+        })
+        return sid, rescue, diag
+
+    diag.update({
+        "價格狀態": "🔴 無有效K線",
+        "失敗原因": diag.get("失敗原因") or "TW/TWO、FinMind、官方與快取都沒有可用 Close",
+    })
+    return sid, pd.DataFrame(), diag
+
 def _is_etf_like_code(sid):
     """台股 ETF/主動 ETF 多為 00 開頭，部分新 ETF 交易天數不足 20 根。"""
     s = str(sid).strip().upper()

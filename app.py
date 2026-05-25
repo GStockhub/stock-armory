@@ -502,31 +502,48 @@ def _debug_data_chain_box(extra=None):
 
 
 def _run_level2_rescue(calc_list, label="主掃描"):
-    """V37.3：level2 若被快取成空或批次失敗，清 cache 後用較小候選池再試一次。"""
+    """S/A/B 技術掃描自癒：保留診斷、清快取、縮小候選池重試。"""
     calc_list = tuple(str(x).strip() for x in calc_list if str(x).strip() and not str(x).startswith("00"))
+    st.session_state["sab_scan_diag"] = []
     if not calc_list:
         return pd.DataFrame(), "calc_list 空"
+
+    def _keep_diag(df):
+        try:
+            diag = getattr(df, "attrs", {}).get("scan_diag", []) if isinstance(df, pd.DataFrame) else []
+            if diag:
+                st.session_state["sab_scan_diag"] = diag
+        except Exception:
+            pass
+
     try:
         df = level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
+        _keep_diag(df)
         if isinstance(df, pd.DataFrame) and not df.empty:
-            return df, f"{label} 成功：{len(df)} 檔"
+            summary = getattr(df, "attrs", {}).get("scan_summary", f"成功 {len(df)} 檔")
+            return df, f"{label} {summary}"
     except Exception as e:
         first_err = str(e)
     else:
         first_err = "第一次回傳空表或 None"
 
-    # Streamlit cache 可能把限流期間的空結果暫存；強制清一次再縮小樣本。
     try:
         level2_quant_engine.clear()
     except Exception:
         pass
 
-    # 縮小候選池，降低 Yahoo / FinMind 壓力；優先用前 60 檔。
     small_list = calc_list[:60]
     try:
         df2 = level2_quant_engine(small_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
+        _keep_diag(df2)
         if isinstance(df2, pd.DataFrame) and not df2.empty:
-            return df2, f"{label} 第一次失敗；縮小重試成功：{len(df2)} 檔"
+            summary = getattr(df2, "attrs", {}).get("scan_summary", f"成功 {len(df2)} 檔")
+            return df2, f"{label} 第一次失敗；縮小重試成功｜{summary}"
+        diag = st.session_state.get("sab_scan_diag", [])
+        if diag:
+            bad = [d for d in diag if "✅" not in str(d.get("價格狀態", ""))]
+            first_bad = bad[0] if bad else diag[0]
+            return pd.DataFrame(), f"{label} 仍無技術資料：{first_bad.get('代號','-')}｜{first_bad.get('失敗原因','價格資料不可用')}"
         return pd.DataFrame(), f"{label} 仍無技術資料：{first_err}"
     except Exception as e:
         return pd.DataFrame(), f"{label} 重試失敗：{first_err}｜{e}"
@@ -881,8 +898,14 @@ with t_rank:
 
         st.caption(f"技術掃描狀態：{scan_msg}")
         if intel_df is None or getattr(intel_df, "empty", True):
-            st.error("🚨 S/A/B 技術掃描目前沒有產出資料。這代表批次價格資料鏈失敗或被限流；沙盤單檔仍可使用。", icon="💀")
+            st.error("🚨 S/A/B 技術掃描目前沒有產出資料。多半是候選股價格K線抓不到、K線不足，或資料源暫時限流；沙盤單檔仍可使用。", icon="💀")
             _debug_data_chain_box({"calc_list": len(calc_list), "scan_msg": scan_msg})
+            diag_rows = st.session_state.get("sab_scan_diag", [])
+            if diag_rows:
+                diag_df = pd.DataFrame(diag_rows)
+                keep_cols = [c for c in ["代號", "價格狀態", "K線筆數", "價格來源", "最後日期", "失敗原因"] if c in diag_df.columns]
+                with st.expander("🔎 S/A/B 價格資料失敗明細", expanded=True):
+                    st.dataframe(diag_df[keep_cols].head(20), use_container_width=True, hide_index=True)
         else:
             final_rank = pd.merge(today_df, intel_df, on="代號", suffixes=("_chip", "_intel"))
             final_rank = final_rank[~final_rank["代號"].astype(str).str.startswith("00")].copy()

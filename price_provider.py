@@ -47,9 +47,22 @@ def _period_to_days(period: str) -> int:
 
 
 def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """攤平 yfinance/多來源可能出現的 MultiIndex 欄位。
+
+    yfinance 偶爾會把欄位做成 (Price, Ticker) 或 (Ticker, Price)。
+    這裡優先保留 Open/High/Low/Close/Adj Close/Volume 這些價格欄，避免 Close 被攤平成股票代號。
+    """
     if isinstance(df.columns, pd.MultiIndex):
         df = df.copy()
-        df.columns = df.columns.get_level_values(0)
+        price_cols = {"Open", "High", "Low", "Close", "Adj Close", "Volume"}
+        level_names = []
+        for level in range(df.columns.nlevels):
+            vals = [str(x) for x in df.columns.get_level_values(level)]
+            hit = sum(v in price_cols for v in vals)
+            level_names.append((hit, level))
+        best_level = sorted(level_names, reverse=True)[0][1]
+        df.columns = df.columns.get_level_values(best_level)
+        df = df.loc[:, ~pd.Index(df.columns).duplicated(keep="first")]
     return df
 
 
@@ -72,6 +85,14 @@ def normalize_price_df(raw: Optional[pd.DataFrame], source: str = "unknown", min
         df.index = pd.to_datetime(df.index, errors="coerce")
     df = df[~pd.isna(df.index)]
     df = df[~df.index.duplicated(keep="last")].sort_index()
+    # 若來源只有 Adj Close，就先拿來補 Close，避免 Yahoo 欄位異常時整批掃描歸零。
+    if "Close" not in df.columns and "Adj Close" in df.columns:
+        df["Close"] = df["Adj Close"]
+    elif "Close" in df.columns and "Adj Close" in df.columns:
+        c_tmp = pd.to_numeric(df["Close"], errors="coerce")
+        adj_tmp = pd.to_numeric(df["Adj Close"], errors="coerce")
+        df["Close"] = c_tmp.fillna(adj_tmp)
+
     for c in ["Open", "High", "Low", "Close", "Volume"]:
         if c not in df.columns:
             df[c] = np.nan if c != "Volume" else 0
