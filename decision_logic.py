@@ -36,6 +36,8 @@ def calc_refined_safety_score(row):
     buy_streak = to_int(row.get('連買', 0), 0)
     liq_tier = text(row.get('流動性分級', ''))
     short_tradable = bool(row.get('短線可交易', True))
+    eod_status = text(row.get('EOD短線狀態', ''))
+    eod_fail = bool(row.get('隔日沖淘汰', False))
 
     score = base
     if price > 0 and m5 > 0 and price < m5:
@@ -63,6 +65,10 @@ def calc_refined_safety_score(row):
     if (not short_tradable) or ('地雷' in liq_tier) or ('不適合短線' in liq_tier):
         score -= 2.5
     elif '可交易' in liq_tier:
+        score -= 0.8
+    if eod_fail or '隔日不攻' in eod_status:
+        score -= 2.0
+    elif '只可觀察' in eod_status:
         score -= 0.8
     return max(1, min(10, int(round(score))))
 
@@ -110,11 +116,15 @@ def get_decision_label(row, holding=False):
     tactic = text(row.get('戰術型態', ''))
     liq_tier = text(row.get('流動性分級', ''))
     short_tradable = bool(row.get('短線可交易', True))
+    eod_status = text(row.get('EOD短線狀態', ''))
+    eod_fail = bool(row.get('隔日沖淘汰', False))
 
     if price <= 0:
         return '⚪ 資料不足'
     if (not short_tradable) or ('地雷' in liq_tier) or ('不適合短線' in liq_tier):
         return '⛔ 流動性不足'
+    if eod_fail or '隔日不攻' in eod_status:
+        return '🔴 隔日不攻'
     if (m10 > 0 and price < m10) or ('爆量出貨' in phase) or (sell_streak >= 3 and m5 > 0 and price < m5):
         return '🔴 禁買/出場'
     if holding and m5 > 0 and price >= m5 and sell_streak < 3:
@@ -140,7 +150,12 @@ def get_next_action(row, holding=False):
 
     if '流動性不足' in label:
         return liq_status or '排除：流動性不足'
+    if '隔日不攻' in label:
+        return text(row.get('隔日沖評語', '尾盤結構轉弱，隔天不追。'))
     if '可進攻' in label:
+        eod_note = text(row.get('EOD短線狀態', ''))
+        if '只可觀察' in eod_note:
+            return '只觀察；收盤結構未達主攻標準'
         return '依計畫；跳空>4.5%不追'
     if '等回踩' in label:
         if rsi > 75 or bias > 7:

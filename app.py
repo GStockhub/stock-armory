@@ -1049,9 +1049,17 @@ with t_rank:
                 close_pos = row.get("close_position", 1)
                 
                 fake_spike = bool(row.get("假放量警告", False))
-                if vol_ratio > 1.8 and close_pos > 0.7 and not fake_spike: score += 15
+                eod_fail = bool(row.get("隔日沖淘汰", False))
+                eod_status = str(row.get("EOD短線狀態", "") or "")
+                eod_penalty = float(row.get("EOD短線扣分", 0) or 0)
+                if vol_ratio > 1.8 and close_pos > 0.7 and not fake_spike and not eod_fail: score += 15
                 elif vol_ratio > 1.8 and close_pos < 0.4: score -= 25
                 if fake_spike: score -= 20
+                score -= min(eod_penalty, 45)
+                if "隔日不攻" in eod_status:
+                    score -= 20
+                elif "只可觀察" in eod_status:
+                    score -= 10
 
                 t = row["戰術型態"]
                 if "🔥" in t: score += 25
@@ -1101,15 +1109,17 @@ with t_rank:
             final_rank["建議"] = final_rank.apply(get_next_action, axis=1)
             rank_sorted = final_rank.sort_values("Quant_Score", ascending=False).reset_index(drop=True)
             is_phase_3 = rank_sorted["生命週期"].str.contains("第三段", na=False)
+            eod_attack_ok = ~rank_sorted.get("隔日沖淘汰", pd.Series(False, index=rank_sorted.index)).fillna(False).astype(bool)
+            eod_watch_only = rank_sorted.get("EOD短線狀態", pd.Series("", index=rank_sorted.index)).astype(str).str.contains("只可觀察|隔日不攻", na=False)
             liq_ok = rank_sorted.get("短線可交易", pd.Series(True, index=rank_sorted.index)).fillna(True).astype(bool)
             liq_cap = rank_sorted.get("最高評級限制", pd.Series("S", index=rank_sorted.index)).astype(str)
             liq_s_ok = liq_ok & (~liq_cap.isin(["B", "觀察", "排除"]))
             liq_a_ok = liq_ok & (~liq_cap.isin(["觀察", "排除"]))
             liq_b_ok = liq_ok & (~liq_cap.isin(["觀察", "排除"]))
             
-            s_mask = (rank_sorted["Quant_Score"] >= MODE_PROFILE["s"]) & (rank_sorted["基本達標"] == True) & (~is_phase_3) & liq_s_ok
-            a_mask = (~s_mask) & (rank_sorted["Quant_Score"] >= MODE_PROFILE["a"]) & (rank_sorted["基本達標"] == True) & liq_a_ok
-            b_mask = (~s_mask) & (~a_mask) & (rank_sorted["Quant_Score"] >= MODE_PROFILE["b"]) & liq_b_ok
+            s_mask = (rank_sorted["Quant_Score"] >= MODE_PROFILE["s"]) & (rank_sorted["基本達標"] == True) & (~is_phase_3) & liq_s_ok & eod_attack_ok & (~eod_watch_only)
+            a_mask = (~s_mask) & (rank_sorted["Quant_Score"] >= MODE_PROFILE["a"]) & (rank_sorted["基本達標"] == True) & liq_a_ok & eod_attack_ok & (~eod_watch_only)
+            b_mask = (~s_mask) & (~a_mask) & (rank_sorted["Quant_Score"] >= MODE_PROFILE["b"]) & liq_b_ok & eod_attack_ok
             c_mask = (~s_mask) & (~a_mask) & (~b_mask)
 
             s_all = rank_sorted[s_mask].copy()
@@ -1137,7 +1147,8 @@ with t_rank:
                     (pd.to_numeric(fallback_pool["Quant_Score"], errors="coerce").fillna(0) >= MODE_PROFILE["b"] - 10)
                     & (pd.to_numeric(fallback_pool["現價"], errors="coerce").fillna(0) > pd.to_numeric(fallback_pool["停損價"], errors="coerce").fillna(0))
                     & (~fallback_pool["生命週期"].astype(str).str.contains("爆量出貨|高機率末升", na=False))
-                    & (~fallback_pool["決策標籤"].astype(str).str.contains("禁買|出場|流動性不足", na=False))
+                    & (~fallback_pool["決策標籤"].astype(str).str.contains("禁買|出場|流動性不足|隔日不攻", na=False))
+                    & (~fallback_pool.get("隔日沖淘汰", pd.Series(False, index=fallback_pool.index)).fillna(False).astype(bool))
                     & (fallback_pool.get("短線可交易", pd.Series(True, index=fallback_pool.index)).fillna(True).astype(bool))
                 )
                 master_list = fallback_pool[fallback_mask].sort_values(["Quant_Score", "安全指數"], ascending=[False, False]).head(10).copy()
@@ -1188,7 +1199,7 @@ with t_rank:
 
             if master_list.empty:
                 st.warning("今日沒有通過 S/A/B 條件的標的。這通常不是壞掉，而是分數、基本達標、停損線、乖離或資料源限流造成清單被過濾。")
-                diag_cols = ["代號", "名稱", "Quant_Score", "基本達標", "流動性分級", "20日均量(張)", "20日均成交金額", "假放量警告", "現價", "停損價", "生命週期", "戰術型態", "決策標籤"]
+                diag_cols = ["代號", "名稱", "Quant_Score", "基本達標", "EOD短線狀態", "收盤位置(%)", "上影線比例(%)", "隔日沖評語", "流動性分級", "20日均量(張)", "20日均成交金額", "假放量警告", "現價", "停損價", "生命週期", "戰術型態", "決策標籤"]
                 diag_cols = [c for c in diag_cols if c in rank_sorted.columns]
                 if diag_cols:
                     with st.expander("🔎 查看未入選診斷 Top 20", expanded=False):
@@ -1241,6 +1252,12 @@ with t_rank:
                             note += "；末升警戒"
                         if bool(rr.get("假放量警告", False)):
                             note += "；假放量：量比高但絕對量低"
+                        eod_status = str(rr.get("EOD短線狀態", "") or "")
+                        if eod_status:
+                            note += f"；{eod_status}"
+                        eod_note = str(rr.get("隔日沖評語", "") or "")
+                        if eod_note and eod_status != "🟢 2~10日可攻":
+                            note += f"；{eod_note}"
                         liq_status = str(rr.get("流動性狀態", "") or "")
                         if liq_status and "理想" not in liq_status:
                             note += f"；{liq_status}"
@@ -1259,6 +1276,9 @@ with t_rank:
                             "戰術型態": rr.get("戰術型態", ""),
                             "生命週期": rr.get("生命週期", ""),
                             "量化分數": rr.get("Quant_Score", ""),
+                            "EOD短線狀態": rr.get("EOD短線狀態", ""),
+                            "收盤位置(%)": rr.get("收盤位置(%)", ""),
+                            "上影線比例(%)": rr.get("上影線比例(%)", ""),
                             "流動性": rr.get("流動性分級", ""),
                             "20日均量(張)": rr.get("20日均量(張)", ""),
                             "20日均成交金額": rr.get("20日均成交金額", ""),
@@ -1271,6 +1291,7 @@ with t_rank:
                         "名次", "評級", "代號", "名稱", "決策標籤", "建議", "法人狀態", "產業", "生命週期", "戰術型態",
                         "Quant_Score", "勝率(%)", "均報(%)", "安全指數", "安全指數", "現價", "M5", "M10", "M20",
                         "乖離(%)", "RSI", "MACD_Hist", "BB_Upper", "停損價", "停利價",
+                        "EOD短線狀態", "收盤位置(%)", "上影線比例(%)", "紅K", "跌破開盤", "爆量不漲", "碰漲停未鎖", "隔日沖淘汰", "隔日沖評語",
                         "流動性分級", "流動性狀態", "20日均量(張)", "20日均成交金額", "假放量警告",
                         "建議買量(張)", "連買", "投信連賣", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"
                     ]
@@ -1321,6 +1342,9 @@ with t_rank:
                                 liq_t = str(r.get("流動性分級", ""))
                                 if liq_t and liq_t != "理想短線": badges += f"<span style='background-color: rgba(241, 196, 15, 0.15); color: #F1C40F; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #F1C40F;'>💧{liq_t}</span>"
                                 if bool(r.get("假放量警告", False)): badges += f"<span style='background-color: rgba(255, 75, 75, 0.15); color: #FF4B4B; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #FF4B4B;'>⚠️假放量</span>"
+                                eod_badge = str(r.get("EOD短線狀態", "") or "")
+                                if eod_badge and "可攻" not in eod_badge:
+                                    badges += f"<span style='background-color: rgba(255, 75, 75, 0.12); color: #FFB3B3; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid rgba(255,75,75,.55);'>{eod_badge}</span>"
 
                                 card_html = f'<div class="tier-card" style="background-color: {COLORS["card"]}; border-top: 4px solid {border_color}; border-left: 1px solid {COLORS["border"]}; border-right: 1px solid {COLORS["border"]}; border-bottom: 1px solid {COLORS["border"]}; height: 100%; display: flex; flex-direction: column;">'
                                 
@@ -1344,7 +1368,8 @@ with t_rank:
                                 card_html += f'<div style="background-color: {COLORS["bg"]}; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid {COLORS["green"]};">'
                                 card_html += f'<div class="info-row"><span class="info-label" style="font-weight:bold; color: {COLORS["text"]};">🎯 量化評分</span><span class="info-value" style="font-size: 16px; color: {COLORS["text"]}; font-weight:bold;">{r["Quant_Score"]} 分</span></div>'
                                 card_html += f'<div style="color: {COLORS["text"]}; font-size: 12px; font-weight: bold; margin-top: 4px;">{r["戰術型態"]} | <span style="color:{COLORS["accent"]}">{r["生命週期"]}</span></div>'
-                                card_html += f'<div style="color:{COLORS["subtext"]}; font-size:12px; margin-top:4px;">{r.get("決策標籤", "")} ｜ {r.get("法人狀態", "")}</div></div>'
+                                card_html += f'<div style="color:{COLORS["subtext"]}; font-size:12px; margin-top:4px;">{r.get("決策標籤", "")} ｜ {r.get("法人狀態", "")}</div>'
+                                card_html += f'<div style="color:{COLORS["subtext"]}; font-size:12px; margin-top:4px;">EOD：{r.get("EOD短線狀態", "")}｜收盤位置 {r.get("收盤位置(%)", 0)}%</div></div>'
                                 card_html += f'<div style="width: 100%;">'
                                 card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">📊 歷史勝率</span><span class="info-value"><span style="color: {COLORS["green"]}; font-weight:bold;">{r["勝率(%)"]:.1f}%</span> <span style="color: {COLORS["subtext"]}; font-size:11px;">(均報 +{r["均報(%)"]:.2f}%)</span></span></div>'
                                 card_html += f'<div class="info-row"><span class="info-label" style="color: {COLORS["text"]}; opacity: 0.8;">💰 現價</span><span class="info-value"><span style="color: {COLORS["primary"]};">{r["現價"]:.2f}</span> <span style="color: {COLORS["subtext"]}; font-size:11px;">(乖離 {r["乖離(%)"]:.1f}%)</span></span></div>'
@@ -1381,6 +1406,9 @@ with t_rank:
                             tags.append(f"💧{liq}")
                         if bool(row.get('假放量警告', False)):
                             tags.append("⚠️假放量")
+                        eod_status = str(row.get('EOD短線狀態', '') or '')
+                        if eod_status:
+                            tags.append(eod_status)
                         parts = [
                             f"{row.get('決策標籤','')}｜{row.get('法人狀態','')}",
                             f"{row.get('生命週期','')}｜{row.get('戰術型態','')}",

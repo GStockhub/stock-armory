@@ -85,6 +85,96 @@ def _is_fake_volume_spike(vol_ratio, today_lots):
     except Exception:
         return False
 
+
+def _eod_short_swing_profile(price, open_p, high_p, low_p, prev_close, day_return, vol_ratio, close_position):
+    """EOD 2~10日短線濾網。
+
+    目的不是把 EOD 系統改成當沖，而是讓 S/A/B 更像「明天可攻、2~10日可操作」的候選。
+    亞電那種「碰漲停、沒鎖住、跌破開盤、收盤在低檔」會被降級或淘汰。
+    """
+    try:
+        price = float(price or 0)
+        open_p = float(open_p or price)
+        high_p = float(high_p or price)
+        low_p = float(low_p or price)
+        prev_close = float(prev_close or price)
+        day_return = float(day_return or 0)
+        vol_ratio = float(vol_ratio or 1)
+        close_position = float(close_position if close_position is not None else 0.5)
+    except Exception:
+        return {
+            "EOD短線狀態": "⚪ 資料不足",
+            "EOD短線扣分": 0,
+            "收盤位置(%)": 50.0,
+            "上影線比例(%)": 0.0,
+            "紅K": False,
+            "跌破開盤": False,
+            "爆量不漲": False,
+            "碰漲停未鎖": False,
+            "隔日沖淘汰": False,
+            "隔日沖評語": "資料不足，先用原本S/A/B判斷。",
+        }
+
+    rng = max(high_p - low_p, 1e-9)
+    body_top = max(price, open_p)
+    upper_shadow_pct = max(high_p - body_top, 0) / rng * 100
+    close_pos_pct = max(0.0, min(100.0, close_position * 100))
+    red_k = price >= open_p
+    close_below_open = price < open_p
+    # 台股普通股漲停約10%；ETF與特殊股票不一定，但這裡只做「曾接近漲停又收不住」的風險提示。
+    touched_limit_like = prev_close > 0 and high_p >= prev_close * 1.095
+    limit_touch_fail = bool(touched_limit_like and price <= high_p * 0.985 and close_pos_pct < 70)
+    explosive_no_rise = bool(vol_ratio >= 2.0 and (day_return < 2.0 or close_pos_pct < 50))
+    long_upper = bool(upper_shadow_pct >= 35 and close_pos_pct < 65)
+
+    penalty = 0
+    reasons = []
+    if close_pos_pct < 50:
+        penalty += 25
+        reasons.append("收盤位置低於50%")
+    elif close_pos_pct < 70:
+        penalty += 10
+        reasons.append("收盤位置未達70%")
+    else:
+        reasons.append("收盤位置合格")
+
+    if close_below_open:
+        penalty += 18
+        reasons.append("收盤跌破開盤")
+    if long_upper:
+        penalty += 16
+        reasons.append("長上影")
+    if explosive_no_rise:
+        penalty += 18
+        reasons.append("爆量不漲")
+    if limit_touch_fail:
+        penalty += 25
+        reasons.append("碰漲停未鎖")
+
+    hard_fail = bool(close_pos_pct < 50 or close_below_open or limit_touch_fail or (long_upper and explosive_no_rise))
+    if hard_fail:
+        status = "🔴 隔日不攻"
+        note = "；".join(reasons) + "。明天不可追，只能等重新站回開盤價/VWAP。"
+    elif close_pos_pct < 70 or long_upper or explosive_no_rise:
+        status = "🟡 只可觀察"
+        note = "；".join(reasons) + "。可放觀察，不列主攻。"
+    else:
+        status = "🟢 2~10日可攻"
+        note = "收盤位置強、未出現明顯倒貨K；隔天仍需沙盤確認開高幅度。"
+
+    return {
+        "EOD短線狀態": status,
+        "EOD短線扣分": penalty,
+        "收盤位置(%)": round(close_pos_pct, 1),
+        "上影線比例(%)": round(upper_shadow_pct, 1),
+        "紅K": bool(red_k),
+        "跌破開盤": bool(close_below_open),
+        "爆量不漲": bool(explosive_no_rise),
+        "碰漲停未鎖": bool(limit_touch_fail),
+        "隔日沖淘汰": bool(hard_fail),
+        "隔日沖評語": note,
+    }
+
 def _simulate_sop_returns(close_s, open_s, high_s, low_s, vol_s, max_hold_bars=10):
     """用接近你真實SOP的方式估算：隔日開盤進、跳空>4.5%不追、+5.5%先出半、M5/M10控風險。"""
     df_bt = pd.DataFrame({"Close": close_s, "Open": open_s, "High": high_s, "Low": low_s, "Volume": vol_s}).dropna()
@@ -293,7 +383,13 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             vol_ratio = vol_now / vol_ma5 if vol_ma5 > 0 else 1
             liq = _liquidity_profile(p_now, vol_now, vol_ma20)
             fake_volume_spike = _is_fake_volume_spike(vol_ratio, liq.get("今日量(張)", 0))
-            close_position = (p_now - float(low_s.iloc[-1])) / (float(high_s.iloc[-1]) - float(low_s.iloc[-1])) if float(high_s.iloc[-1]) != float(low_s.iloc[-1]) else 0.5
+            today_open = float(open_s.iloc[-1]) if pd.notna(open_s.iloc[-1]) else p_now
+            today_high = float(high_s.iloc[-1]) if pd.notna(high_s.iloc[-1]) else p_now
+            today_low = float(low_s.iloc[-1]) if pd.notna(low_s.iloc[-1]) else p_now
+            close_position = (p_now - today_low) / (today_high - today_low) if today_high != today_low else 0.5
+            eod_profile = _eod_short_swing_profile(
+                p_now, today_open, today_high, today_low, prev_close, day_return, vol_ratio, close_position
+            )
 
             try:
                 tmp = pd.DataFrame({"Close": close_s, "High": high_s, "Low": low_s}).dropna()
@@ -367,6 +463,10 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             elif tactic_a_weak: s_score -= 1
             if fake_volume_spike:
                 s_score -= 2
+            if eod_profile.get("隔日沖淘汰", False):
+                s_score -= 3
+            elif eod_profile.get("EOD短線狀態") == "🟡 只可觀察":
+                s_score -= 1
             if not liq.get("短線可交易", True):
                 s_score -= 3
 
@@ -376,8 +476,8 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             intel_results.append({
                 "代號": sid, "名稱": TWSE_NAME_MAP.get(sid, ACTIVE_ETF_NAME_MAP.get(sid, sid)), "產業": ind, "現價": p_now, "成交量": vol_now, "今日放量": (vol_now > vol_ma5 * 1.4),
                 "日漲幅(%)": day_return, "3日漲幅(%)": ret_3d, "5日漲幅(%)": ret_5d,
-                "乖離(%)": bias, "M5": m5, "M10": m10, "勝率(%)": win_rate, "均報(%)": avg_ret, "戰術型態": tactic,
-                "停損價": stop_price, "原始風險差額": raw_risk, "基本達標": (s_score >= 6 and bias <= 8), "安全指數": s_score,
+                "乖離(%)": bias, "M5": m5, "M10": m10, "M20": m20, "勝率(%)": win_rate, "均報(%)": avg_ret, "戰術型態": tactic,
+                "停損價": stop_price, "原始風險差額": raw_risk, "基本達標": (s_score >= 6 and bias <= 8 and not eod_profile.get("隔日沖淘汰", False)), "安全指數": s_score,
                 "vol_ratio": vol_ratio, "close_position": close_position,
                 "vol_ma20": vol_ma20, "atr_percent": atr_percent,
                 "今日量(張)": liq.get("今日量(張)", 0), "20日均量(張)": liq.get("20日均量(張)", 0),
@@ -385,7 +485,8 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
                 "流動性狀態": liq.get("流動性狀態", ""), "短線可交易": liq.get("短線可交易", True),
                 "最高評級限制": liq.get("最高評級限制", "S"), "流動性扣分": liq.get("流動性扣分", 0),
                 "假放量警告": bool(fake_volume_spike),
-                "ATR": atr_now, "BB_Upper": bb_upper, "RSI": rsi_now, "MACD_Cross": macd_cross # 🚀 新增指標輸出
+                **eod_profile,
+                "ATR": atr_now, "BB_Upper": bb_upper, "RSI": rsi_now, "MACD_Cross": macd_cross, "MACD_Hist": hist_now # 🚀 新增指標輸出
             })
         except Exception as e:
             row_failures.append({"代號": sid, "價格狀態": "🔴 計算例外", "失敗原因": str(e)[:120]})
