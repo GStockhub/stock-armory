@@ -454,8 +454,12 @@ def render_top_status_panel():
     """, unsafe_allow_html=True)
 
 
-with st.spinner("情報兵正在部署防線..."):
-    chip_db = fetch_chips_data(FM_TOKEN)
+# 手機快查模式只需要「沙盤 + 持股」，不先抓法人籌碼，避免手機重開時卡很久。
+if mobile_quick_mode:
+    chip_db = {}
+else:
+    with st.spinner("情報兵正在部署防線..."):
+        chip_db = fetch_chips_data(FM_TOKEN)
 
 m_df = pd.DataFrame()
 today_df = pd.DataFrame()
@@ -632,14 +636,20 @@ chips_data_source = st.session_state.get("chips_data_source", "即時")
 
 if chip_data_available:
     dates = sorted(list(chip_db.keys()), reverse=True)
+    base_chip_cols = ["代號", "名稱", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
     today_df = _sanitize_today_df(chip_db[dates[0]].copy())
+    if today_df.empty or "代號" not in today_df.columns:
+        # 防止最新籌碼日格式異常時，後面 merge(on="代號") 直接 KeyError。
+        today_df = pd.DataFrame(columns=base_chip_cols)
 
-    for i, d in enumerate(dates):
+    merge_days = dates[:3] if mobile_quick_mode else dates
+    for i, d in enumerate(merge_days):
         day_df = _sanitize_today_df(chip_db[d])
-        if day_df.empty or "投信(張)" not in day_df.columns:
+        if day_df.empty or "代號" not in day_df.columns or "投信(張)" not in day_df.columns:
             today_df[f"D{i}"] = 0
         else:
-            today_df = pd.merge(today_df, day_df[["代號", "投信(張)"]].rename(columns={"投信(張)": f"D{i}"}), on="代號", how="left").fillna(0)
+            right = day_df[["代號", "投信(張)"]].copy().rename(columns={"投信(張)": f"D{i}"})
+            today_df = pd.merge(today_df, right, on="代號", how="left").fillna(0)
 
     def get_streak(r):
         s = 0
@@ -669,12 +679,20 @@ if chip_data_available:
         chip_data_available = False
         chips_data_source = "技術備援"
 else:
-    st.toast("籌碼連線失敗；啟用技術面備援，S/A/B 仍可掃描但法人欄位暫缺。", icon="⚠️")
-    today_df = _build_technical_fallback_chips(max_rows=350)
-    dates = ["TECH"]
-    top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist()) if not today_df.empty else []
-    chip_data_available = False
-    chips_data_source = "技術備援"
+    if mobile_quick_mode:
+        # 手機快查不需要建立完整 S/A/B 技術備援池，避免手機載入時做無用工。
+        today_df = pd.DataFrame(columns=["代號", "名稱", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"])
+        dates = ["MOBILE"]
+        top_80_chips = []
+        chip_data_available = False
+        chips_data_source = "手機快查"
+    else:
+        st.toast("籌碼連線失敗；啟用技術面備援，S/A/B 仍可掃描但法人欄位暫缺。", icon="⚠️")
+        today_df = _build_technical_fallback_chips(max_rows=350)
+        dates = ["TECH"]
+        top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist()) if not today_df.empty else []
+        chip_data_available = False
+        chips_data_source = "技術備援"
 
 if sheet_url and auth_status == "admin_auth":
     try:
@@ -687,22 +705,27 @@ if sheet_url and auth_status == "admin_auth":
         h_df = sheet_df[sheet_df["分類"] == "持股"].copy() if "分類" in sheet_df.columns else sheet_df.copy()
         if not h_df.empty and "代號" in h_df.columns:
             h_df["代號"] = h_df["代號"].astype(str).str.strip()
-            # 🚀 統帥優化：持股情報直接調用最強的 level2_quant_engine 統一獲取 MACD/RSI/BBAND
-            h_intel = level2_quant_engine(tuple(h_df["代號"].tolist()), TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
-            if h_intel is not None and not h_intel.empty:
-                m_df = pd.merge(h_df, h_intel, on="代號", how="left")
-                if "名稱_x" in m_df.columns:
-                    m_df = m_df.rename(columns={"名稱_x": "名稱"}).drop(columns=["名稱_y"], errors='ignore')
-                else:
-                    m_df["名稱"] = m_df["代號"].map(lambda x: TWSE_NAME_MAP.get(str(x), ACTIVE_ETF_NAME_MAP.get(str(x), "未知")))
-            else:
-                # V37.9.1：新掛牌主動 ETF 可能還沒有足夠 K 線；持股卡片仍應顯示成本與名稱，
-                # 不應整區消失或顯示「未知」。技術欄位留空，由卡片顯示「資料暖機」。
+            if mobile_quick_mode:
+                # 手機模式優先速度：只讀持股表，不額外掃技術指標；避免每次開手機都跑一輪 level2_quant_engine。
                 m_df = h_df.copy()
                 m_df["名稱"] = m_df["代號"].map(lambda x: TWSE_NAME_MAP.get(str(x), ACTIVE_ETF_NAME_MAP.get(str(x), "未知")))
+            else:
+                # 🚀 統帥優化：持股情報直接調用最強的 level2_quant_engine 統一獲取 MACD/RSI/BBAND
+                h_intel = level2_quant_engine(tuple(h_df["代號"].tolist()), TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
+                if h_intel is not None and not h_intel.empty:
+                    m_df = pd.merge(h_df, h_intel, on="代號", how="left")
+                    if "名稱_x" in m_df.columns:
+                        m_df = m_df.rename(columns={"名稱_x": "名稱"}).drop(columns=["名稱_y"], errors='ignore')
+                    else:
+                        m_df["名稱"] = m_df["代號"].map(lambda x: TWSE_NAME_MAP.get(str(x), ACTIVE_ETF_NAME_MAP.get(str(x), "未知")))
+                else:
+                    # V37.9.1：新掛牌主動 ETF 可能還沒有足夠 K 線；持股卡片仍應顯示成本與名稱，
+                    # 不應整區消失或顯示「未知」。技術欄位留空，由卡片顯示「資料暖機」。
+                    m_df = h_df.copy()
+                    m_df["名稱"] = m_df["代號"].map(lambda x: TWSE_NAME_MAP.get(str(x), ACTIVE_ETF_NAME_MAP.get(str(x), "未知")))
     except Exception as e: st.error(f"❌ 讀取持股部位失敗：{e}")
 
-if aar_sheet_url:
+if aar_sheet_url and not mobile_quick_mode:
     try:
         aar_probe_df = read_remote_csv(aar_sheet_url, dtype=str)
         aar_rows = len(aar_probe_df)
