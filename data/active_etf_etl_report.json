@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-06-10T12:48:00Z",
+  "run_at": "2026-06-10T14:04:34Z",
   "output_path": "data/active_etf_holdings_history.csv",
   "mode": "daily",
   "mode_note": "daily：強制熱門核心 Top 10；其餘交給每週 full 補抓",
@@ -20,11 +20,11 @@
   "keep_days": 60,
   "raw_rows": 98,
   "complete_rows": 98,
-  "history_rows": 3059,
+  "history_rows": 3041,
   "history_cleaning": {
-    "input_rows": 3059,
-    "output_rows": 3059,
-    "removed_rows": 0,
+    "input_rows": 3157,
+    "output_rows": 3121,
+    "removed_rows": 36,
     "removed_old_rows": 0,
     "removed_polluted_rows": 0
   },
@@ -102,9 +102,22 @@
       "來源類別": "官方",
       "來源": "https://www.capitalfund.com.tw/etf/product/detail/399/buyback",
       "類型": "PCF",
+      "抓到筆數": 0,
+      "權重合計": 0.0,
+      "狀態": "⚠️ empty",
+      "採用": false,
+      "需要Playwright": false
+    },
+    {
+      "ETF代號": "00982A",
+      "ETF名稱": "主動群益台灣強棒",
+      "投信": "群益投信",
+      "來源類別": "第三方備援",
+      "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00982A.TW&topc=",
+      "類型": "MoneyDJ持股備援",
       "抓到筆數": 10,
       "權重合計": 50.41,
-      "狀態": "✅ 官方完整",
+      "狀態": "✅ 第三方備援完整",
       "採用": true,
       "需要Playwright": false
     },
@@ -115,22 +128,9 @@
       "來源類別": "官方",
       "來源": "https://www.capitalfund.com.tw/etf/product/detail/500/buyback",
       "類型": "PCF",
-      "抓到筆數": 0,
-      "權重合計": 0.0,
-      "狀態": "⚠️ empty",
-      "採用": false,
-      "需要Playwright": false
-    },
-    {
-      "ETF代號": "00992A",
-      "ETF名稱": "主動群益科技創新",
-      "投信": "群益投信",
-      "來源類別": "第三方備援",
-      "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00992A.TW&topc=",
-      "類型": "MoneyDJ持股備援",
       "抓到筆數": 10,
       "權重合計": 49.45,
-      "狀態": "✅ 第三方備援完整",
+      "狀態": "✅ 官方完整",
       "採用": true,
       "需要Playwright": false
     },
@@ -441,7 +441,7 @@
       "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0009.xdjhtm?etfid=00990A.TW",
       "類型": "link:href",
       "抓到筆數": 8,
-      "權重合計": 72.61,
+      "權重合計": 69.42,
       "狀態": "🟡 第三方備援可參考",
       "採用": true,
       "需要Playwright": NaN
@@ -599,9 +599,22 @@
       "來源類別": "官方",
       "來源": "https://www.capitalfund.com.tw/etf/product/detail/399/buyback",
       "類型": "PCF",
+      "抓到筆數": 0,
+      "權重合計": 0.0,
+      "狀態": "⚠️ empty",
+      "採用": false,
+      "需要Playwright": false
+    },
+    {
+      "ETF代號": "00982A",
+      "ETF名稱": "主動群益台灣強棒",
+      "投信": "群益投信",
+      "來源類別": "第三方備援",
+      "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00982A.TW&topc=",
+      "類型": "MoneyDJ持股備援",
       "抓到筆數": 10,
       "權重合計": 50.41,
-      "狀態": "✅ 官方完整",
+      "狀態": "✅ 第三方備援完整",
       "採用": true,
       "需要Playwright": false
     },
@@ -612,22 +625,9 @@
       "來源類別": "官方",
       "來源": "https://www.capitalfund.com.tw/etf/product/detail/500/buyback",
       "類型": "PCF",
-      "抓到筆數": 0,
-      "權重合計": 0.0,
-      "狀態": "⚠️ empty",
-      "採用": false,
-      "需要Playwright": false
-    },
-    {
-      "ETF代號": "00992A",
-      "ETF名稱": "主動群益科技創新",
-      "投信": "群益投信",
-      "來源類別": "第三方備援",
-      "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00992A.TW&topc=",
-      "類型": "MoneyDJ持股備援",
       "抓到筆數": 10,
       "權重合計": 49.45,
-      "狀態": "✅ 第三方備援完整",
+      "狀態": "✅ 官方完整",
       "採用": true,
       "需要Playwright": false
     },
@@ -938,7 +938,7 @@
       "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0009.xdjhtm?etfid=00990A.TW",
       "類型": "link:href",
       "抓到筆數": 8,
-      "權重合計": 72.61,
+      "權重合計": 69.42,
       "狀態": "🟡 第三方備援可參考",
       "採用": true,
       "需要Playwright": NaN
@@ -1024,8 +1024,8 @@
   ],
   "adopted_source": {
     "00981A": "第三方備援: https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00981A.TW&topc=",
-    "00982A": "官方: https://www.capitalfund.com.tw/etf/product/detail/399/buyback",
-    "00992A": "第三方備援: https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00992A.TW&topc=",
+    "00982A": "第三方備援: https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00982A.TW&topc=",
+    "00992A": "官方: https://www.capitalfund.com.tw/etf/product/detail/500/buyback",
     "00991A": "官方: https://www.fhtrust.com.tw/ETF/etf_detail/ETF24#nav",
     "00980A": "第三方備援: https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00980A.TW&topc=",
     "00400A": "第三方備援: https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00400A.TW&topc=",
@@ -1041,14 +1041,14 @@
       "來源類型修正": "第三方備援"
     },
     "00982A": {
-      "資料來源等級": "A",
-      "來源可信度": "A級｜官方完整",
-      "來源類型修正": "官方"
-    },
-    "00992A": {
       "資料來源等級": "C",
       "來源可信度": "C級｜第三方備援",
       "來源類型修正": "第三方備援"
+    },
+    "00992A": {
+      "資料來源等級": "A",
+      "來源可信度": "A級｜官方完整",
+      "來源類型修正": "官方"
     },
     "00991A": {
       "資料來源等級": "A",
@@ -1087,16 +1087,16 @@
     }
   },
   "official_complete": [
-    "00982A",
-    "00991A"
+    "00991A",
+    "00992A"
   ],
   "official_playwright_complete": [],
   "fallback_complete": [
     "00400A",
     "00980A",
     "00981A",
+    "00982A",
     "00985A",
-    "00992A",
     "00993A",
     "00999A"
   ],
@@ -1112,8 +1112,8 @@
       "健康燈號": "🟢 今日成功更新",
       "今日成功": true,
       "連續失敗天數": 0,
-      "最後成功日期": "2026-06-10",
-      "資料過期天數": 0,
+      "最後成功日期": "2026-06-05",
+      "資料過期天數": 5,
       "採用來源": "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00981A.TW&topc=",
       "資料來源等級": "C",
       "來源可信度": "C級｜第三方備援",
@@ -1131,13 +1131,13 @@
       "連續失敗天數": 0,
       "最後成功日期": "2026-06-10",
       "資料過期天數": 0,
-      "採用來源": "https://www.capitalfund.com.tw/etf/product/detail/399/buyback",
-      "資料來源等級": "A",
-      "來源可信度": "A級｜官方完整",
-      "採用來源類型": "官方",
-      "嘗試來源數": 1,
+      "採用來源": "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00982A.TW&topc=",
+      "資料來源等級": "C",
+      "來源可信度": "C級｜第三方備援",
+      "採用來源類型": "第三方備援",
+      "嘗試來源數": 2,
       "需要Playwright": false,
-      "最後狀態": "✅ 官方完整"
+      "最後狀態": "✅ 第三方備援完整"
     },
     {
       "ETF代號": "00992A",
@@ -1148,13 +1148,13 @@
       "連續失敗天數": 0,
       "最後成功日期": "2026-06-10",
       "資料過期天數": 0,
-      "採用來源": "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00992A.TW&topc=",
-      "資料來源等級": "C",
-      "來源可信度": "C級｜第三方備援",
-      "採用來源類型": "第三方備援",
-      "嘗試來源數": 2,
+      "採用來源": "https://www.capitalfund.com.tw/etf/product/detail/500/buyback",
+      "資料來源等級": "A",
+      "來源可信度": "A級｜官方完整",
+      "採用來源類型": "官方",
+      "嘗試來源數": 1,
       "需要Playwright": false,
-      "最後狀態": "✅ 第三方備援完整"
+      "最後狀態": "✅ 官方完整"
     },
     {
       "ETF代號": "00991A",
@@ -1214,8 +1214,8 @@
       "健康燈號": "🟡 今日取得可參考快照",
       "今日成功": true,
       "連續失敗天數": 0,
-      "最後成功日期": "2026-06-10",
-      "資料過期天數": 0,
+      "最後成功日期": "2026-06-06",
+      "資料過期天數": 4,
       "採用來源": "https://www.moneydj.com/ETF/X/Basic/Basic0009.xdjhtm?etfid=00990A.TW",
       "資料來源等級": "C",
       "來源可信度": "C級｜第三方備援可參考",
@@ -1600,9 +1600,9 @@
       "產業數": 4,
       "資料狀態": "✅ 完整",
       "資料備註": "可納入分析",
-      "資料來源等級": "A",
-      "來源可信度": "A級｜官方完整",
-      "採用來源類型": "官方"
+      "資料來源等級": "C",
+      "來源可信度": "C級｜第三方備援",
+      "採用來源類型": "第三方備援"
     },
     {
       "ETF代號": "00985A",
@@ -1620,10 +1620,10 @@
       "ETF代號": "00990A",
       "ETF名稱": "主動元大AI新經濟",
       "持股數": 8,
-      "權重合計": 72.61,
+      "權重合計": 69.42,
       "產業數": 2,
       "資料狀態": "🟡 可參考",
-      "資料備註": "約80~90%持股方向；持股數8、權重合計72.6%",
+      "資料備註": "約80~90%持股方向；持股數8、權重合計69.4%",
       "資料來源等級": "C",
       "來源可信度": "C級｜第三方備援可參考",
       "採用來源類型": "第三方備援"
@@ -1648,9 +1648,9 @@
       "產業數": 6,
       "資料狀態": "✅ 完整",
       "資料備註": "可納入分析",
-      "資料來源等級": "C",
-      "來源可信度": "C級｜第三方備援",
-      "採用來源類型": "第三方備援"
+      "資料來源等級": "A",
+      "來源可信度": "A級｜官方完整",
+      "採用來源類型": "官方"
     },
     {
       "ETF代號": "00993A",
