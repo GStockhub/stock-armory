@@ -635,11 +635,23 @@ chip_data_available = len(chip_db) >= 1
 chips_data_source = st.session_state.get("chips_data_source", "即時")
 
 if chip_data_available:
-    dates = sorted(list(chip_db.keys()), reverse=True)
+    # 快取偶爾會留下盤後尚未出資料時的 0 / NAN 假列。
+    # 不要只因為日期最新就整個退回技術備援；改採「最新一個有效法人日」。
+    raw_dates = sorted(list(chip_db.keys()), reverse=True)
+    usable_days = []
+    for d in raw_dates:
+        try:
+            cleaned_day = _sanitize_today_df(chip_db.get(d, pd.DataFrame()))
+            if len(cleaned_day) >= 20:
+                usable_days.append(d)
+        except Exception:
+            continue
+
+    dates = usable_days
     base_chip_cols = ["代號", "名稱", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]
-    today_df = _sanitize_today_df(chip_db[dates[0]].copy())
-    if today_df.empty or "代號" not in today_df.columns:
-        # 防止最新籌碼日格式異常時，後面 merge(on="代號") 直接 KeyError。
+    if dates:
+        today_df = _sanitize_today_df(chip_db[dates[0]].copy())
+    else:
         today_df = pd.DataFrame(columns=base_chip_cols)
 
     merge_days = dates[:3] if mobile_quick_mode else dates
@@ -672,7 +684,7 @@ if chip_data_available:
 
     # V37.2：防止 chip_db 有 key 但最新 DataFrame 為空 / 只剩 NaN、0，導致 S/A/B 與情報局整區無資料。
     if today_df.empty or "代號" not in today_df.columns or len(top_80_chips) < 20:
-        st.toast("法人籌碼快取格式異常；啟用技術面備援，避免個股游擊與情報局空白。", icon="⚠️")
+        st.toast("法人籌碼沒有可用交易日；已啟用技術面備援，避免個股游擊與情報局空白。", icon="⚠️")
         today_df = _build_technical_fallback_chips(max_rows=350)
         dates = ["TECH"]
         top_80_chips = _valid_stock_codes(today_df["代號"].head(120).tolist()) if not today_df.empty else []

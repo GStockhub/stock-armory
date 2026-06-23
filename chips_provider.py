@@ -42,6 +42,7 @@ DEFAULT_CHIPS_HISTORY_PATH = "data/chips_history.csv"
 LOCAL_CACHE = os.environ.get("CHIPS_HISTORY_LOCAL", ".chips_cache/chips_history.csv")
 TMP_CACHE = os.environ.get("CHIPS_HISTORY_TMP", "/tmp/stock_armory_chips_history.csv")
 SESSION_KEY = "_stock_armory_chips_history_df"
+MIN_USABLE_CHIP_ROWS = max(20, int(os.environ.get("CHIPS_MIN_USABLE_ROWS", "50")))
 
 
 def _maybe_cache_data(ttl=1800, show_spinner=False):
@@ -73,6 +74,26 @@ def _clean_code(v) -> str:
     return re.sub(r"[^0-9A-Z]", "", str(v or "").strip().upper())
 
 
+def _is_stock_code(v) -> bool:
+    """法人籌碼只保留一般上市櫃四碼股票。
+
+    TWSE/TPEX 在休市、尚未出資料或回傳說明頁時，偶爾會被解析成
+    ``0 / 共0筆 / NAN`` 這類假列。若把它們寫入快取，最新日期只剩兩列
+    假資料，就會讓前端誤判「快取格式異常」。
+    """
+    code = _clean_code(v)
+    return bool(re.fullmatch(r"\d{4}", code)) and not code.startswith("00")
+
+
+def _is_usable_chip_day(df: pd.DataFrame, min_rows: int = MIN_USABLE_CHIP_ROWS) -> bool:
+    """確認單一交易日不是休市/說明頁被誤解析出的殘缺資料。"""
+    if df is None or df.empty or "代號" not in df.columns:
+        return False
+    codes = df["代號"].map(_clean_code)
+    valid_count = int(codes.map(_is_stock_code).sum())
+    return valid_count >= int(min_rows)
+
+
 def _normalize_chips_df(df: pd.DataFrame, date_str: str = "") -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame(columns=CHIP_COLUMNS)
@@ -89,7 +110,8 @@ def _normalize_chips_df(df: pd.DataFrame, date_str: str = "") -> pd.DataFrame:
         out[c] = pd.to_numeric(out[c], errors="coerce").fillna(0.0)
     if "三大法人合計" not in df.columns or out["三大法人合計"].abs().sum() == 0:
         out["三大法人合計"] = out["外資(張)"] + out["投信(張)"] + out["自營(張)"]
-    out = out[(out["代號"] != "") & (~out["代號"].str.startswith("00"))].copy()
+    # 只留一般上市櫃四碼股票；排除 ETF/ETN、權證與休市說明頁產生的 0、NAN 假列。
+    out = out[out["代號"].map(_is_stock_code)].copy()
     out = out.drop_duplicates(subset=["代號"], keep="last")
     if date_str:
         out["日期"] = date_str
@@ -129,7 +151,8 @@ def normalize_chips_history(df: pd.DataFrame, max_days: int = 30) -> pd.DataFram
     for c in ["外資(張)", "投信(張)", "自營(張)", "三大法人合計"]:
         out[c] = pd.to_numeric(out[c].astype(str).str.replace(",", "", regex=False), errors="coerce").fillna(0.0)
     out = out.dropna(subset=["日期"])
-    out = out[(out["代號"] != "") & (~out["代號"].str.startswith("00"))].copy()
+    # 同步清掉舊快取中的 0 / NAN / ETF 等非個股列，避免最新日期被兩筆假資料污染。
+    out = out[out["代號"].map(_is_stock_code)].copy()
     out = out.drop_duplicates(subset=["日期", "代號"], keep="last")
     if out.empty:
         return pd.DataFrame(columns=CHIP_COLUMNS)
@@ -192,7 +215,13 @@ def read_github_chips_history() -> Tuple[pd.DataFrame, dict]:
         raw = base64.b64decode(payload.get("content", "")).decode("utf-8-sig")
         df = pd.read_csv(io.StringIO(raw), dtype=str)
         norm = normalize_chips_history(df, max_days=60)
-        diag.update({"ok": True, "message": f"GitHub chips 讀取成功：{len(norm):,} 筆", "sha": payload.get("sha")})
+        valid_days = int(pd.to_datetime(norm["日期"], errors="coerce").nunique()) if not norm.empty else 0
+        diag.update({
+            "ok": not norm.empty,
+            "message": f"GitHub chips 讀取成功：{len(norm):,} 筆／{valid_days} 個有效交易日",
+            "sha": payload.get("sha"),
+            "days": valid_days,
+        })
         return norm, diag
     except Exception as e:
         diag["message"] = f"GitHub chips 讀取例外：{type(e).__name__}: {e}"
@@ -469,7 +498,8 @@ def safe_fetch_chips(fm_token: Optional[str] = None, days: int = 5, max_lookback
             except Exception as e:
                 print(f"TPEX chips failed {date_iso}: {e}")
             day_df = _merge_day_sources(day_frames, date_iso)
-            if not day_df.empty:
+            # 交易所休市、盤後尚未出資料或回傳說明頁時，不要把 0 / NAN 假列寫成最新快取日。
+            if _is_usable_chip_day(day_df):
                 result[date_yyyymmdd] = day_df[["代號", "名稱", "外資(張)", "投信(張)", "自營(張)", "三大法人合計"]].reset_index(drop=True)
                 fetched_days.append(day_df)
                 time.sleep(0.2)
