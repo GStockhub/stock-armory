@@ -42,19 +42,19 @@ BAD_EXT = re.compile(r"\.(css|ico|jpg|jpeg|png|gif|svg|webp|woff2?|ttf|eot|map|m
 BAD_TEXT = re.compile(r"(<|>|\\u003c|\\u003e|\{|\}|data:image|base64|microsoft\.com|edge\?|download10|font-weight|background:|text-align|@media|svg\+xml)", re.I)
 
 
+from net_utils import build_session, smart_get
+
+
 def _session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8",
-    })
-    return s
+    return build_session(
+        with_retry=True,
+        extra_headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8"},
+    )
 
 
 def fetch_url(url: str, timeout: int = 25) -> tuple[str, str]:
     try:
-        resp = _session().get(url, timeout=timeout, verify=False)
+        resp = smart_get(url, session=_session(), timeout=timeout)
         resp.raise_for_status()
         return resp.text or "", resp.headers.get("content-type", "")
     except Exception:

@@ -23,6 +23,9 @@ class BacktestConfig:
     slippage_pct: float = 0.0015
     allow_odd_lot: bool = True
     odd_lot_entry_delay: bool = False
+    # 參數掃描用：進場訊號過濾（0 / 全級 = 維持原行為）
+    min_entry_score: float = 0.0
+    allowed_tiers: Tuple[str, ...] = ("S", "A", "B")
 
 
 def _num(s):
@@ -285,6 +288,8 @@ def run_portfolio_backtest(
             row = df.iloc[loc]
             ok, score, tier, tactic = _signal_score(row)
             if not ok:
+                continue
+            if score < float(cfg.min_entry_score) or tier not in cfg.allowed_tiers:
                 continue
             next_date = df.index[loc + 1]
             next_idx_signals.append((next_date, {

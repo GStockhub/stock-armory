@@ -45,25 +45,11 @@ SESSION_KEY = "_stock_armory_chips_history_df"
 MIN_USABLE_CHIP_ROWS = max(20, int(os.environ.get("CHIPS_MIN_USABLE_ROWS", "50")))
 
 
-def _maybe_cache_data(ttl=1800, show_spinner=False):
-    def deco(fn):
-        if st is not None:
-            return st.cache_data(ttl=ttl, show_spinner=show_spinner)(fn)
-        return fn
-    return deco
+from net_utils import maybe_cache_data as _maybe_cache_data, build_session, smart_get
 
 
 def _get_session() -> requests.Session:
-    s = requests.Session()
-    retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["GET", "HEAD", "OPTIONS"])
-    adapter = HTTPAdapter(max_retries=retry)
-    s.mount("http://", adapter)
-    s.mount("https://", adapter)
-    s.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
-    })
-    return s
+    return build_session(with_retry=True)
 
 
 def _num(s) -> pd.Series:
@@ -335,7 +321,7 @@ def sync_chips_history(new_history: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
 def fetch_twse_t86(date_yyyymmdd: str, session: Optional[requests.Session] = None) -> pd.DataFrame:
     session = session or _get_session()
     url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={date_yyyymmdd}&selectType=ALLBUT0999&response=json"
-    r = session.get(url, timeout=20, verify=False)
+    r = smart_get(url, session=session, timeout=20)
     if r.status_code != 200:
         return pd.DataFrame()
     try:
@@ -370,7 +356,7 @@ def fetch_finmind_chips(date_iso: str, fm_token: Optional[str] = None, session: 
     params = {"dataset": "TaiwanStockInstitutionalInvestorsBuySell", "start_date": date_iso, "end_date": date_iso}
     if fm_token and str(fm_token).strip():
         params["token"] = str(fm_token).strip()
-    r = session.get(url, params=params, timeout=24, verify=False)
+    r = smart_get(url, session=session, timeout=24, params=params)
     if r.status_code != 200:
         return pd.DataFrame()
     try:
@@ -426,7 +412,7 @@ def fetch_tpex_chips(dt: datetime, session: Optional[requests.Session] = None) -
     ]
     for url in urls:
         try:
-            r = session.get(url, timeout=24, verify=False)
+            r = smart_get(url, session=session, timeout=24)
             if r.status_code != 200 or not r.text.strip():
                 continue
             tables = pd.read_html(io.StringIO(r.text))

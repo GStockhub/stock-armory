@@ -184,22 +184,11 @@ def _filter_complete_holdings(df: pd.DataFrame, industry_map: Optional[Dict[str,
 # 基礎工具
 # -----------------------------
 
-def _maybe_cache_data(ttl=1800, show_spinner=False):
-    def deco(fn):
-        if st is not None:
-            return st.cache_data(ttl=ttl, show_spinner=show_spinner)(fn)
-        return fn
-    return deco
+from net_utils import maybe_cache_data as _maybe_cache_data, build_session, smart_get
 
 
 def _session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    })
-    return s
+    return build_session(with_retry=True)
 
 
 def _to_float(v, default=0.0) -> float:
@@ -298,7 +287,7 @@ def _source_urls_for(code: str, custom_sources: Optional[Dict[str, str]] = None)
 
 def _fetch_html(url: str, timeout: int = 18) -> str:
     try:
-        resp = _session().get(url, timeout=timeout, verify=False)
+        resp = smart_get(url, session=_session(), timeout=timeout)
         resp.raise_for_status()
         text = resp.text or ""
         return text if len(text) >= 100 else ""

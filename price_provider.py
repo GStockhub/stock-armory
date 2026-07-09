@@ -152,8 +152,17 @@ def save_last_good_cache(sid: str, df: pd.DataFrame) -> None:
             pass
 
 
+# 效能優化：記住每檔股票成功的 Yahoo 後綴（.TW 上市 / .TWO 上櫃）。
+# 上櫃股原本每次都會先浪費一次 .TW 請求（必失敗），記住後可省下約一半的無效網路往返。
+_YF_SUFFIX_MEMORY = {}
+
+
 def fetch_yfinance_price(sid: str, period: str = "60d", min_bars: int = 20) -> pd.DataFrame:
-    for suffix in [".TW", ".TWO"]:
+    suffixes = [".TW", ".TWO"]
+    remembered = _YF_SUFFIX_MEMORY.get(sid)
+    if remembered in suffixes:
+        suffixes = [remembered] + [s for s in suffixes if s != remembered]
+    for suffix in suffixes:
         try:
             ticker = f"{sid}{suffix}"
             # yfinance 會把 404 / delisted 訊息直接吐到 stderr；這裡靜音，避免 Streamlit log 被逐檔洗版。
@@ -161,6 +170,7 @@ def fetch_yfinance_price(sid: str, period: str = "60d", min_bars: int = 20) -> p
                 raw = yf.download(ticker, period=period, threads=False, progress=False, auto_adjust=False)
             df = normalize_price_df(raw, source=f"Yahoo{suffix}", min_bars=min_bars)
             if validate_price_df(df, min_bars=min_bars):
+                _YF_SUFFIX_MEMORY[sid] = suffix
                 return df
         except Exception:
             continue

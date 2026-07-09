@@ -19,12 +19,7 @@ except Exception:
     st = None
 
 
-def _maybe_cache_data(ttl=21600, show_spinner=False):
-    def deco(fn):
-        if st is not None:
-            return st.cache_data(ttl=ttl, show_spinner=show_spinner)(fn)
-        return fn
-    return deco
+from net_utils import maybe_cache_data as _maybe_cache_data
 
 
 def _is_etf_like(sid: str) -> bool:

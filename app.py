@@ -3,20 +3,28 @@ import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import time
-import ssl
+import os
 import html
-from streamlit_cookies_controller import CookieController
 
 from data_center import load_industry_map, get_macro_dashboard, fetch_chips_data, read_remote_csv, convert_gsheet_url, ACTIVE_ETF_NAME_MAP
 from quant_engine import run_sandbox_sim, level2_quant_engine
 from decision_logic import get_institution_state, get_decision_label, get_next_action, calc_refined_safety_score, is_institution_observation
 from backtest_engine import BacktestConfig, run_portfolio_backtest
+from app_helpers import (
+    format_lots, _row_text, _to_float_safe, _parse_tw_date_safe,
+    _clean_stock_code, _valid_stock_codes, _macro_to_float,
+)
+import auth
 
-try:
-    _create_unverified_https_context = ssl._create_unverified_context
-except AttributeError: pass
-else: ssl._create_default_https_context = _create_unverified_https_context
+# 安全性更新：不再全域關閉 SSL 憑證驗證。
+# 個別憑證有問題的網站由 net_utils.smart_get() 逐主機自動降級處理。
+# 若部署環境確實需要舊行為，設定環境變數 ALLOW_INSECURE_SSL=1（僅供除錯）。
+if str(os.environ.get("ALLOW_INSECURE_SSL", "")).strip() in {"1", "true", "yes"}:
+    import ssl
+    try:
+        ssl._create_default_https_context = ssl._create_unverified_context
+    except AttributeError:
+        pass
 
 import manual as manual_module
 MANUAL_TEXT = getattr(manual_module, "MANUAL_TEXT", "")
@@ -35,47 +43,10 @@ from fundamental_engine import get_fundamental_badge
 st.set_page_config(page_title="我要賺大錢", page_icon="💰️", layout="wide", initial_sidebar_state="expanded")
 
 # ---------------------------------------------------------
-# 🔒 專屬門禁與 API Token
+# 🔒 專屬門禁與 API Token（邏輯已抽至 auth.py，密碼不再硬編碼）
 # ---------------------------------------------------------
-ADMIN_PWD = st.secrets.get("admin_pwd", "0989")
-GUEST_PWD = st.secrets.get("guest_pwd", "1023")
-FM_TOKEN = st.secrets.get("fm_token", "")
-
-try:
-    controller = CookieController()
-    try:
-        auth_status = controller.get("v3_auth_token")
-    except Exception:
-        auth_status = st.session_state.get("v3_auth_token", None)
-except Exception:
-    controller = None
-    auth_status = st.session_state.get("v3_auth_token", None)
-
-if auth_status not in ["admin_auth", "guest_auth"]:
-    st.markdown("<h1 style='text-align: center; margin-top: 100px;'>🔒 終極戰情室 - 軍事管制區</h1>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        pwd = st.text_input("請輸入通行密碼：", type="password", placeholder="輸入密碼後按下 Enter 或點擊解鎖")
-        if st.button("🔓 驗證並解鎖", use_container_width=True) or pwd:
-            if pwd == ADMIN_PWD:
-                st.session_state["v3_auth_token"] = "admin_auth"
-                try:
-                    if controller is not None: controller.set("v3_auth_token", "admin_auth", max_age=2592000)
-                except Exception: pass
-                st.success("✅ 統帥確認：...正在為您開啟專屬戰情室...")
-                time.sleep(1.2)
-                st.rerun()
-            elif pwd == GUEST_PWD:
-                st.session_state["v3_auth_token"] = "guest_auth"
-                try:
-                    if controller is not None: controller.set("v3_auth_token", "guest_auth", max_age=2592000)
-                except Exception: pass
-                st.success("✅ 友軍確認：...正在開啟系統...")
-                time.sleep(1.2)
-                st.rerun()
-            elif pwd != "":
-                st.error("❌ 密碼錯誤！防禦系統已啟動。")
-    st.stop()
+FM_TOKEN = auth.get_fm_token()
+auth_status, controller = auth.ensure_authenticated()
 
 # UI 共用樣式已固化於 theme.py，由 sidebar.render_sidebar() 套用。
 configs = sidebar.render_sidebar(auth_status)
@@ -86,11 +57,11 @@ etf_holdings_url = str(configs.get("etf_holdings_url", "")).strip()
 mobile_quick_mode = bool(configs.get("mobile_quick_mode", False))
 
 try: total_capital = float(configs.get("total_capital", 100000))
-except: total_capital = 100000.0
+except Exception: total_capital = 100000.0
 try: risk_amount = float(configs.get("risk_amount", 1000))
-except: risk_amount = 1000.0
+except Exception: risk_amount = 1000.0
 try: fee_discount = float(configs.get("fee_discount", 1.0))
-except: fee_discount = 1.0
+except Exception: fee_discount = 1.0
 operation_mode = configs.get("operation_mode", "標準模式")
 MODE_PROFILE = {
     "保守模式": {"s": 92, "a": 72, "b": 55, "size": 0.70, "label": "🛡️ 保守模式", "note": "提高分數門檻、建議買量打7折，只打最有把握的球。"},
@@ -118,12 +89,7 @@ def risk_color(val):
         if v >= 88: return f'color: {COLORS["green"]}; font-weight: bold;'
         elif v < 45: return f'color: {COLORS["red"]}; font-weight: bold;'
         return f'color: {COLORS["primary"]}; font-weight: bold;'
-    except: return ""
-
-def format_lots(shares):
-    lots = int(shares) / 1000
-    if lots <= 0: return "0"
-    return f"{lots:.1f}".rstrip("0").rstrip(".")
+    except Exception: return ""
 
 def render_data_health_panel():
     health = []
@@ -168,51 +134,6 @@ def render_data_status_bar():
     """
     st.markdown(html_block, unsafe_allow_html=True)
 
-
-def _row_text(row, possible_keys, exclude_keys=None, default=""):
-    exclude_keys = exclude_keys or []
-    for col in row.index:
-        c = str(col).strip()
-        if any(x in c for x in exclude_keys):
-            continue
-        if c in possible_keys or any(k in c for k in possible_keys):
-            val = row[col]
-            if pd.notna(val) and str(val).strip() not in ["", "nan", "NaN", "None"]:
-                return str(val).strip()
-    return default
-
-
-def _to_float_safe(v, default=0.0):
-    try:
-        raw = str(v).replace(",", "").strip()
-        if raw in ["", "nan", "NaN", "None"]:
-            return default
-        import re
-        m = re.search(r"-?\d+\.?\d*", raw)
-        return float(m.group(0)) if m else default
-    except Exception:
-        return default
-
-
-
-
-def _parse_tw_date_safe(v):
-    """解析 AAR / 持股表常見日期格式：YYYY-MM-DD、YYYY/MM/DD、民國年、MM-DD。失敗回傳 NaT。"""
-    try:
-        raw = str(v).strip().replace("/", "-").replace(".", "-")
-        if raw in ["", "nan", "NaN", "None"]:
-            return pd.NaT
-        parts = raw.split("-")
-        if len(parts) == 2:
-            return pd.to_datetime(f"{datetime.now().year}-{parts[0]}-{parts[1]}", errors="coerce")
-        if len(parts) == 3:
-            y = int(float(parts[0]))
-            if y < 1911:
-                y += 1911
-            return pd.to_datetime(f"{y}-{parts[1]}-{parts[2]}", errors="coerce")
-        return pd.to_datetime(raw, errors="coerce")
-    except Exception:
-        return pd.NaT
 
 def build_rescue_residual_map(aar_df, current_codes):
     """從 AAR 交易日誌找出：同代號近期/歷史已有認賠紀錄，但目前仍持有的救援殘倉。"""
@@ -293,13 +214,6 @@ def render_battle_summary(master_list, rank_sorted):
                 <div style="font-size:12.5px; line-height:1.35; color:{COLORS['subtext']};">{sub}</div>
             </div>
             """, unsafe_allow_html=True)
-
-
-def _macro_to_float(val):
-    try:
-        return float(str(val).replace("%", "").replace(",", "").strip())
-    except Exception:
-        return np.nan
 
 
 def build_macro_brief(macro_df, macro_score, overheat_flag):
@@ -470,41 +384,6 @@ aar_rows = 0
 aar_read_ok = False
 aar_probe_df = pd.DataFrame()
 rescue_residual_map = {}
-
-
-def _clean_stock_code(x):
-    """把候選股代號標準化；排除 NaN、0、空字串、ETF。
-
-    這層是為了避免法人快取或 CSV 欄位被 pandas 轉成 NaN/0，
-    造成 S/A/B 掃描拿 NaN、0 去抓 K 線，整批顯示無技術資料。
-    """
-    try:
-        if pd.isna(x):
-            return ""
-    except Exception:
-        pass
-    s = str(x).strip().upper()
-    if not s or s in {"NAN", "NONE", "NULL", "0", "0.0", "-"}:
-        return ""
-    s = s.replace(".TW", "").replace(".TWO", "")
-    if s.endswith(".0"):
-        s = s[:-2]
-    # 有些來源會把代號存成 2330 台積電，先取第一段。
-    s = s.split()[0].strip()
-    if s.isdigit() and len(s) == 4 and not s.startswith("00"):
-        return s
-    return ""
-
-
-def _valid_stock_codes(values):
-    out = []
-    seen = set()
-    for v in values or []:
-        c = _clean_stock_code(v)
-        if c and c not in seen:
-            out.append(c)
-            seen.add(c)
-    return out
 
 
 def _sanitize_today_df(df):
@@ -921,6 +800,18 @@ def render_mainstream_exposure_alert(hold_df, COLORS, industry_map, name_map):
     """, unsafe_allow_html=True)
 
 @st.fragment
+def _fragment_deco(fn):
+    """Streamlit >=1.37 支援 fragment：沙盤查詢只重跑此區塊，不重跑整個 app。舊版自動退回原行為。"""
+    frag = getattr(st, "fragment", None)
+    if callable(frag):
+        try:
+            return frag(fn)
+        except Exception:
+            return fn
+    return fn
+
+
+@_fragment_deco
 def render_sandbox_panel():
     st.markdown("### 🔮 <span class='highlight-primary'>沙盤推演</span>", unsafe_allow_html=True)
     col_s1, col_s2 = st.columns([1, 3])
@@ -961,14 +852,34 @@ def _fmt_money0(x):
 if mobile_quick_mode:
     mobile_ui.render_mobile_battle_room(
         COLORS, TWSE_NAME_MAP, FM_TOKEN, run_sandbox_sim, get_fundamental_badge,
-        auth_status, m_df, fee_discount
+        auth_status, m_df, fee_discount,
+        macro_score=MACRO_SCORE, overheat_flag=OVERHEAT_FLAG,
     )
     st.stop()
 
 
-t_rank, t_etf, t_chip, t_cmd, t_book = st.tabs(["🎯 個股游擊", "📈 ETF 主體倉", "📡 情報局", "🏦 總司令部", "📖 兵工廠與軍史館"])
+# =========================================================
+# ⚡ 效能優化：懶加載分頁
+# st.tabs 每次 rerun 會渲染「全部」分頁內容（含背後運算）；
+# 改為條件渲染後，只有當前分頁的程式碼會執行，
+# 切換說明書/司令部時不再重跑個股掃描。
+# =========================================================
+_PAGE_LABELS = ["🎯 個股游擊", "📈 ETF 主體倉", "📡 情報局", "🏦 總司令部", "📖 兵工廠與軍史館"]
+try:
+    _active_page = st.segmented_control(
+        "戰情分頁", _PAGE_LABELS, default=_PAGE_LABELS[0],
+        key="armory_active_page", label_visibility="collapsed",
+    )
+except Exception:
+    # 舊版 Streamlit（<1.40）沒有 segmented_control，退回水平 radio
+    _active_page = st.radio(
+        "戰情分頁", _PAGE_LABELS, horizontal=True,
+        key="armory_active_page", label_visibility="collapsed",
+    )
+if not _active_page:
+    _active_page = _PAGE_LABELS[0]
 
-with t_rank:
+if _active_page == "🎯 個股游擊":
     _ensure_today_candidates("進入個股游擊時 today_df 仍為空")
     render_sandbox_panel()
     st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
@@ -1591,10 +1502,10 @@ with t_rank:
                             """, unsafe_allow_html=True)
 
 
-with t_etf:
+if _active_page == "📈 ETF 主體倉":
     etf_ui.render_etf_tab(COLORS, FM_TOKEN, TWSE_IND_MAP, TWSE_NAME_MAP, etf_holdings_url, table_style)
 
-with t_chip:
+if _active_page == "📡 情報局":
     render_daily_intel_panel(st, COLORS, table_style=table_style)
     st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     _ensure_today_candidates("進入情報局時 today_df 仍為空")
@@ -1634,7 +1545,7 @@ with t_chip:
     else:
         st.info("法人籌碼暫時無法取得；情報局會在技術備援候選池建立後恢復。沙盤、ETF、司令部仍可使用。")
 
-with t_cmd:
+if _active_page == "🏦 總司令部":
     cmd_hold_tab, cmd_aar_tab, cmd_bt_tab = st.tabs(["🛡️ 持股風控", "📊 AAR 戰術教練", "🧪 訊號追蹤室"])
     with cmd_hold_tab:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
@@ -1654,7 +1565,7 @@ with t_cmd:
                             val = row_data[col]
                             if pd.notna(val) and str(val).strip() != '':
                                 try: return float(str(val).replace(',', '').strip())
-                                except: pass
+                                except Exception: pass
                     return default
 
                 total_float_pnl = 0
@@ -1667,7 +1578,7 @@ with t_cmd:
                             buy_r = p_cost_r * qty_r * 1000 * (1 + active_fee_rate)
                             sell_r = p_now_r * qty_r * 1000 * (1 - active_fee_rate - 0.003)
                             total_float_pnl += (sell_r - buy_r)
-                    except: pass
+                    except Exception: pass
 
                 float_loss_pct = (total_float_pnl / total_capital * 100) if total_capital > 0 else 0
                 if float_loss_pct <= -2.0:
@@ -1711,7 +1622,7 @@ with t_cmd:
                                         timer_color = COLORS["red"]
                                         timer_warning = f" ⚠️ 已持 {held_days_now} 天！超出甜蜜點"
                                     else: timer_warning = f" (已持 {held_days_now} 天)"
-                            except: pass
+                            except Exception: pass
 
                         if p_now > 0 and qty > 0:
                             buy_cost_total = (p_cost * qty * 1000) + int((p_cost * qty * 1000) * active_fee_rate)
@@ -1880,8 +1791,10 @@ with t_cmd:
             overheat_flag=OVERHEAT_FLAG,
             operation_mode=operation_mode,
         )
+        import param_scan
+        param_scan.render_param_scan_panel(COLORS, table_style, FM_TOKEN, name_map=TWSE_NAME_MAP)
 
-with t_book:
+if _active_page == "📖 兵工廠與軍史館":
     quick_tab, context_tab, full_tab, hist_tab = st.tabs(["⚡ 快速版", "🧭 分區名詞", "📚 完整兵工廠", "🏛️ 軍史館"])
     with quick_tab:
         st.markdown(QUICK_MANUAL_TEXT, unsafe_allow_html=True)

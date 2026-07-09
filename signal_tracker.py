@@ -31,7 +31,7 @@ SIGNAL_COLUMNS = [
     "基準價",
     "沙盤狀態", "沙盤等級", "沙盤建議", "沙盤現價", "沙盤M5", "沙盤M10", "沙盤乖離", "沙盤勝率", "沙盤停損價", "沙盤檢查時間",
     "樣本代號", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%",
-    "是否達標", "是否失敗", "更新時間",
+    "是否達標", "是否失敗", "模式", "大盤分數", "更新時間",
 ]
 
 TRACKED_SIGNAL_TYPES = ["S級", "A級", "B級"]
@@ -81,9 +81,14 @@ def normalize_signal_history(df: pd.DataFrame, keep_days: int = 180) -> pd.DataF
     if keep_days:
         cutoff = (datetime.now() - timedelta(days=int(keep_days))).strftime("%Y-%m-%d")
         out = out[out["日期"] >= cutoff].copy()
-    for c in ["分數", "基準價", "沙盤現價", "沙盤M5", "沙盤M10", "沙盤乖離", "沙盤勝率", "沙盤停損價", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%"]:
+    for c in ["分數", "基準價", "沙盤現價", "沙盤M5", "沙盤M10", "沙盤乖離", "沙盤勝率", "沙盤停損價", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%", "大盤分數"]:
         out[c] = pd.to_numeric(out[c], errors="coerce")
-    for c in ["類型", "代號", "名稱", "評級", "產業", "狀態", "來源摘要", "沙盤狀態", "沙盤等級", "沙盤建議", "沙盤檢查時間", "樣本代號", "是否達標", "是否失敗", "更新時間"]:
+    # 資料瘦身：去除 float32 精度雜訊（63.70000076...），CSV 更小、git diff 更乾淨。
+    for c in ["基準價", "沙盤現價", "沙盤M5", "沙盤M10", "沙盤停損價"]:
+        out[c] = out[c].round(2)
+    for c in ["分數", "沙盤乖離", "沙盤勝率", "隔日漲跌%", "3日最高漲幅%", "5日最高漲幅%", "大盤分數"]:
+        out[c] = out[c].round(2)
+    for c in ["類型", "代號", "名稱", "評級", "產業", "狀態", "來源摘要", "沙盤狀態", "沙盤等級", "沙盤建議", "沙盤檢查時間", "樣本代號", "是否達標", "是否失敗", "模式", "更新時間"]:
         out[c] = out[c].astype(str).replace("nan", "")
     out["代號"] = out["代號"].map(_clean_code)
     out = out.drop_duplicates(subset=["日期", "類型", "代號", "名稱"], keep="last")
@@ -311,6 +316,12 @@ def _current_signal_rows(twse_ind_map: Dict[str, str], twse_name_map: Optional[D
 
     rows = _attach_sandbox_to_rows(rows, twse_name_map, fm_token)
     out = pd.DataFrame(rows)
+    if not out.empty:
+        out["模式"] = str(operation_mode or "")
+        try:
+            out["大盤分數"] = float(macro_score)
+        except Exception:
+            out["大盤分數"] = np.nan
     return normalize_signal_history(out, keep_days=9999)
 
 def _calc_returns_for_code(code: str, base_date: str, base_price: float, fm_token: str) -> Tuple[float, float, float]:
@@ -521,6 +532,10 @@ def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, twse_
         hide_index=True,
         height=420,
     )
+
+    st.markdown("<hr style='margin: 18px 0; border-color: " + COLORS.get("border", "#444") + ";'>", unsafe_allow_html=True)
+    import signal_quality
+    signal_quality.render_quality_dashboard(history, COLORS, table_style, operation_mode=operation_mode)
 
     with st.expander("🧾 CSV 保存設計", expanded=False):
         st.markdown("""

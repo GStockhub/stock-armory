@@ -8,6 +8,7 @@ from __future__ import annotations
 import html
 import re
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -210,12 +211,15 @@ def build_mobile_holdings_view(hold_df, fee_discount, twse_name_map):
     return out, total
 
 
-def render_mobile_holdings_panel(auth_status, m_df, colors, twse_name_map, fee_discount):
+def render_mobile_holdings_panel(auth_status, m_df, colors, twse_name_map, fee_discount, precomputed=None):
     st.markdown("### 💼 <span class='highlight-primary'>我的持股戰情</span>", unsafe_allow_html=True)
     if auth_status != "admin_auth":
         st.info("友軍模式不顯示個人持股、成本與損益；沙盤推演與其他功能仍可使用。")
         return
-    hold_view, total_pnl = build_mobile_holdings_view(m_df, fee_discount, twse_name_map)
+    if precomputed is not None:
+        hold_view, total_pnl = precomputed
+    else:
+        hold_view, total_pnl = build_mobile_holdings_view(m_df, fee_discount, twse_name_map)
     if hold_view.empty:
         st.info("目前沒有讀到有效持股資料，請確認 secrets / CSV 網址。")
         return
@@ -246,9 +250,109 @@ def render_mobile_holdings_panel(auth_status, m_df, colors, twse_name_map, fee_d
     st.markdown(cards, unsafe_allow_html=True)
 
 
-def render_mobile_battle_room(colors, twse_name_map, fm_token, run_sandbox_sim, get_fundamental_badge, auth_status, m_df, fee_discount):
+def _macro_light(macro_score, overheat_flag):
+    """把大盤環境濃縮成一顆紅綠燈。"""
+    try:
+        score = float(macro_score)
+    except Exception:
+        score = np.nan
+    if overheat_flag:
+        return "🟡", "大盤過熱", "指數乖離偏高，只出半量、拉高停損紀律。"
+    if np.isnan(score):
+        return "⚪", "環境未知", "大盤資料未取得，先以個股結構與停損為準。"
+    if score >= 70:
+        return "🟢", "環境有利", "多頭環境，按模式正常出兵。"
+    if score >= 45:
+        return "🟡", "環境中性", "選股不選市，只打 S/A 與沙盤通過的球。"
+    return "🔴", "環境不利", "空方環境，今日以觀望與持股防守為主。"
+
+
+def _today_top_candidates(max_n=3):
+    """從訊號追蹤室讀今日已保存的 S/A/B 快照前幾名（不觸發掃描，維持手機模式輕量）。"""
+    try:
+        import signal_tracker
+        from datetime import datetime as _dt
+        hist, _ = signal_tracker.load_signal_history()
+        if hist is None or hist.empty:
+            return pd.DataFrame(), False
+        today = _dt.now().strftime("%Y-%m-%d")
+        t = hist[(hist["日期"] == today) & (hist["類型"].isin(["S級", "A級", "B級"]))].copy()
+        if t.empty:
+            return pd.DataFrame(), True
+        order = {"S級": 0, "A級": 1, "B級": 2}
+        t["_o"] = t["類型"].map(order)
+        t["分數"] = pd.to_numeric(t["分數"], errors="coerce")
+        return t.sort_values(["_o", "分數"], ascending=[True, False]).head(max_n), True
+    except Exception:
+        return pd.DataFrame(), False
+
+
+def render_mobile_command_brief(colors, macro_score, overheat_flag, hold_view, auth_status):
+    """三秒決策區：① 大盤紅綠燈 ② 持股警報 ③ 今日候選前三。"""
+    icon, title, advice = _macro_light(macro_score, overheat_flag)
+
+    # ① 大盤紅綠燈（最大的一張卡）
+    st.markdown(f"""
+    <div style="background:{colors['card']}; border:1px solid {colors['border']}; border-radius:14px; padding:14px 16px; margin-bottom:10px; text-align:center;">
+        <div style="font-size:34px; line-height:1;">{icon}</div>
+        <div style="font-size:17px; font-weight:900; color:{colors['text']}; margin-top:4px;">{title}</div>
+        <div style="font-size:13px; color:{colors['subtext']}; margin-top:3px;">{advice}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ② 持股警報（admin 才有持股資料）
+    if auth_status == "admin_auth" and hold_view is not None and not hold_view.empty:
+        alerts = hold_view[hold_view["風險排序"] <= 2]
+        if not alerts.empty:
+            worst = alerts.iloc[0]
+            body = "、".join(f"{r['名稱']}({r['代號']})" for _, r in alerts.head(3).iterrows())
+            st.markdown(f"""
+            <div style="background:{colors['card']}; border:1px solid {colors['red']}; border-left:6px solid {colors['red']}; border-radius:12px; padding:11px 14px; margin-bottom:10px;">
+                <b style="color:{colors['red']};">🚨 持股警報：{len(alerts)} 檔需處理</b>
+                <div style="font-size:13.5px; color:{colors['text']}; margin-top:4px;">{html.escape(body)}</div>
+                <div style="font-size:12.5px; color:{colors['subtext']}; margin-top:3px;">最優先：{html.escape(str(worst['名稱']))} — {html.escape(str(worst['今日指令']))}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="background:{colors['card']}; border:1px solid {colors['border']}; border-left:6px solid {colors['green']}; border-radius:12px; padding:10px 14px; margin-bottom:10px;">
+                <b style="color:{colors['green']};">✅ 持股防線完整</b>
+                <span style="font-size:13px; color:{colors['subtext']};">　{len(hold_view)} 檔皆守在均線之上，照 SOP 續抱。</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ③ 今日候選前三（讀已保存快照，不觸發掃描）
+    cands, loaded = _today_top_candidates(3)
+    if not cands.empty:
+        chips = ""
+        for _, r in cands.iterrows():
+            chips += f"""<span style="display:inline-block; background:{colors['bg']}; border:1px solid {colors['border']}; border-radius:99px; padding:4px 11px; margin:2px 4px 2px 0; font-size:13px; color:{colors['text']};"><b>{html.escape(str(r['類型']))}</b>　{html.escape(str(r['名稱']))}({html.escape(str(r['代號']))})</span>"""
+        st.markdown(f"""
+        <div style="background:{colors['card']}; border:1px solid {colors['border']}; border-radius:12px; padding:10px 14px; margin-bottom:6px;">
+            <b style="color:{colors['text']}; font-size:14px;">🎯 今日候選</b><div style="margin-top:6px;">{chips}</div>
+            <div style="font-size:12px; color:{colors['subtext']}; margin-top:5px;">想深入哪一檔？把代號貼進下方沙盤體檢。</div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif loaded:
+        st.caption("今日尚未保存作戰快照；回到桌面版掃描後按「保存今日作戰快照」，這裡就會出現候選名單。")
+
+
+def render_mobile_battle_room(colors, twse_name_map, fm_token, run_sandbox_sim, get_fundamental_badge, auth_status, m_df, fee_discount, macro_score=None, overheat_flag=False):
     st.markdown("<h1 style='text-align: center;' class='highlight-primary'>📱 手機模式</h1>", unsafe_allow_html=True)
-    st.caption("手機版只保留沙盤推演與持股戰情；沙盤放最上方，方便臨場快速查單檔。")
+
+    # 持股視圖只算一次，決策區與持股面板共用
+    hold_view, total_pnl = (pd.DataFrame(), 0.0)
+    if auth_status == "admin_auth":
+        hold_view, total_pnl = build_mobile_holdings_view(m_df, fee_discount, twse_name_map)
+
+    # ── ① 三秒決策區：先回答「今天能不能出手、有沒有火要滅」 ──
+    render_mobile_command_brief(colors, macro_score, overheat_flag, hold_view, auth_status)
+
+    # ── ② 沙盤推演：臨場查單檔 ──
+    st.markdown("<hr style='margin: 8px 0 14px 0; border-color: " + colors["border"] + ";'>", unsafe_allow_html=True)
     render_quick_sandbox_panel(colors, twse_name_map, fm_token, run_sandbox_sim, get_fundamental_badge)
+
+    # ── ③ 持股戰情細節 ──
     st.markdown("<hr style='margin: 10px 0 18px 0; border-color: " + colors["border"] + ";'>", unsafe_allow_html=True)
-    render_mobile_holdings_panel(auth_status, m_df, colors, twse_name_map, fee_discount)
+    render_mobile_holdings_panel(auth_status, m_df, colors, twse_name_map, fee_discount,
+                                 precomputed=(hold_view, total_pnl) if auth_status == "admin_auth" else None)

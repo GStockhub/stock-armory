@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import concurrent.futures
+import os
+
+# 效能優化：掃描並行度可由環境變數 SCAN_MAX_WORKERS 調整（預設 8，原為 5）。
+# 若遇 Yahoo/FinMind 限流可調回 5。
+SCAN_MAX_WORKERS = max(2, int(os.environ.get("SCAN_MAX_WORKERS", "8")))
 from data_center import fetch_single_stock_batch_diag, safe_download, ACTIVE_ETF_NAME_MAP
 
 
@@ -311,7 +316,7 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
 
     bulk_data = {}
     scan_diag = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=SCAN_MAX_WORKERS) as executor:
         futures = {executor.submit(fetch_single_stock_batch_diag, sid, fm_token): sid for sid in calc_list}
         for future in concurrent.futures.as_completed(futures):
             sid = futures[future]

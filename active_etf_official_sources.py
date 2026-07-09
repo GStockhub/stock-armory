@@ -143,19 +143,16 @@ except Exception:
 OUTPUT_COLUMNS = ["日期", "ETF代號", "ETF名稱", "成分股代號", "成分股名稱", "權重", "持有股數", "來源"]
 
 
+from net_utils import build_session, smart_get
+
+
 def _session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    })
-    return s
+    return build_session(with_retry=True)
 
 
 def _fetch_html(url: str, timeout: int = 25) -> str:
     try:
-        resp = _session().get(url, timeout=timeout, verify=False)
+        resp = smart_get(url, session=_session(), timeout=timeout)
         resp.raise_for_status()
         text = resp.text or ""
         return text if len(text) >= 80 else ""

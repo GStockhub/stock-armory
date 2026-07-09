@@ -9,6 +9,7 @@ import streamlit as st
 import urllib3
 import yfinance as yf
 from price_provider import safe_download_price
+from net_utils import smart_get
 from chips_provider import safe_fetch_chips
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -87,7 +88,7 @@ def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
         return pd.DataFrame()
     session = get_retry_session()
     try:
-        resp = session.get(url, timeout=20, verify=False)
+        resp = smart_get(url, session=session, timeout=20)
         resp.raise_for_status()
         content = resp.content.decode('utf-8-sig')
         return pd.read_csv(io.StringIO(content), dtype=dtype)
