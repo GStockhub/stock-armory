@@ -27,6 +27,13 @@ def _to_float_safe(v, default=0.0):
 def _get_sandbox_grade(res, colors):
     p_now, m5, m10 = res["現價"], res["M5"], res["M10"]
     bias, win_rate, sl_price = res["乖離"], res["勝率"], res["停損價"]
+    # V38：流動性優先於技術結構 —— 牛皮股再漂亮的型態都不打。
+    liq_tier = str(res.get("流動性分級", "") or "")
+    if liq_tier in ("地雷級", "不適合短線") or (liq_tier == "可交易" and not bool(res.get("短線可交易", True))):
+        avg_lots = res.get("20日均量(張)", 0)
+        grade_color, grade_text = colors["red"], "⛔ 流動性不足 (排除)"
+        advice = f"20日均量僅 {avg_lots:,.0f} 張（{res.get('流動性狀態','量能不足')}）。牛皮股滑價大、想跑跑不掉，技術面再好也不列入 3-5 天波段。"
+        return grade_color, grade_text, advice
     if p_now < m10:
         grade_color, grade_text = colors["red"], "🛑 嚴禁接刀 (D級)"
         advice = f"現價跌破 M10 ({m10:.1f})，短線轉弱。站不回 M5 前不追；若 M10 無止跌，等 M20 觀察。"

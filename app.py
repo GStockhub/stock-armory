@@ -672,6 +672,15 @@ except Exception:
     with st.sidebar:
         st.markdown(health_html, unsafe_allow_html=True)
 
+with st.sidebar:
+    if st.button("🔄 立即刷新持股/AAR 遠端資料", use_container_width=True, key="force_remote_refresh",
+                 help="持股表與 AAR 表預設快取 3 分鐘以加速互動；剛改完 Google Sheet 想立即看到就按這裡。"):
+        try:
+            read_remote_csv.clear()
+        except Exception:
+            pass
+        st.rerun()
+
 render_top_status_panel()
 
 # =========================================================
@@ -859,27 +868,17 @@ if mobile_quick_mode:
 
 
 # =========================================================
-# ⚡ 效能優化：懶加載分頁
-# st.tabs 每次 rerun 會渲染「全部」分頁內容（含背後運算）；
-# 改為條件渲染後，只有當前分頁的程式碼會執行，
-# 切換說明書/司令部時不再重跑個股掃描。
+# ⚡ V38 架構：st.tabs（一次渲染、前端切頁零重跑）+ fragment 區塊自治
+# 統帥指示：一次讀取完後隨意切頁不需重讀；互動區塊只更新自己。
+# - st.tabs 切頁是純前端行為，不觸發任何伺服器重跑。
+# - 各互動面板（沙盤、訊號追蹤、參數掃描）用 st.fragment 包起來，
+#   按面板內的按鈕只重跑該面板，不重跑整個網站。
+# - 資料層已全面快取（大盤/籌碼/持股表/遠端CSV），初次載入後的
+#   全頁執行成本主要剩渲染。
 # =========================================================
-_PAGE_LABELS = ["🎯 個股游擊", "📈 ETF 主體倉", "📡 情報局", "🏦 總司令部", "📖 兵工廠與軍史館"]
-try:
-    _active_page = st.segmented_control(
-        "戰情分頁", _PAGE_LABELS, default=_PAGE_LABELS[0],
-        key="armory_active_page", label_visibility="collapsed",
-    )
-except Exception:
-    # 舊版 Streamlit（<1.40）沒有 segmented_control，退回水平 radio
-    _active_page = st.radio(
-        "戰情分頁", _PAGE_LABELS, horizontal=True,
-        key="armory_active_page", label_visibility="collapsed",
-    )
-if not _active_page:
-    _active_page = _PAGE_LABELS[0]
+t_rank, t_etf, t_chip, t_cmd, t_book = st.tabs(["🎯 個股游擊", "📈 ETF 主體倉", "📡 情報局", "🏦 總司令部", "📖 兵工廠與軍史館"])
 
-if _active_page == "🎯 個股游擊":
+with t_rank:
     _ensure_today_candidates("進入個股游擊時 today_df 仍為空")
     render_sandbox_panel()
     st.markdown("<hr style='margin: 10px 0 25px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
@@ -1502,10 +1501,10 @@ if _active_page == "🎯 個股游擊":
                             """, unsafe_allow_html=True)
 
 
-if _active_page == "📈 ETF 主體倉":
+with t_etf:
     etf_ui.render_etf_tab(COLORS, FM_TOKEN, TWSE_IND_MAP, TWSE_NAME_MAP, etf_holdings_url, table_style)
 
-if _active_page == "📡 情報局":
+with t_chip:
     render_daily_intel_panel(st, COLORS, table_style=table_style)
     st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     _ensure_today_candidates("進入情報局時 today_df 仍為空")
@@ -1545,7 +1544,7 @@ if _active_page == "📡 情報局":
     else:
         st.info("法人籌碼暫時無法取得；情報局會在技術備援候選池建立後恢復。沙盤、ETF、司令部仍可使用。")
 
-if _active_page == "🏦 總司令部":
+with t_cmd:
     cmd_hold_tab, cmd_aar_tab, cmd_bt_tab = st.tabs(["🛡️ 持股風控", "📊 AAR 戰術教練", "🧪 訊號追蹤室"])
     with cmd_hold_tab:
         st.markdown("### 🏦 <span class='highlight-primary'>司令部：戰備資金精算</span>", unsafe_allow_html=True)
@@ -1794,7 +1793,7 @@ if _active_page == "🏦 總司令部":
         import param_scan
         param_scan.render_param_scan_panel(COLORS, table_style, FM_TOKEN, name_map=TWSE_NAME_MAP)
 
-if _active_page == "📖 兵工廠與軍史館":
+with t_book:
     quick_tab, context_tab, full_tab, hist_tab = st.tabs(["⚡ 快速版", "🧭 分區名詞", "📚 完整兵工廠", "🏛️ 軍史館"])
     with quick_tab:
         st.markdown(QUICK_MANUAL_TEXT, unsafe_allow_html=True)

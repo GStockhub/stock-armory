@@ -63,6 +63,7 @@ def convert_gsheet_url(url: str) -> str:
             return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
     return url
 
+@st.cache_data(ttl=180, show_spinner=False)
 def read_remote_csv(url: str, dtype=str) -> pd.DataFrame:
     """讀取遠端或本機 CSV。
 

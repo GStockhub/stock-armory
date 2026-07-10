@@ -114,6 +114,17 @@ def _default_scan_symbols(max_n: int = 12) -> List[str]:
     return []
 
 
+def _fragment_deco(fn):
+    """Streamlit >=1.37 fragment：面板內互動只重跑本面板，不重跑整個 app。舊版自動退回原行為。"""
+    frag = getattr(st, "fragment", None)
+    if callable(frag):
+        try:
+            return frag(fn)
+        except Exception:
+            return fn
+    return fn
+
+@_fragment_deco
 def render_param_scan_panel(COLORS: dict, table_style: dict, fm_token: str, name_map: Optional[Dict[str, str]] = None):
     with st.expander("🧪 參數掃描室：驗證 SOP 參數是否為歷史最優", expanded=False):
         st.caption("用同一批股票、同一段歷史，只改一個參數，比較資金曲線結果。一次掃一個維度，避免過擬合。")

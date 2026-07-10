@@ -41,8 +41,12 @@ def _liquidity_profile(price, today_volume, avg_volume_20):
     except Exception:
         price, today_volume, avg_volume_20 = 0.0, 0.0, 0.0
 
-    # TWSE 官方為股，部分來源可能已是張；用 100,000 作為保守分界。
-    unit_is_shares = max(today_volume, avg_volume_20) >= 100000
+    # V38 修復：舊版用 100,000 當「股/張」自動分界，導致日均量 < 100 張的牛皮股
+    # （如 80 張 = 80,000 股 < 100,000）被誤判成 80,000「張」→ 流動性理想 → 可進 S 級。
+    # 翻轉點恰好落在最該被攔下的標的上。實際上 price_provider 的三個來源
+    # （Yahoo / FinMind / TWSE）日成交量單位一律是「股」，故預設固定視為股；
+    # 若未來接入以張計的來源，設環境變數 LIQ_VOLUME_IN_LOTS=1 切換。
+    unit_is_shares = str(os.environ.get("LIQ_VOLUME_IN_LOTS", "")).strip() not in {"1", "true", "yes"}
     today_lots = today_volume / 1000.0 if unit_is_shares else today_volume
     avg_lots_20 = avg_volume_20 / 1000.0 if unit_is_shares else avg_volume_20
     avg_amount_20 = avg_volume_20 * price if unit_is_shares else avg_volume_20 * 1000.0 * price
@@ -60,10 +64,13 @@ def _liquidity_profile(price, today_volume, avg_volume_20):
         max_grade = "觀察"
         penalty = 35
     elif avg_lots_20 < 1000 or avg_amount_20 < 80_000_000:
+        # V38：日均 500–1000 張預設排除於 S/A/B 主清單（統帥不打牛皮股）。
+        # 想恢復舊行為（允許進 B 級）設環境變數 LIQ_ALLOW_THIN_B=1。
+        allow_thin_b = str(os.environ.get("LIQ_ALLOW_THIN_B", "")).strip() in {"1", "true", "yes"}
         tier = "可交易"
-        status = "🟡 可交易但不理想"
-        tradable = True
-        max_grade = "B"
+        status = "🟡 可交易但不理想" if allow_thin_b else "🟡 量不足千張：僅列觀察"
+        tradable = allow_thin_b
+        max_grade = "B" if allow_thin_b else "觀察"
         penalty = 10
     else:
         tier = "理想短線"
@@ -299,10 +306,18 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     ind = TWSE_NAME_MAP.get(sid, "未知")
     stop_price = max(m10, p_now - 1.5 * atr_now)
 
+    # V38：沙盤也做流動性體檢，牛皮股在單檔查詢時直接示警。
+    vol_ma20 = _last_roll(vol_s, 20, vol_ma5)
+    liq = _liquidity_profile(p_now, vol_now, vol_ma20)
+
     return {
         "代號": sid,
         "名稱": TWSE_NAME_MAP.get(sid, ACTIVE_ETF_NAME_MAP.get(sid, sid)),
         "現價": p_now,
+        "流動性分級": liq.get("流動性分級", ""),
+        "流動性狀態": liq.get("流動性狀態", ""),
+        "20日均量(張)": liq.get("20日均量(張)", 0),
+        "短線可交易": liq.get("短線可交易", True),
         "M5": m5,
         "M10": m10,
         "乖離": bias,

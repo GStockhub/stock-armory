@@ -441,6 +441,17 @@ def _summary_stats(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("類型")
 
 
+def _fragment_deco(fn):
+    """Streamlit >=1.37 fragment：面板內互動只重跑本面板，不重跑整個 app。舊版自動退回原行為。"""
+    frag = getattr(st, "fragment", None)
+    if callable(frag):
+        try:
+            return frag(fn)
+        except Exception:
+            return fn
+    return fn
+
+@_fragment_deco
 def render_signal_tracker_tab(COLORS, table_style, fm_token, twse_ind_map, twse_name_map=None, macro_score=None, overheat_flag=False, operation_mode="標準模式"):
     st.markdown("### 🧪 <span class='highlight-primary'>訊號追蹤室 V37.2</span>", unsafe_allow_html=True)
     st.caption("第一階段：只追蹤系統自動產生的 S/A/B 候選，保存時自動補沙盤體檢；不混入產業輪動、ETF、特殊關注或手動觀察。")
