@@ -1,8 +1,11 @@
-streamlit>=1.37.0
-pandas
-numpy
-requests
-yfinance
-urllib3
-streamlit-cookies-controller
-lxml
+# V38.3 版本鎖定：防止重新部署時解析到未驗證的最新版組合（Python 3.14 + pandas 3.0 + yfinance 1.x 曾造成 Segmentation fault）
+# 搭配 Streamlit Cloud 設定 Python 3.12 使用
+streamlit>=1.40,<1.50
+pandas>=2.2,<3.0
+numpy>=1.26,<2.3
+requests>=2.31,<3.0
+yfinance>=0.2.40,<0.3
+urllib3>=2.0,<3.0
+streamlit-cookies-controller==0.0.4
+lxml>=5.0,<7.0
+beautifulsoup4>=4.12,<5.0

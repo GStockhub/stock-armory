@@ -1100,6 +1100,19 @@ with t_rank:
                     )
                     st.warning("⚠️ 嚴格 S/A/B 條件暫時沒有主攻標的；已啟用保守觀察清單。這些標的需再用沙盤體檢，不代表直接買進。")
 
+            # V38.3 最終硬閘門：顯示前最後一道防線。不管標的從主清單、保守回填
+            # 或任何路徑進來，20日均成交金額 < 3,000 萬、真實今日量+均量雙低、
+            # 或「流動性欄位缺失」（NaN 視為 0 = 排除）一律攔下。預設放行的時代結束。
+            if not master_list.empty:
+                _amt = pd.to_numeric(master_list.get("20日均成交金額", pd.Series(0, index=master_list.index)), errors="coerce").fillna(0)
+                _avg_lots = pd.to_numeric(master_list.get("20日均量(張)", pd.Series(0, index=master_list.index)), errors="coerce").fillna(0)
+                _today_lots = pd.to_numeric(master_list.get("今日量(張)", pd.Series(0, index=master_list.index)), errors="coerce").fillna(0)
+                _final_gate = (_amt >= 30_000_000) & ((_avg_lots >= 100) | (_amt >= 150_000_000)) & ((_today_lots >= 100) | (_today_lots * pd.to_numeric(master_list["現價"], errors="coerce").fillna(0) * 1000 >= 30_000_000))
+                _blocked = master_list[~_final_gate]
+                if not _blocked.empty:
+                    st.info("🛡️ 最終流動性閘門已攔下：" + "、".join(f"{r['名稱']}({r['代號']})" for _, r in _blocked.iterrows()))
+                master_list = master_list[_final_gate].copy()
+
             master_list["名次"] = range(1, len(master_list) + 1) if not master_list.empty else []
 
             main_codes_now = set(master_list["代號"].astype(str).tolist()) if not master_list.empty else set()

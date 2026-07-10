@@ -294,8 +294,9 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
     
     df = df[~df.index.duplicated(keep="last")].copy()
     if "Volume" not in df.columns: df["Volume"] = 0
-    df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0)
-    df["Volume"] = df["Volume"].replace(0, np.nan).ffill().fillna(1000)
+    _vol_raw = pd.to_numeric(df["Volume"], errors="coerce").fillna(0)
+    _vol_liq = _vol_raw.copy()  # 真實量（0 保留）供流動性判定
+    df["Volume"] = _vol_raw.replace(0, np.nan).ffill().fillna(1000)
 
     close_s = pd.to_numeric(df["Close"], errors="coerce")
     open_s = pd.to_numeric(df["Open"], errors="coerce")
@@ -344,7 +345,9 @@ def run_sandbox_sim(sid, TWSE_NAME_MAP, fm_token=None):
 
     # V38：沙盤也做流動性體檢，牛皮股在單檔查詢時直接示警。
     vol_ma20 = _last_roll(vol_s, 20, vol_ma5)
-    liq = _liquidity_profile(p_now, vol_now, vol_ma20)
+    _liq_today = float(_vol_liq.iloc[-1]) if len(_vol_liq) else 0.0
+    _liq_ma20 = float(_vol_liq.tail(20).mean()) if len(_vol_liq) else 0.0
+    liq = _liquidity_profile(p_now, _liq_today, _liq_ma20)
 
     return {
         "代號": sid,
@@ -402,7 +405,12 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
                     row_failures.append({"代號": sid, "價格狀態": "🔴 欄位缺失", "失敗原因": f"缺少 {need_col}"})
                     raise ValueError(f"missing {need_col}")
             if "Volume" not in df.columns: df["Volume"] = 0
-            df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0).replace(0, np.nan).ffill().fillna(1000)
+            # V38.3 修復：舊版把 0 量日 ffill 成前一個有量日的數字 —— 牛皮股一次爆量
+            # 就能把之後所有零成交日灌成大量，20日均量與今日量雙雙失真，流動性濾網形同虛設。
+            # 拆成兩份：vol_liq_s 保留真實 0（專供流動性判定）；ffill 版僅供技術指標防除零。
+            vol_raw = pd.to_numeric(df["Volume"], errors="coerce").fillna(0)
+            vol_liq_s = vol_raw.copy()
+            df["Volume"] = vol_raw.replace(0, np.nan).ffill().fillna(1000)
 
             close_s = pd.to_numeric(df["Close"], errors="coerce")
             open_s = pd.to_numeric(df["Open"], errors="coerce")
@@ -437,7 +445,10 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
             vol_ma20 = _last_roll(vol_s, 20, vol_ma5)
 
             vol_ratio = vol_now / vol_ma5 if vol_ma5 > 0 else 1
-            liq = _liquidity_profile(p_now, vol_now, vol_ma20)
+            # 流動性用「真實量」判定：零成交日就是 0，不吃 ffill 灌水值。
+            _liq_today = float(vol_liq_s.iloc[-1]) if len(vol_liq_s) else 0.0
+            _liq_ma20 = float(vol_liq_s.tail(20).mean()) if len(vol_liq_s) else 0.0
+            liq = _liquidity_profile(p_now, _liq_today, _liq_ma20)
             fake_volume_spike = _is_fake_volume_spike(vol_ratio, liq.get("今日量(張)", 0))
             today_open = float(open_s.iloc[-1]) if pd.notna(open_s.iloc[-1]) else p_now
             today_high = float(high_s.iloc[-1]) if pd.notna(high_s.iloc[-1]) else p_now
