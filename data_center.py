@@ -131,7 +131,9 @@ def get_macro_dashboard():
     overheat_flag = False
 
     try:
-        data = yf.download(list(indices.keys()), period="60d", threads=False, progress=False)
+        from price_provider import _YF_LOCK
+        with _YF_LOCK:
+            data = yf.download(list(indices.keys()), period="60d", threads=False, progress=False, auto_adjust=False)
         if data.empty or "Close" not in data.columns:
             return 5, pd.DataFrame([{"名稱": "系統", "現價": "0", "月線(M20)": "0", "乖離(%)": "0", "狀態": "⚠️ Yahoo資料中斷"}]), False
 

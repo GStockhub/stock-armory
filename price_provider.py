@@ -21,7 +21,14 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
 import requests
+import threading
+
 import yfinance as yf
+
+# V38.4：yfinance 新版底層改用 curl-cffi，其 session 非執行緒安全；
+# 多執行緒掃描同時呼叫 yf.download 可能在原生層競態導致 Segmentation fault。
+# 所有 yf.download 一律經過此全域鎖序列化（FinMind/TWSE 等其他來源不受影響，仍可並行）。
+_YF_LOCK = threading.Lock()
 
 CACHE_DIR = os.environ.get("PRICE_CACHE_DIR", ".price_cache")
 TMP_CACHE_DIR = os.environ.get("PRICE_TMP_CACHE_DIR", "/tmp/stock_armory_price_cache")
@@ -166,7 +173,7 @@ def fetch_yfinance_price(sid: str, period: str = "60d", min_bars: int = 20) -> p
         try:
             ticker = f"{sid}{suffix}"
             # yfinance 會把 404 / delisted 訊息直接吐到 stderr；這裡靜音，避免 Streamlit log 被逐檔洗版。
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with _YF_LOCK, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 raw = yf.download(ticker, period=period, threads=False, progress=False, auto_adjust=False)
             df = normalize_price_df(raw, source=f"Yahoo{suffix}", min_bars=min_bars)
             if validate_price_df(df, min_bars=min_bars):
@@ -290,7 +297,7 @@ def fetch_batch_recent_bars(sids, period: str = "60d") -> dict:
     def _batch(codes, suffix):
         tickers = [f"{c}{suffix}" for c in codes]
         try:
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with _YF_LOCK, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 raw = yf.download(tickers, period=period, threads=False, progress=False,
                                   auto_adjust=False, group_by="ticker")
         except Exception:
