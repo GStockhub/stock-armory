@@ -51,27 +51,63 @@ def _liquidity_profile(price, today_volume, avg_volume_20):
     avg_lots_20 = avg_volume_20 / 1000.0 if unit_is_shares else avg_volume_20
     avg_amount_20 = avg_volume_20 * price if unit_is_shares else avg_volume_20 * 1000.0 * price
 
-    if avg_lots_20 < 300 or avg_amount_20 < 20_000_000:
-        tier = "地雷級"
-        status = "⛔ 地雷級：流動性不足"
+    # =====================================================================
+    # V38.2 雙軌流動性判定（統帥指令：金額為王、張數輔助，不誤殺高價股）
+    #
+    # 核心邏輯：對 3-5 天波段，真正決定「進得去、出得來」的是日均成交金額；
+    # 張數是中低價股的深度輔助指標。高價股（如 3000 元股）零股市場活絡，
+    # 300 張 = 9 億成交金額，流動性其實極佳，不該被張數硬地板誤殺。
+    #
+    # 理想（完整 S/A/B 資格），滿足任一：
+    #   A. 日均成交金額 ≥ 1.5 億（金額單獨達標，高價股走這條）
+    #   B. 日均成交金額 ≥ 8,000 萬 且 日均量 ≥ 2,000 張
+    # 可交易（最高 B 級），滿足任一：
+    #   C. 日均成交金額 ≥ 5,000 萬
+    #   D. 日均成交金額 ≥ 3,000 萬 且 日均量 ≥ 1,000 張
+    # 其餘 → 排除。
+    # 今日斷流保險絲：今日量 < 100 張 且 今日成交金額 < 3,000 萬 → 一律排除
+    # （防業旺型：20 日均量或許灌水達標，但今天實際只成交 7 張，明天你根本出不去）
+    #
+    # 環境變數可調：LIQ_IDEAL_AMT_SOLO / LIQ_IDEAL_AMT / LIQ_IDEAL_LOTS /
+    #               LIQ_TRADABLE_AMT_SOLO / LIQ_TRADABLE_AMT / LIQ_TRADABLE_LOTS
+    # =====================================================================
+    _ideal_amt_solo = float(os.environ.get("LIQ_IDEAL_AMT_SOLO", str(150_000_000)))
+    _ideal_amt = float(os.environ.get("LIQ_IDEAL_AMT", str(80_000_000)))
+    _ideal_lots = float(os.environ.get("LIQ_IDEAL_LOTS", "2000"))
+    _trade_amt_solo = float(os.environ.get("LIQ_TRADABLE_AMT_SOLO", str(50_000_000)))
+    _trade_amt = float(os.environ.get("LIQ_TRADABLE_AMT", str(30_000_000)))
+    _trade_lots = float(os.environ.get("LIQ_TRADABLE_LOTS", "1000"))
+
+    today_amount = today_lots * 1000.0 * price
+    today_dried_up = (today_lots < 100) and (today_amount < 30_000_000)
+
+    # 金額單獨達標路徑仍設 100 張保險地板：日均 30 張的超高價股，
+    # 買 3 張就是當日一成量，滑價風險不可控。（100 張對高價股毫無壓力：
+    # 大立光型 300 張、9 億輕鬆通過。）
+    _solo_lots_floor = float(os.environ.get("LIQ_SOLO_LOTS_FLOOR", "100"))
+    ideal_ok = (avg_amount_20 >= _ideal_amt_solo and avg_lots_20 >= _solo_lots_floor) or \
+               (avg_amount_20 >= _ideal_amt and avg_lots_20 >= _ideal_lots)
+    tradable_ok = (avg_amount_20 >= _trade_amt_solo and avg_lots_20 >= _solo_lots_floor) or \
+                  (avg_amount_20 >= _trade_amt and avg_lots_20 >= _trade_lots)
+
+    if today_dried_up:
+        tier = "今日斷流"
+        status = f"⛔ 今日僅成交 {today_lots:,.0f} 張（{today_amount/1e8:.2f} 億）：明日極可能出不去，排除"
         tradable = False
         max_grade = "排除"
         penalty = 45
-    elif avg_lots_20 < 500 or avg_amount_20 < 30_000_000:
-        tier = "不適合短線"
-        status = "⛔ 不適合短線：量/成交金額不足"
+    elif not tradable_ok:
+        tier = "地雷級"
+        status = f"⛔ 日均量 {avg_lots_20:,.0f} 張 / 金額 {avg_amount_20/1e8:.2f} 億：流動性不足，排除"
         tradable = False
-        max_grade = "觀察"
-        penalty = 35
-    elif avg_lots_20 < 1000 or avg_amount_20 < 80_000_000:
-        # V38：日均 500–1000 張預設排除於 S/A/B 主清單（統帥不打牛皮股）。
-        # 想恢復舊行為（允許進 B 級）設環境變數 LIQ_ALLOW_THIN_B=1。
-        allow_thin_b = str(os.environ.get("LIQ_ALLOW_THIN_B", "")).strip() in {"1", "true", "yes"}
+        max_grade = "排除"
+        penalty = 45
+    elif not ideal_ok:
         tier = "可交易"
-        status = "🟡 可交易但不理想" if allow_thin_b else "🟡 量不足千張：僅列觀察"
-        tradable = allow_thin_b
-        max_grade = "B" if allow_thin_b else "觀察"
-        penalty = 10
+        status = f"🟡 日均量 {avg_lots_20:,.0f} 張 / 金額 {avg_amount_20/1e8:.2f} 億：可交易但未達理想，最高 B 級"
+        tradable = True
+        max_grade = "B"
+        penalty = 15
     else:
         tier = "理想短線"
         status = "🟢 理想短線流動性"
@@ -529,3 +565,44 @@ def level2_quant_engine(calc_list, TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, fm_
     out.attrs["scan_diag"] = merged_diag or scan_diag
     out.attrs["scan_summary"] = f"成功 {len(out)} 檔／候選 {len(calc_list)} 檔"
     return out
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def light_holdings_intel(codes: tuple) -> pd.DataFrame:
+    """手機模式的輕量持股加料：批次抓價 + 本地算 現價/M5/M10/停損價。
+
+    不跑完整 level2 引擎（籌碼/RSI/MACD 都省略），維持手機開啟速度；
+    一次批次請求 + 10 分鐘快取，成本約 1–2 秒。
+    """
+    from price_provider import fetch_batch_recent_bars
+    bars = fetch_batch_recent_bars(list(codes or []))
+    rows = []
+    for sid, df in bars.items():
+        try:
+            close = df["Close"].dropna()
+            if len(close) < 2:
+                continue
+            p_now = float(close.iloc[-1])
+            m5 = _last_roll(close, 5, p_now)
+            m10 = _last_roll(close, 10, m5)
+            try:
+                tmp = df.dropna(subset=["High", "Low"]).copy()
+                tmp["PrevClose"] = tmp["Close"].shift(1)
+                tr = np.maximum(tmp["High"] - tmp["Low"],
+                                np.maximum((tmp["High"] - tmp["PrevClose"]).abs(),
+                                           (tmp["Low"] - tmp["PrevClose"]).abs()))
+                atr = float(tr.rolling(14).mean().iloc[-1])
+                if not np.isfinite(atr) or atr <= 0:
+                    atr = p_now * 0.03
+            except Exception:
+                atr = p_now * 0.03
+            rows.append({
+                "代號": str(sid),
+                "現價": round(p_now, 2),
+                "M5": round(m5, 2),
+                "M10": round(m10, 2),
+                "停損價": round(max(m10, p_now - 1.5 * atr), 2),
+            })
+        except Exception:
+            continue
+    return pd.DataFrame(rows)

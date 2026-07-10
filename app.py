@@ -597,9 +597,19 @@ if sheet_url and auth_status == "admin_auth":
         if not h_df.empty and "代號" in h_df.columns:
             h_df["代號"] = h_df["代號"].astype(str).str.strip()
             if mobile_quick_mode:
-                # 手機模式優先速度：只讀持股表，不額外掃技術指標；避免每次開手機都跑一輪 level2_quant_engine。
+                # V38 修復：手機模式原本完全不加料，導致持股卡片現價 0.00、損益 0。
+                # 改用 light_holdings_intel（一次批次請求 + 10 分鐘快取，約 1–2 秒）
+                # 補上 現價/M5/M10/停損價，速度與完整 level2 掃描不可同日而語。
                 m_df = h_df.copy()
                 m_df["名稱"] = m_df["代號"].map(lambda x: TWSE_NAME_MAP.get(str(x), ACTIVE_ETF_NAME_MAP.get(str(x), "未知")))
+                try:
+                    from quant_engine import light_holdings_intel
+                    _lite = light_holdings_intel(tuple(m_df["代號"].astype(str).tolist()))
+                    if _lite is not None and not _lite.empty:
+                        m_df = m_df.drop(columns=[c for c in ["現價", "M5", "M10", "停損價"] if c in m_df.columns])
+                        m_df = pd.merge(m_df, _lite, on="代號", how="left")
+                except Exception:
+                    pass  # 加料失敗時退回原行為：卡片顯示「報價待確認」而非整區壞掉
             else:
                 # 🚀 統帥優化：持股情報直接調用最強的 level2_quant_engine 統一獲取 MACD/RSI/BBAND
                 h_intel = level2_quant_engine(tuple(h_df["代號"].tolist()), TWSE_IND_MAP, TWSE_NAME_MAP, MACRO_SCORE, FM_TOKEN)
@@ -1036,7 +1046,8 @@ with t_rank:
             liq_ok = rank_sorted.get("短線可交易", pd.Series(True, index=rank_sorted.index)).fillna(True).astype(bool)
             liq_cap = rank_sorted.get("最高評級限制", pd.Series("S", index=rank_sorted.index)).astype(str)
             liq_s_ok = liq_ok & (~liq_cap.isin(["B", "觀察", "排除"]))
-            liq_a_ok = liq_ok & (~liq_cap.isin(["觀察", "排除"]))
+            # V38.1 修正：最高評級限制為 B 的股票（日均 1000–2000 張）不得升上 A 級。
+            liq_a_ok = liq_ok & (~liq_cap.isin(["B", "觀察", "排除"]))
             liq_b_ok = liq_ok & (~liq_cap.isin(["觀察", "排除"]))
             
             s_mask = (rank_sorted["Quant_Score"] >= MODE_PROFILE["s"]) & (rank_sorted["基本達標"] == True) & (~is_phase_3) & liq_s_ok & eod_attack_ok & (~eod_watch_only)

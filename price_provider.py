@@ -274,3 +274,46 @@ def safe_download_price(sid: str, fm_token: Optional[str] = None, period: str = 
     if validate_price_df(cached, min_bars=min_bars):
         return cached
     return pd.DataFrame()
+
+
+def fetch_batch_recent_bars(sids, period: str = "60d") -> dict:
+    """一次 HTTP 請求批次抓多檔近期 K 線（手機模式輕量加料用）。
+
+    回傳 {sid: DataFrame(Close/High/Low)}；抓不到 .TW 的自動再批次補試 .TWO。
+    與逐檔 safe_download_price 相比，10 檔持股從 10+ 次請求降為 1–2 次。
+    """
+    sids = [str(s).strip() for s in (sids or []) if str(s).strip()]
+    if not sids:
+        return {}
+    out = {}
+
+    def _batch(codes, suffix):
+        tickers = [f"{c}{suffix}" for c in codes]
+        try:
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                raw = yf.download(tickers, period=period, threads=False, progress=False,
+                                  auto_adjust=False, group_by="ticker")
+        except Exception:
+            return
+        if raw is None or raw.empty:
+            return
+        for c in codes:
+            try:
+                sub = raw[f"{c}{suffix}"] if isinstance(raw.columns, pd.MultiIndex) else raw
+                close = pd.to_numeric(sub.get("Close"), errors="coerce")
+                if close is None or close.dropna().shape[0] < 2:
+                    continue
+                out[c] = pd.DataFrame({
+                    "Close": close,
+                    "High": pd.to_numeric(sub.get("High"), errors="coerce"),
+                    "Low": pd.to_numeric(sub.get("Low"), errors="coerce"),
+                }).dropna(subset=["Close"])
+                _YF_SUFFIX_MEMORY[c] = suffix
+            except Exception:
+                continue
+
+    _batch(sids, ".TW")
+    missing = [s for s in sids if s not in out]
+    if missing:
+        _batch(missing, ".TWO")
+    return out
