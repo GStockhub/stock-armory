@@ -38,6 +38,7 @@ import mobile_ui
 import rotation_radar
 import signal_tracker
 from intel_news_engine import render_daily_intel_panel
+from market_risk_ui import render_market_risk_panel
 from fundamental_engine import get_fundamental_badge
 
 st.set_page_config(page_title="我要賺大錢", page_icon="💰️", layout="wide", initial_sidebar_state="expanded")
@@ -1529,6 +1530,8 @@ with t_etf:
     etf_ui.render_etf_tab(COLORS, FM_TOKEN, TWSE_IND_MAP, TWSE_NAME_MAP, etf_holdings_url, table_style)
 
 with t_chip:
+    render_market_risk_panel(st, COLORS, table_style=table_style)
+    st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     render_daily_intel_panel(st, COLORS, table_style=table_style)
     st.markdown("<hr style='margin: 14px 0 22px 0; border-color: " + COLORS["border"] + ";'>", unsafe_allow_html=True)
     _ensure_today_candidates("進入情報局時 today_df 仍為空")
