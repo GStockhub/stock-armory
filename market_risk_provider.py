@@ -94,35 +94,74 @@ def fetch_taifex_foreign_oi(date) -> Optional[int]:
 
 
 # ================================================================ S2 槓桿
-def fetch_margin_and_index(date) -> Optional[dict]:
-    """TWSE 融資餘額(仟元)+ 大盤收盤。非交易日回 None。"""
+def fetch_margin_and_index(date, verbose: bool = False) -> Optional[dict]:
+    """TWSE 融資餘額(仟元)+ 大盤收盤。非交易日回 None。
+
+    診斷強化版:每個可能默默失敗的關卡都印出原因(前綴 [S2]),
+    verbose=True 時再多印回應片段,供 --debug-margin 模式使用。
+    """
     d8 = date.strftime("%Y%m%d")
     s = _session()
 
-    j = smart_get(
-        f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date={d8}&selectType=MS&response=json",
-        session=s, timeout=30,
-    ).json()
-    if j.get("stat") != "OK":
+    # --- 融資餘額
+    url = f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date={d8}&selectType=MS&response=json"
+    resp = smart_get(url, session=s, timeout=30)
+    if verbose:
+        print(f"[S2][debug] MI_MARGN HTTP {resp.status_code}, content-type={resp.headers.get('content-type','')}")
+    try:
+        j = resp.json()
+    except Exception:
+        print(f"[S2] MI_MARGN 回應不是 JSON(可能被 WAF 擋下),前 300 字:{resp.text[:300]!r}")
         return None
+    if j.get("stat") != "OK":
+        print(f"[S2] MI_MARGN stat={j.get('stat')!r}(TWSE 回查無資料;若當日為交易日且已過 21:30,代表此端點對本 IP 不給資料)")
+        return None
+
     margin_total = None
+    seen_first_cells = []
     for tbl in j.get("tables", []):
         for row in tbl.get("data", []):
             cells = [str(c) for c in row]
-            if cells and "融資金額" in cells[0]:
-                margin_total = float(_num([cells[-1]]).iloc[0])   # 最後一欄 = 今日餘額
+            if not cells:
+                continue
+            seen_first_cells.append(cells[0])
+            # 模糊比對:任一欄含「融資金額」都接受,取該列最後一個可解析數字
+            if any("融資金額" in c for c in cells[:2]):
+                v = _num([cells[-1]]).iloc[0]
+                if pd.notna(v):
+                    margin_total = float(v)
     if margin_total is None:
+        print(f"[S2] MI_MARGN stat=OK 但找不到「融資金額」列;各表首欄樣本:{seen_first_cells[:12]}")
+        if verbose:
+            print(f"[S2][debug] tables 標題:{[t.get('title') for t in j.get('tables', [])]}")
         return None
+    if verbose:
+        print(f"[S2][debug] 融資餘額 = {margin_total:,.0f} 仟元")
 
-    j2 = smart_get(
-        f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={d8}&response=json",
-        session=s, timeout=30,
-    ).json()
-    roc = f"{date.year - 1911}/{date.month:02d}/{date.day:02d}"
+    # --- 大盤收盤(FMTQIK,失敗時退 yfinance ^TWII)
     taiex_close = None
-    for row in j2.get("data", []):
-        if str(row[0]).strip() == roc:
-            taiex_close = float(_num([row[4]]).iloc[0])
+    try:
+        j2 = smart_get(
+            f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={d8}&response=json",
+            session=s, timeout=30,
+        ).json()
+        roc = f"{date.year - 1911}/{date.month:02d}/{date.day:02d}"
+        for row in j2.get("data", []):
+            if str(row[0]).strip() == roc:
+                taiex_close = float(_num([row[4]]).iloc[0])
+        if taiex_close is None:
+            print(f"[S2] FMTQIK 找不到 {roc};回傳日期:{[str(r[0]) for r in j2.get('data', [])][-5:]},改用 ^TWII 備援")
+    except Exception as e:
+        print(f"[S2] FMTQIK 失敗:{e},改用 ^TWII 備援")
+    if taiex_close is None:
+        try:
+            import yfinance as yf
+            twii = yf.Ticker("^TWII").history(period="5d")["Close"].dropna()
+            if len(twii):
+                taiex_close = float(twii.iloc[-1])
+                print(f"[S2] ^TWII 備援收盤 = {taiex_close:.2f}")
+        except Exception as e:
+            print(f"[S2] ^TWII 備援也失敗:{e}")
     if taiex_close is None:
         return None
     return {"margin_balance_k": margin_total, "taiex_close": taiex_close}
@@ -306,6 +345,8 @@ def run_daily(date=None) -> dict:
         m = fetch_margin_and_index(date)
         if m:
             today.update(m)
+        else:
+            print("[略過] S2 融資/指數:原因見上方 [S2] 訊息")
     except Exception:
         failed.append("S2 融資/指數")
         print(f"[失敗] S2 融資/指數\n{traceback.format_exc()}")
@@ -362,7 +403,19 @@ def backfill_breadth(days: int = 90) -> None:
 
 
 if __name__ == "__main__":
-    if "--backfill" in sys.argv:
+    if "--debug-margin" in sys.argv:
+        # 只診斷 S2,不寫任何檔案:
+        #   python market_risk_provider.py --debug-margin           # 查今天
+        #   python market_risk_provider.py --debug-margin 20260729  # 查指定日(建議用昨天,資料一定已公佈)
+        i = sys.argv.index("--debug-margin")
+        if len(sys.argv) > i + 1 and sys.argv[i + 1].isdigit():
+            d = datetime.strptime(sys.argv[i + 1], "%Y%m%d").date()
+        else:
+            d = datetime.now(TAIPEI_TZ).date()
+        print(f"[S2][debug] 診斷日期:{d}")
+        result = fetch_margin_and_index(d, verbose=True)
+        print(f"[S2][debug] 結果:{result}")
+    elif "--backfill" in sys.argv:
         i = sys.argv.index("--backfill")
         n = int(sys.argv[i + 1]) if len(sys.argv) > i + 1 else 90
         backfill_breadth(n)
