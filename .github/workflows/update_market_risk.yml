@@ -13,6 +13,10 @@ on:
         description: "回填廣度收盤歷史天數(首次啟用填 90,平日留空)"
         required: false
         default: ""
+      debug_margin_date:
+        description: "S2 融資診斷模式:填 YYYYMMDD(建議昨天),只印診斷不寫檔"
+        required: false
+        default: ""
   schedule:
     # Taiwan 21:30 weekdays; margin (MI_MARGN) publishes late evening,
     # 期交所/廣度/國際資料此時也都齊了。
@@ -41,7 +45,9 @@ jobs:
 
       - name: Run market risk ETL
         run: |
-          if [ -n "${{ github.event.inputs.backfill_days }}" ]; then
+          if [ -n "${{ github.event.inputs.debug_margin_date }}" ]; then
+            python market_risk_provider.py --debug-margin ${{ github.event.inputs.debug_margin_date }}
+          elif [ -n "${{ github.event.inputs.backfill_days }}" ]; then
             python market_risk_provider.py --backfill ${{ github.event.inputs.backfill_days }}
           else
             python market_risk_provider.py
