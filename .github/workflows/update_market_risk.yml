@@ -20,7 +20,7 @@ on:
   schedule:
     # Taiwan 21:30 weekdays; margin (MI_MARGN) publishes late evening,
     # 期交所/廣度/國際資料此時也都齊了。
-    - cron: "30 13 * * 1-5"
+    - cron: "30 11 * * 1-5"
 
 permissions:
   contents: write
