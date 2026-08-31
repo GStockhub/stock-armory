@@ -1,102 +1,44 @@
 {
-  "run_at": "2026-08-28T21:11:26Z",
-  "local_date": "2026-08-29",
+  "run_at": "2026-08-31T15:11:41Z",
+  "local_date": "2026-08-31",
   "summary": [
-    "今日新聞主線集中在 AI伺服器、利率/總經、記憶體，整體語氣偏多。",
-    "主動ETF資料覆蓋 10/10 檔，約 100%，可用來判斷經理人大方向。",
+    "今日新聞主線集中在 PCB/ABF、半導體、台股大盤，整體語氣偏空。",
+    "主動ETF資料覆蓋 22/23 檔，約 96%，可用來判斷經理人大方向。",
     "新聞若與ETF重倉、法人籌碼、S/A/B族群同向，可視為主線被盤面承認；仍不直接當買進訊號。"
   ],
   "topics": [
     {
-      "topic": "AI伺服器",
-      "news_count": 14,
-      "tone_score": 4,
-      "tone": "偏多",
+      "topic": "PCB/ABF",
+      "news_count": 19,
+      "tone_score": -2,
+      "tone": "偏空",
       "market_hits": 0,
       "trust": "B",
       "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
       "examples": [
         {
-          "title": "Nvidia傳以129億美元併購Hugging Face - iThome",
+          "title": "三大法人倒貨267億！ 投信賣超榜上竟「沒欣興」 網嘆：很難賣啊 - Yahoo股市",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE4wdUFCTlF5dEU5eTJNRDZ4WE91cGJRMVlqOXBIX3pOdWlTdzhFenNqRTlfYld6aUpyaDJaZEs4eHMyQ0dIdGRMbk52TUx6dw?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMi-AJBVV95cUxPNEROLUNRZ0FMMFVSajF5VXV3QTFLOFNYUXA1WmFmZi05WEh1ZHlUTUdReTVBNUlBQWhhYVFFaFZDQmtZTVRrcGdtd1k1S3VHNE1SckVqNDNPT1E2dFRMMnlsdkg1UDhIcW8xVE01T05pUWlzYnpEYS1YQ2hHUFhYZU1nUy1IWEx4dktfZXBQMERzUFpQMVdXNUMwOUdWTjJoWk11OXlucVBTODdacGlacmhNal9odHMyOTlBQ3VIdzE2ZnJSay1jT2NZTzAzRmNRMDNPdnlmd1NncVBQQVVwU2pCMkhfeHhDNVpBMjFUTFlaZ3hHSHdvZWJ4MEtsdm1oT21IVlltcHo3bkhKcUh0T29aSUxYTEF2dkxKTm9yVi11UnJxRzdJR0NBSWVJcE5ZeFU2Wmt5RU4xOXFneDA3YW1tdzUzZkdCT29XS2h5VmtPVU9tYW5Ob04yMVNndjZGenJLVlp0NUZkdDE5ZnlPd2R4ZFpZWDVB?oc=5",
+          "tone": "偏空"
+        },
+        {
+          "title": "不怕欣興無量跌停！外資進場接刀2206張 - 自由財經",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFBsNkJieHpQemxoYjc3eTkzYmduaXl2YUl4ZElrcDFXNDNCNXVzem1uRE53aUp1WVdwNlRiV2xBZFEtSG9QQUVVeEVxZG14X1RNRU9IZ1FMeFN5cjZUdVFF?oc=5",
           "tone": "中性"
         },
         {
-          "title": "NVIDIA AI 機櫃產品世代交替，估 2027 年 NVL72 產值貢獻可突破 7,100 億美元 - TechNews 科技新報",
+          "title": "涉洗產地股價0秒跌停！「摔出千金股」欣興今緊急發聲：爭議產品是PCB、不是ABF載板 - Yahoo股市",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxNMHc4djA5NjN1ak5wRTFQVWdkaDd6eXVIbnVMbmI0TW9YdHgxaFpxcHZ2SnZGZzhuWXY1OVBHc2ZEektKZE9YU0YtYTN5U0IwNXpvSHIzcEUyTzNpRDFqNkU3NVA5RzU4ak1nT0xrSHc4YWtDME43aEtHd3d3dWxtck92VjY?oc=5",
-          "tone": "偏多"
-        },
-        {
-          "title": "川普擬開徵「終端產品關稅」筆電、AI伺服器全納入！台灣代工三雄恐遭重創 - Yahoo股市",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMivwNBVV95cUxOUGw1c1Q1YmtOWTVvVkJDLS1aUnQ3c2JWN0NTeHR1TzVkRlV5NUd1azFHclB3VDY2R2JtdTBlSjFHZEROZ0F1NDFObkNlZEFxblZHQUw5QnlTdWJMcnM3Y1hEUy1KczBSZnJBSHRPQ3ZDdEYzQmRrdkwzZGViZ0ZCNm1OeXVEbFVhbzVoUXFIZjI0N21Ua0hGdDNnbm1rNXo5Y0NZdGVOdDBxcjhoYXN0YzI0SjdENDNBZkdjQTljLUJ6TmhZVmt6VE9hTy1od2plLW9tUVBwZ3ZobW5DWkN4aFNNSHFSRWx0S0twdXNHMTduaWZkWG03c3d2NVFfVVRTUG9KUDZTaEFNWUMta3lISTZsSDNaMlFEMDBBWGJXUTc1SHd4UGxnT3IyOTQwYVpJNVBkYkdYcWl5czNMUDgxQTNfRmJxV0RaTU5PaXBGZVBHNW5MSUphNnRYeTBvb3pHOERyeEhHRUxaZmVkQk9teUM1OUVOcDBQSnl6ZnZPbVotVmhLTGY2YWc0WjNqU3VZRE9BM2pXUmE5ZDVuZGFzQWstS3hlWk5EbFZkcGFvTHd5RnVqV0tOS2Zaa2haUTQ?oc=5",
-          "tone": "中性"
-        }
-      ]
-    },
-    {
-      "topic": "利率/總經",
-      "news_count": 14,
-      "tone_score": 2,
-      "tone": "偏多",
-      "market_hits": 0,
-      "trust": "B",
-      "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
-      "examples": [
-        {
-          "title": "Nvidia傳以129億美元併購Hugging Face - iThome",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE4wdUFCTlF5dEU5eTJNRDZ4WE91cGJRMVlqOXBIX3pOdWlTdzhFenNqRTlfYld6aUpyaDJaZEs4eHMyQ0dIdGRMbk52TUx6dw?oc=5",
-          "tone": "中性"
-        },
-        {
-          "title": "NVIDIA AI 機櫃產品世代交替，估 2027 年 NVL72 產值貢獻可突破 7,100 億美元 - TechNews 科技新報",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxNMHc4djA5NjN1ak5wRTFQVWdkaDd6eXVIbnVMbmI0TW9YdHgxaFpxcHZ2SnZGZzhuWXY1OVBHc2ZEektKZE9YU0YtYTN5U0IwNXpvSHIzcEUyTzNpRDFqNkU3NVA5RzU4ak1nT0xrSHc4YWtDME43aEtHd3d3dWxtck92VjY?oc=5",
-          "tone": "偏多"
-        },
-        {
-          "title": "NVIDIA AI 機櫃產品世代交替，估 2027 年 NVL72 產值貢獻可突破7,100 億美元- 股市爆料同學會 - CMoney",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE4xVU44QzhnNVBrSEFfbDBVZVk4TnlaSF9NVzZGOHlHam9NOWYwWGEzS2hyVWZkTVRhcWVubTZHek1oYUpJNFdCbi1SSEtCbW9vMWhjdWxJNl8?oc=5",
-          "tone": "偏多"
-        }
-      ]
-    },
-    {
-      "topic": "記憶體",
-      "news_count": 13,
-      "tone_score": 2,
-      "tone": "偏多",
-      "market_hits": 0,
-      "trust": "B",
-      "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
-      "examples": [
-        {
-          "title": "外資、投信聯手狠砍！國家隊砸近5億護「這檔記憶體股」 - 三立新聞網SETN.com",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE85dnNZS1MtTTgtR3ByQWZ0b0FOMDVHc0tXRFNMZDRNd0NLVkhONGs1bWM1SGJReXFiM3JiWG4yRF94Nk5qdzdWTEdyaw?oc=5",
-          "tone": "中性"
-        },
-        {
-          "title": "外資投信不約而同 敲進「這記憶體大廠」3萬張！31萬股東揪團喝紅酒 - Yahoo新聞",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMilANBVV95cUxQTzNlSkhQUDA5ZUlEdjVSVVd0X0J5aW5MSUxWUC1JQUhndXRpZVVoaEtyV2pmR1ZoNUo4eUFzZ1ZTbFlmQTZBRWhSTVVIN3JSSmFuWklGV2d5Sl81d3k0bU9vYkRYSkZfWlkydEZpUVd5V0t4M3JYYkhHWDUweThyUVdXWjE4ZHI5elJaSVprUXo5blJ4di1NLVVDZjl0dG9rOEJGT2VwWXd3ZXpwWVJhREx0d01BU3JsdFdScFZYNkxndjZCd180X2RqRVJpbUV6MGUyRDlWbXBZRVdfWFlXQldZNzAwRUFRWVpCR0JObUFqSXktbmV3MnpTZ3BHSkYwRllJdWNBN083ZFpuOFZoX21FY2kyRmlBU0ktbHJISVc3cEw3dTRRcWhVV25sZzhqSzhCRGh4TzlLZ1ZoMkowMElLRlN6c1JuV1lKTnJlR0Y5bnJmb0RsMWl0QzBZNmhwc2tON2xRbHIzWndMTEZlbW02Z3dTbzd6WElCR3JFOVJQcVMzck0yRzJxMHN6eFdzakgtTA?oc=5",
-          "tone": "中性"
-        },
-        {
-          "title": "外資投信狠砍！國家隊5億護這檔記憶體股 - 鏡週刊Mirror Media",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTFBMRDZ4aWpDOEswNFR2c3lTS3ZMUUkySnNPczhSUkFiWmJPOTlmS3BtUkFMejg5bnR5MGJYZVc1UmozSWs2Q2YwSkphekRwb2xRNU0za0JhLS1LLTJj0gFiQVVfeXFMUDRSblJ1QkwyVzFMUWNnbk41dVhLQkVzS01mMnZXWnBSVVNtWHg4X3JjMU5zRGs0UjRXbWFUWU1yRDFWQmk2ZVJvQ0JEbEpWVkM3Skl2cjB6S0RkUnFkVmVsclE?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMi0gNBVV95cUxNdG5BVUQ5SnN1b0hsS2FkaVhscDM3UDVSQkpEMzdKTUY1VnR0Ul9JRlQzekhpUzRybEdCZHgxZ2lfMEpOTWtSRXpuSFlybXBTRnhINDAza1k5MWlFa3RCTHVVdWZLcEhCUlVmNUlTTFRUYVB0OFlPN2NRWGdrcGtpemxsOXJQNDBCX1d4WHd2aEZuWWpraDhnb05oQVBQZVVYV0V5UVViMXdsMmxHVmZzRElkNmdLRVlOOGwyRy1Tdmc0V1RCR0k2aFhRa3dxU0FxUnh0TGdGaGxRRzlQR1ptWHZzMUJFdG43N2hTbC01aWpKS2NaUXFJQVhpQVZZZDVpOUoyalc0d1AxN3RCSkxfYzRETXBBRlNKRzVzT0Ffc0JnRUlhMnV4V3RyZWtTV2trRXhzZkRVckNoYlhMaXZPMGFOMWZXa3JILVlRVUtvWE5TNTNPblktQ09TcFMtNmt2NUI0amVnc0NQLUZTdE1VdUZnZnR6cFpmamRFZGhlTHVIeUYtNkNZTmx1eUowSDZLZDNLUEhDSEpFcjlfTExyb1VUenNCWkpDQ2p2NjRyV0tkN0oxN1RnNVhjRHpZR3Q0aU9yd2JoSi1KVDJWcDVHd3dB?oc=5",
           "tone": "中性"
         }
       ]
     },
     {
       "topic": "半導體",
-      "news_count": 13,
+      "news_count": 16,
       "tone_score": 0,
       "tone": "中性",
       "market_hits": 3,
@@ -104,9 +46,9 @@
       "trust_label": "A級｜新聞＋盤面＋ETF覆蓋同向",
       "examples": [
         {
-          "title": "三大法人買賣超 – 外資買超(2330)台積電、(2454)聯發科，投信買超(3081)聯亞、(6669)緯穎，法人合計買超593.87億元 - sinotrade.com.tw",
+          "title": "外資暴砍「這封測大廠」1.6萬張！投信展開救援 26萬股東卻哭笑不得 - 三立新聞網SETN.com",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMi0wRBVV95cUxNd1h4YUxZTHNpNGpfR1FsVHprSFAzUy1wcEQ5SHlSeU1wMG1MbDBDM3pXdy1ibmY3RGVORVptbXpaTndkc0Z2SV9zR2lmZGhERTBEbk1jNVZYWkJtZndOUHNuVjlfaEduVldqbVVndlZkdjNWSm5zVk1VNXhBRzhiSi0yZnFSVVd4eUFrZWVXOUpkV1E4aHo4MTBtRF9sM3NTRHRMZTRfVTVTNzRXZTBCUzByV2VySld5d2wzWEE3ZzdJa2dkeENVTklzeUdXTFlEQUZ1MnAyTlBVV3oxcUpPT3NEWVdueURFNHBwRGk3SVNpU3R6MVVuMW15UjhJdDNNUENTdWJEME9QNHV5YkJ2NnhQZEZYcUpURmVJQmVBOGNUanYwMG1EendnZERnUGJyeWV5UHdFZDkwWTRkX2t4MnZhZUtjcWh6ZFhIQXVRNlAtNk5WX055LTVqdW5yT3J6ekVkRXNVYmJreE1WalRWbU9jVUlYRXV5S3VVR2IzVVVHaEFhUXo5Z3Vld2hob2NWUFVWd3NpVmRpMmVBMDhmNEhIQTNFWkxucVVudW5EMXlCb05LdFJxYTYxQzl2MS1JRnNLVjhHX2JjZTJCdlF5dFlPZGZ0Y1A3d0V3RmhVUnFFM1ltekx2SmxLZThsYXhqdTJNU2tMNzdOa3Y1QnNndWw4SUVQa2JUZG1JYjV2d0VaVmZaNkFhVmYxc0V1VE9mY1FycDVDZTBjOXI2Z3pyRFZWb2ZBclg3YnpxQzdMeXJXYXUwM1FjUU9vSEFRelZMcWhn?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE5YVG9vbWhfdFhxRUowN25RbFhUYWsyLWdjOGZWMms4SzZQbGdtQUg1ZTFJUFJfYm40NUJ5QVZ1SjNueFZrRGJ3bWVXaw?oc=5",
           "tone": "中性"
         },
         {
@@ -116,45 +58,45 @@
           "tone": "中性"
         },
         {
-          "title": "台積電工作6年價值觀變了！人生「10大自由」全解鎖 工程師：分紅多到腳麻 - Yahoo股市",
+          "title": "AI硬體競爭升溫 台積電憑晶圓代工優勢成市場焦點 - Yahoo股市",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMi7AJBVV95cUxQMGUzTXpIVER5bndlUWluSmczQ0ROTEFISDc5UnQzdEhjRHo2bjAyN0J1cXVoYkRiRERGdmNsZGlKbExJb0RiNE5NaGtxNnJjaFVVVUVxMlA0X0xKSDVGZHMxZGt0c1dwUG1zMnlmREQzMk8tNDVfQUQ1MXdUYWRkNFdURkFKcGFXRGpKWFNlZTdQWlZRRnVFSXlsQ0I4ZExkQTBGOGo3eTRISDZXRlk4d3hxcXJRbVlDenlCMFZMQ285ZDZjYlBiajdyOG1KVjlhQUhQY210bjZwMi1Jb1p0Tlp2VFVsTGZrTkpQZERzcmpvVUJQdm5jbTlQTk5QZUQ2c1VYeWQ4WGNkMGtIVUl4cDlOWHpEcHRldHVNNk95U2dxdnhEbzZiZFdoNnV2ODB6cXcxMXFwdThpemE4WVhKR3dXY0N4Zy1CbEZGRlAxbXJKYXN3azY5eEFaTXo2VV9SMW9hNEtTT252cjFw?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMi2wJBVV95cUxOaXE4QlA1ZHgtdEd6TjVoTlFUOWdqLXdWTTFOVmtvSlJHV2EtcTdxT29iOFdtV1NIZFZ4RU42VE5HMmpUVHFHdEhDSWdNZlViUzRjT2NvMEw3RHFsY2xPRFNFMEs2RmoyRHFKZ0hHY2FpS2pmVVR6UV8zdG1HY0w2UjgtaExXVGgxSFJ6SFFSWWJPb1dLMUtCb18zSk5hU3FwOHFhaU9GbWpqa2lnMnVXbTVHdVRfSDR1clJubHc1NVo3dGFfWE5JYmpfZ1Y1Mm1sYW01MDFEZ3JIaTktMlJwanpmbEl4VmF4RFAxaGFuaVp5UlJqNXVGSDBnSWI4U25OcGNaTDh0Vk9tNExEVGJuYkNONnRSMzBubEJuNWlUUm9kZzVpM0VfRzFEOW5HbXV1OGcyQ3lVX1I4RGQ5ZHQ3dTNkVGtNYmtXX0FJMzQwX0NuX0VLYlBHQ0Nscw?oc=5",
           "tone": "中性"
         }
       ]
     },
     {
       "topic": "台股大盤",
-      "news_count": 12,
-      "tone_score": 1,
+      "news_count": 15,
+      "tone_score": 2,
       "tone": "偏多",
       "market_hits": 0,
       "trust": "B",
       "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
       "examples": [
         {
-          "title": "三大法人買賣超 – 外資買超(2330)台積電、(2454)聯發科，投信買超(3081)聯亞、(6669)緯穎，法人合計買超593.87億元 - sinotrade.com.tw",
+          "title": "三大法人倒貨267億！ 投信賣超榜上竟「沒欣興」 網嘆：很難賣啊 - Yahoo股市",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMi0wRBVV95cUxNd1h4YUxZTHNpNGpfR1FsVHprSFAzUy1wcEQ5SHlSeU1wMG1MbDBDM3pXdy1ibmY3RGVORVptbXpaTndkc0Z2SV9zR2lmZGhERTBEbk1jNVZYWkJtZndOUHNuVjlfaEduVldqbVVndlZkdjNWSm5zVk1VNXhBRzhiSi0yZnFSVVd4eUFrZWVXOUpkV1E4aHo4MTBtRF9sM3NTRHRMZTRfVTVTNzRXZTBCUzByV2VySld5d2wzWEE3ZzdJa2dkeENVTklzeUdXTFlEQUZ1MnAyTlBVV3oxcUpPT3NEWVdueURFNHBwRGk3SVNpU3R6MVVuMW15UjhJdDNNUENTdWJEME9QNHV5YkJ2NnhQZEZYcUpURmVJQmVBOGNUanYwMG1EendnZERnUGJyeWV5UHdFZDkwWTRkX2t4MnZhZUtjcWh6ZFhIQXVRNlAtNk5WX055LTVqdW5yT3J6ekVkRXNVYmJreE1WalRWbU9jVUlYRXV5S3VVR2IzVVVHaEFhUXo5Z3Vld2hob2NWUFVWd3NpVmRpMmVBMDhmNEhIQTNFWkxucVVudW5EMXlCb05LdFJxYTYxQzl2MS1JRnNLVjhHX2JjZTJCdlF5dFlPZGZ0Y1A3d0V3RmhVUnFFM1ltekx2SmxLZThsYXhqdTJNU2tMNzdOa3Y1QnNndWw4SUVQa2JUZG1JYjV2d0VaVmZaNkFhVmYxc0V1VE9mY1FycDVDZTBjOXI2Z3pyRFZWb2ZBclg3YnpxQzdMeXJXYXUwM1FjUU9vSEFRelZMcWhn?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMi-AJBVV95cUxPNEROLUNRZ0FMMFVSajF5VXV3QTFLOFNYUXA1WmFmZi05WEh1ZHlUTUdReTVBNUlBQWhhYVFFaFZDQmtZTVRrcGdtd1k1S3VHNE1SckVqNDNPT1E2dFRMMnlsdkg1UDhIcW8xVE01T05pUWlzYnpEYS1YQ2hHUFhYZU1nUy1IWEx4dktfZXBQMERzUFpQMVdXNUMwOUdWTjJoWk11OXlucVBTODdacGlacmhNal9odHMyOTlBQ3VIdzE2ZnJSay1jT2NZTzAzRmNRMDNPdnlmd1NncVBQQVVwU2pCMkhfeHhDNVpBMjFUTFlaZ3hHSHdvZWJ4MEtsdm1oT21IVlltcHo3bkhKcUh0T29aSUxYTEF2dkxKTm9yVi11UnJxRzdJR0NBSWVJcE5ZeFU2Wmt5RU4xOXFneDA3YW1tdzUzZkdCT29XS2h5VmtPVU9tYW5Ob04yMVNndjZGenJLVlp0NUZkdDE5ZnlPd2R4ZFpZWDVB?oc=5",
+          "tone": "偏空"
+        },
+        {
+          "title": "外資暴砍「這封測大廠」1.6萬張！投信展開救援 26萬股東卻哭笑不得 - 三立新聞網SETN.com",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE5YVG9vbWhfdFhxRUowN25RbFhUYWsyLWdjOGZWMms4SzZQbGdtQUg1ZTFJUFJfYm40NUJ5QVZ1SjNueFZrRGJ3bWVXaw?oc=5",
           "tone": "中性"
         },
         {
-          "title": "外資、投信聯手狠砍！國家隊砸近5億護「這檔記憶體股」 - 三立新聞網SETN.com",
+          "title": "三大法人買賣超 – 外資買超(2303)聯電、(2330)台積電，投信買超(3017)奇鋐、(1303)南亞，法人合計買超468.18億元 - sinotrade.com.tw",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE85dnNZS1MtTTgtR3ByQWZ0b0FOMDVHc0tXRFNMZDRNd0NLVkhONGs1bWM1SGJReXFiM3JiWG4yRF94Nk5qdzdWTEdyaw?oc=5",
-          "tone": "中性"
-        },
-        {
-          "title": "野村投信最新台股看法--【台股操盤人筆記】把握榮景上漲機會，但也為循環轉折做準備 - news.cnyes.com",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTFA4NER5bVNNWk9IWE1YQXVfSThVNWFheDNkRk1ocHNNS21wMGEwdXRPaFpHWGxtS2d0anVrR284Qno5MmtSNUlZQTFsLWtBV0E?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMixwRBVV95cUxNa1BKQWVGRTZFY2NLRlRPbS0xNGpHM3R4c3JFTFNSV09CSGFCRVBUWmt4bGhXZFptNkYxbFBPNzByYVNHZ2tuRUkwMWJ5aHNXTkFrTTJjenV4VE9IblcyRE0tQURQMjhHel9XZmx3ZEZHbWZKYkxEVkc4cXFOaUZjX1VWOXJodDhBMWt3bHRJM2tyMUZVOWRydUhyb1N3Mm0tZkpMcVJBSzRzY3dEdUMxQ1JsUGRlMFFpaGY2czFlN1BwX3VzRGlHUndubE0wM3NPMll4UHVQM1RvZU9zWnYyZEVjZzY5Vzg5ZlM4SkduMUZoa1BYcU5fNVZKTHBOeC1oZ2cxa1picUJzVlF6Qk4zS2ljek1ITUJjOVZKSmNTYUVaMkpXYVAwMmNLZWZxSjV4WGpTWC16YVo2bG5ldGhiblBUMWxESGIwdnlpbWVxbUkxYk93d05fVER0eTNFVC15cGZyTy10VnJYbDNWenRBamxaZ05zODVTQ1pWUGlHcm1weGFYeVduVWVJWXpRcFdjX0NSWldUbXI5U25UVWVqb3I2NkFBNWdxODhyb0FXWGdkLWVxWUFhOG55eVlmeXZFWklMOVUtd3dBaVhyX0JBY1VfSHlGRmw0WEJZSmFoM091VUx2X0RyRkIxTldBTy0zRVl2SHB4dE5NZU0tSFRIeWxqLUlucDdobm5IR1duV3B2MnZBNndQanZicS0xZWV5N044bklGc0VUUjQ4Nlc4eEJxUE03UGJJeWRjT2JTNy1DVldsQ0RZ?oc=5",
           "tone": "中性"
         }
       ]
     },
     {
-      "topic": "PCB/ABF",
-      "news_count": 11,
+      "topic": "利率/總經",
+      "news_count": 15,
       "tone_score": 0,
       "tone": "中性",
       "market_hits": 0,
@@ -162,57 +104,57 @@
       "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
       "examples": [
         {
-          "title": "連2天低量急拉逾千點！外資、投信全沒買？「PCB、矽光子飆漲8成洩隱憂」主力在審判日前夕布下完美陷阱 - 旺得富理財網",
+          "title": "NVIDIA 豪砸 35 億美元認購聯發科可轉債！聯手打造「邊緣到雲端」全方位 AI 運算平台 - 動區動趨",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE5INi0wMGJKajdjcVJ5a3pTYXgwOWdleTJQRE1uSUVqaUIzSkpzN1JlYjF6RDBwalFkRm9VemRaU3hjb09STjBfOVRPbllnVlRPa2Y2ZnNTU0xVaW9heGhJQ3pYVV9nTTFxbkE?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxPTmlLS25GZy11SDBKdXU2dTdSXzdFYkU3LUV4aWk5NnVncktUQXpxVDZ2TjRIemsyUWRPa0RUdlM1UHBxdWc1MHo2ZXhGQ3ZnUjdYQ3dLSnk4SU51X18zWFlWTXhHZEpQZ3NnM3FMeDJoS2d3WFNTZXM1Q1ZnSUFXbEpJejg?oc=5",
           "tone": "中性"
         },
         {
-          "title": "ABF龍頭「欣興電子」今遭搜索 檢調帶走2副總、會計 - Yahoo新聞",
+          "title": "NVIDIA投資35億美元深化聯發科合作！導入NVLink Fusion打造客製化XPU雲端AI工廠 - Mashdigi",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMitgJBVV95cUxNaHFaSTRscV9kbzRYMEw2M3BrZ2UtaTIyUDFzQWw4WnQ1LXFmUzJMcEs0NzVheFdjbUdrRU5BUElWM3NnUTM1R1RKSk1UUGlJaG9XOVVISUlabThiTUd0akdmMmVmWVRDSVl1OUNYeFpDZ1NtbE1WU0dUd2Q2Z1VOM2JmWE11MDdsaExiNVk4a183YXRzSE00V0dIbGNPdFJibFRyVHk3ZkZrMFRab3NFV3hNM09wTnVwbmt1NTFtdWgxMWdydmtBamszcHFQbjRjQkExM1JWZzNSYkpsX2NlNnprZy1TWVlQUzVlejVUb0xHNHRpWGVIM0VFN3pJVmlhU2I1Rzh6bzA4LWZsTkdEdzRkbUdUa0xhY0NJLTVFZVJlTjdCMW00MXpNa3ltOEtJNl9WQkJR?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMi9wFBVV95cUxNTHBCd3NHUGJuNUpRalpzX3oybmlvdDFvZ2V4VktpdWlOelJ0N2phMS1jOG0wMkNKWGl4RlFDaU5JREJWbjV2MmZsRnhaN2plQkxMMkU3UXZoLWhVTzNwLTRHRWtuVm1pM3lpN0w5NFBiYzVXWlZnby1URHVDWGdtWGd5SjN4cUVmSGNQblI1a1lrMWR3ZGhKaVpyOUdGOWt1OVdNMmY0WG1ObHE1REpBeWpXM0NJVlVZWTBBTG5kdnNvZzV3cU9jalZqVVY1SmlfMmFBTTlFOVdQd2hnVU9WYWFSdmluUTI3YWM2UUxId0xDODhJc0Fr?oc=5",
           "tone": "中性"
         },
         {
-          "title": "陸貨變MIT洗產地？ABF載板大廠欣興電子遭搜索案情曝光- 產業 - 工商時報",
+          "title": "黃仁勳出手了！輝達首度重金投資台灣公司 認購聯發科35億美元海外可轉債 - Yahoo股市",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE1kMkpFTUNBTnF4Y1VTN2s1MEpBU3BHa2R2ZHhmaFJNVDdNWUVYR0lkUlh5NkIxbmFZZnVxdXdUT2w3RkJBdUdXRW5DeWI5ZXR1bFBYcDRnUXZiNnpmdWNz?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMi3wNBVV95cUxOOEFNVG9sUWNJeXkwMEtBSmIzUGR6M0VJeFlvU29qeHJNeW5IMElFbnlmRy1fN09yNlM1VHg1RzBiaUpOTmxIcTVrSTFkQWhsZmhvb1JvLTZhekpxS1k3bUxSVS1jUXhvUG02WkVPRWlSYzNoRVgzZHVMQS1uZV9PXzBGZ21MYzd1VUctbmg2dUlaazI2Nnpic2RGV19CNjJPM0FJSndOM3pIa3pteHFDV2NNd3QySHdQcUJ0dVpTaHlwOXNmVWpzSzBDUjd5SW1TcTFiQW9aa3R2UUNfTlRJMlVTb1BpN2dsRzcwOVgtNzI4RVItY2dEWTUwWTFydnBYZE16ZExMd1AxSURsNTFhV3d4NlpWazg2NzFwZVhxUkN1UnJiMDRnTlpXOWliVmdBTkFGYmI4bEVWY3lGN0sxU2R5UFJxLUZ1OVl4MTJYVzBlTl9XcEFfblVLaktldWNjYkR2RFZibkp2dzJ3NUZ1OUZhX1JRUUFjRXJwUlVGcTF4MGZMdjNoeUNMSXV3M29jSXR2dXh6cDZQYldvUTZTWmpTV19wU2x6NjY4MXZEdjFwSllZMF8tc0ZmNEVNZWxDVTFjV2wydDVRX3J0ZEc3cmM4MHpaaGY3dXJwRXhpcw?oc=5",
+          "tone": "中性"
+        }
+      ]
+    },
+    {
+      "topic": "AI伺服器",
+      "news_count": 14,
+      "tone_score": 1,
+      "tone": "偏多",
+      "market_hits": 0,
+      "trust": "B",
+      "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
+      "examples": [
+        {
+          "title": "NVIDIA 豪砸 35 億美元認購聯發科可轉債！聯手打造「邊緣到雲端」全方位 AI 運算平台 - 動區動趨",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxPTmlLS25GZy11SDBKdXU2dTdSXzdFYkU3LUV4aWk5NnVncktUQXpxVDZ2TjRIemsyUWRPa0RUdlM1UHBxdWc1MHo2ZXhGQ3ZnUjdYQ3dLSnk4SU51X18zWFlWTXhHZEpQZ3NnM3FMeDJoS2d3WFNTZXM1Q1ZnSUFXbEpJejg?oc=5",
+          "tone": "中性"
+        },
+        {
+          "title": "NVIDIA與聯發科揭合作藍圖黃仁勳：AI大規格的工程整合- 新聞 - MoneyDJ",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQaXF3dEJRaVQ1MHZDMjI0VU9TZ1lTVENBbjhEY2xxZE9qNEQxdG5yZHNTTTdXaVNsZE1hYXVyOHhtRFF5Uk5kTlhxMDFsSEM3N05JdzhvdUlpZ3BHNV83MzVmLUdWa0pTdmFYZUJwYUVOUmpXWmdfU0lSbVlIaDYzVUl2emlSSG5kZ0dsSDdVYlJlQQ?oc=5",
+          "tone": "中性"
+        },
+        {
+          "title": "NVIDIA 與聯發科技深化長期合作夥伴關係共同打造從邊緣到雲端的 AI 運算平台 - MediaTek",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMi5wFBVV95cUxNSkFyREh4UUdJYmQzTjduc3BBaWZXTm5RdGtQM2VmOGJFWXVxOWMyaDZjc014eUVFeE1JOUFMUFdGeXBUOXlHZHBEOXdlaTdwaDBqVFN6RFg1V3lVWTg1Skg0d2ZJRHVmVmV6bzZiLUtQVk9XVXVyT09zTUhyS2F4TVV0UTdoUzRqa3A1UzdGQXJJSTFWX2FTQ2NtbmVtT3ltcUxXeEVJRjAtRUN4TmFhX0ZpYWFfV3ZJVDlvSUtDTUVGZkJjSUoxRUxhTnYwLW84VmhNNnIxaXhHTmJPa01xaVJ6eFh4VFnSAecBQVVfeXFMTUpBckRIeFFHSWJkM043bnNwQWlmV05uUXRrUDNlZjhiRVl1cTljMmg2Y3NNeHlFRXhNSTlBTFBXRnlwVDl5R2RwRDl3ZWk3cGgwalRTekRYNVd5VVk4NUpINHdmSUR1ZlZlem82Yi1LUFZPV1V1ck9Pc01IcktheE1VdFE3aFM0amtwNVM3RkFySUkxVl9hU0NjbW5lbU95bXFMV3hFSUYwLUVDeE5hYV9GaWFhX1d2SVQ5b0lLQ01FRmZCY0lKMUVMYU52MC1vOFZoTTZyMWl4R05iT2tNcWlSenhYeFRZ?oc=5",
           "tone": "中性"
         }
       ]
     },
     {
       "topic": "高息/主動ETF",
-      "news_count": 10,
-      "tone_score": 0,
-      "tone": "中性",
-      "market_hits": 0,
-      "trust": "B",
-      "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
-      "examples": [
-        {
-          "title": "2026дё»еӢ•ејҸETFзёҫж•ҲжҰңгҖӢ00991AгҖҒ00992AгҖҒ00981AеүҚдёүеј·зӢӮйЈҶ80%пјҒеӨ§з«Ӣе…үETFиӘ°жңҖеҗёйҮ‘пјҹйӣҷеј·жҢҮжЁҷдёҖж¬ЎзңӢ - sinotrade.com.tw",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMi2ANBVV95cUxQM2FjaVJ6X0VqMHhPM0NUN2VITUFvRWk1QV9OR1pIMlJmeGRxNnUzNFFuWk9yWkVtNWdOS3ZkOFZtMV8xZGFQYjJsU21ZSXZxbWdNNHRYLU5NejNNdXltcDBTcTR2bXBja1NBRHFDbUdENjN3Ulg3LVhMQ2tQdjBBdTNETFprdkYwb1p5YkUzUGFFc1c1RHUzUG5qTmctQU9zZEc4dW42VEVJc2dHWmlGSHJteG1VbHFvUFRsQUNIQkhKT3VBNFpVUFVscENKaldNQ2lMV3gtTGNNUC02ekIzMVpEQ0VfWWM2Ynd3SVd2bUdpOVl5UXFBU2Q3NklBbjlQTFNXbXg0SzBqeUlPeXpXaHktZnNtRF92em1xUThlNWRfR09kMjFoTlFfZ1ZJdFBCX2NtSHRpT0tNZnN6TGktUU4xQjNMYUt6RFRjcEFUcXc0aGtqYURSNFdJY04yUnpEYWhOUVVJM0dhUjY3S1RRN3RIX3ZtN056TVI4TEFLcVVQQWZIS0Zhb0YxcGtNeWlrb2doMkJuRFFVZTJUVTkxaFhIbVA5M1M0SFBzcHJiaHkzbWd0b2RHajZGeW9kTHJlUXJNWlhpTVJwVmtlTzZqWmNzVU5CcmhR?oc=5",
-          "tone": "中性"
-        },
-        {
-          "title": "ж¬ЈиҲҲзҲҶжӘўиӘҝжҗңзҙў еҗҚеҲ—еӨҡжӘ”дё»еӢ•ETFеүҚдә”еӨ§жҢҒиӮЎ - иІЎиЁҠ",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMie0FVX3lxTE5FZzZyYWlVdUhPaUpSVmlqSjYwbTZINzNzT05seXZPWDJ6U3pISEdsRjdmQS1LZEV2RFJHYXNpbm8xRURWaF9VVXg5T3NMaUVmYVZscVlTOWNkWmhzX2xGalM1WFhMek4tSDVRNXY3aGhTSjl2czNYRF84QQ?oc=5",
-          "tone": "中性"
-        },
-        {
-          "title": "еӨ–иіҮзӢӮиІ·дё»еӢ•ејҸETFпјҒе…«жӘ”ж“ йҖІиІ·и¶…еүҚеҚҒпјҢгҖҢйҖҷе…©жӘ”гҖҚжҲҗжңҖж–°зҶұй–ҖжҢҒиӮЎ - йҒ иҰӢйӣңиӘҢ",
-          "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTFBMNzhvanlYV0E1RlplNXpsWE1EcmJJZmRLQTNrb0NSUTE5eVBiQzhzM3lORklQa01wb3ZqcGRrZGYtcV9QUnF5UkY0V1gzZw?oc=5",
-          "tone": "中性"
-        }
-      ]
-    },
-    {
-      "topic": "美股科技",
-      "news_count": 6,
+      "news_count": 11,
       "tone_score": 1,
       "tone": "偏多",
       "market_hits": 0,
@@ -220,38 +162,108 @@
       "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
       "examples": [
         {
-          "title": "AI雲端的隱形炸彈？NVIDIA、Microsoft與雲端巨頭深陷「兩大語言實驗室」風險漩渦 - forecastock.tw",
+          "title": "0050變台積電ETF？權重18％→58％...前十大成分股「這產業被踢光」 內行揭關鍵：市值型最強修正系統- 基金 - 旺得富理財網",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMilAFBVV95cUxNOGY3WlpGSkg3a0FHT0FKRFNqMXF3eUFRMEptanVRWWlhbjYxQ1h5VWFPTnJGOHl6Y05WVkU0ejlyT0UwbkZ0YU9vQTI1OUxMZjdwSXpsdzJiSFpFcVJ1Tm9QYzBlc0hHYVZJenlxdFhJTE1obkdLb2NReUgtVWU3SUdYLVJjSV8tVjFFUkJ4aEd1d0It?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE5aVDMwVU1xSWZTeVVwMWstMU9NTDVkR04tUnVqT0FwSmQ4Ujk3U3dFTjdXbUd4aHZReHY1dzhockJFYmdlWEdPZEw4cTZfNlR4aFg2UnY3RWdnQWZBelhyVTBmb3pzczVuYUE?oc=5",
           "tone": "中性"
         },
         {
-          "title": "2026年9月台美股財經行事曆｜SEMICON 半導體展聚焦矽光子與先進封裝、連假前投信季底作帳提早發動？ FED 利率決策撞上四巫日! - sinotrade.com.tw",
+          "title": "【主動ETF PK】輝達也救不了？海外新兵一半破發 00998A卻漲逾2成 - Yahoo股市",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMiwgVBVV95cUxNMnpPdXk4Zkk5NkN1VVREMC1yd3lldmQ5NEllbVdFSmdPTEM3NEJZc1NkMGc3dkNCRjBZTVozVDVUWWhoVll3dGFTZDFfbG1fa3RJOWNrSkM3VFJLQWZLSXdaTk93MFBJWnhjOF9xSmdleVNkRnp6QUhHaTRWMFFNSUtUQVgybXFQZU5XM2c5RGRCZ2R2aG1QdGJQbFRkM3RuTFRlc0M0bW1XUGxIMnR2Y2FSUEk2QWgyQVFaSHhVTjE1OWZDdnJ1bXFmQW9qLVdYTGw0Q1JMVzBZMEl1ZDhCeERxTEtVdWRWR19PNk90VWY1bWFaQnZVLXhrUVo5OURJVzU1TTlYQWt3SkNST0R0ZlVrbmpfTW9iLXBUanhISEFnaHJ1Y2x0N05NQ1pCY003c2hPeUtlWkluR01rcFdqSlBnVEFoTERQZzlNZDcxdmFld0RGWEhuc20wejEtNnM3UnZPZTV6cmpSM3c4LVBGenFJSEVIUjhqT1ZsSjBhX2ZNZUVRY09aUVhmRGJEekVzSThDMkJIRVhsdmY3YVU4cmZ5aXVXNkp4ZWF0OWY1QnQ3WHRIQTVoeHVCQ21WaFB1MGpKVUZiSVZtUmFidE1xamJ0ZzMzaFB5V0JmQ1NNUjBkclFRcFVPcWx0QzBDdy1EMDhKTjFGbEhsMTFhUGFRUGNGZl8zNVltLVl6aG1NV1BCZVNvN1RlMWVKdDlnSi1CanNwbWZLOUJJM2NacVhJZVd1VnlsWGhWYmVSYVZ6ZUZhNkhOQkxkR0dZUlZobjFLZWpmSHRqTlFKRlhPeUtfUVpIejdqaG5TYVh4R0l2QzBaUDF4c2dWdWR0WFd2anZpVGJpQWJVU0I4WFR3NXU4THVXd0VmRkZXS3RyMkRvNWRjcUd2ZnJ2TzBaVHhIb3NaSzRvNXVua082MW1zN25RUFJR?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMiggNBVV95cUxOVmhvalFnaWhHS0JqblZTTUd0TTdRa1VfU2hoc2xDRkZCaHVldnRrNW1rM0NQTkhveklVc2ZXa3duZGZqTUI4bkprUzVSZFRsUnBfN08xSXhYaHF2T3JrZTY2VVVyUEFBSWQxdmFoa3FoYUdvR1ZDWV9EMGhKOHZ2WUNxQ29pNDg4LTFIWjE1LUk0Y2ctUlVTZXY5VnpNV1pzVzE5YUphZURvYnJUbFJ0eWpfRE5UR0Fud3JJelA3bVEzOVE5TjdENDZMZUV3NVpEdV9mWHk2R2l3ZkQwbTNQaTBGZVFoSTNrNjhGQlREdk5WOXNHOVdXQ1FPNFlBVk1zQWRKVkN1R1NFNFNKc2lscXNLeE0yajRvd1NnQV9mRmNJX0NacU9qbVhXLUxCWml4emNwQzJ2Y0xHUmNwLXhlZDZvSlN0SFZzMldwY2MtQUpxTkdIMGRWSnZicVJDSDdYQUpqWFVyWGgtc1dNTW04ZUkzY2c5WW5fV3ItQXZwZ2E1Zw?oc=5",
           "tone": "中性"
         },
         {
-          "title": "美股綠一片！費半重挫1.34%領跌 台積電ADR也熄火 - Yahoo股市",
+          "title": "2026主動式ETF績效榜》00991A、00992A、00981A前三強狂飆80%！大立光ETF誰最吸金？雙強指標一次看 - sinotrade.com.tw",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxNdmhHNDJ1bUdXR2FrdjdWWDlTM2IxUy1Xc0p2YzNqR0xHMzA3a2VqcVhjaXE1MzRBT1dQSXpsX2JLZWF6SjJYUlBvRVJfM1VfTmkzejFnSXVUNGRKaWFhUTk2WmFnQ0otMkRTcGcycGo5LVVPaS1veGRSQi1XSEV4V2VLaWZOMUl3WWtkaEQ0WkpWLVBVRW1aQlBMZkszaGJJMkx6SjIzaHVBUGxBYmUtb3VURG1tR082RWtKVFVGaU41NUt1SGo3eGZMLUNXYlpOTXhnZHM4czQ4OWNx?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMi2ANBVV95cUxQM2FjaVJ6X0VqMHhPM0NUN2VITUFvRWk1QV9OR1pIMlJmeGRxNnUzNFFuWk9yWkVtNWdOS3ZkOFZtMV8xZGFQYjJsU21ZSXZxbWdNNHRYLU5NejNNdXltcDBTcTR2bXBja1NBRHFDbUdENjN3Ulg3LVhMQ2tQdjBBdTNETFprdkYwb1p5YkUzUGFFc1c1RHUzUG5qTmctQU9zZEc4dW42VEVJc2dHWmlGSHJteG1VbHFvUFRsQUNIQkhKT3VBNFpVUFVscENKaldNQ2lMV3gtTGNNUC02ekIzMVpEQ0VfWWM2Ynd3SVd2bUdpOVl5UXFBU2Q3NklBbjlQTFNXbXg0SzBqeUlPeXpXaHktZnNtRF92em1xUThlNWRfR09kMjFoTlFfZ1ZJdFBCX2NtSHRpT0tNZnN6TGktUU4xQjNMYUt6RFRjcEFUcXc0aGtqYURSNFdJY04yUnpEYWhOUVVJM0dhUjY3S1RRN3RIX3ZtN056TVI4TEFLcVVQQWZIS0Zhb0YxcGtNeWlrb2doMkJuRFFVZTJUVTkxaFhIbVA5M1M0SFBzcHJiaHkzbWd0b2RHajZGeW9kTHJlUXJNWlhpTVJwVmtlTzZqWmNzVU5CcmhR?oc=5",
+          "tone": "中性"
+        }
+      ]
+    },
+    {
+      "topic": "記憶體",
+      "news_count": 10,
+      "tone_score": 2,
+      "tone": "偏多",
+      "market_hits": 0,
+      "trust": "B",
+      "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
+      "examples": [
+        {
+          "title": "台積電爆滿又漲價！ 韓媒爆SK海力士找英特爾代工HBM - ETtoday財經雲",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTFB6TElzSUFueEFlOWVkX0p1N182ckgwVzZGZFhmakljbTNKOC13M3FHc1JwaXEteVd0UkNBUndrNTNTZU9xR29oLW1MOFBwOWJXa2fSAVBBVV95cUxOMFdzLWVvLVZCWFZVSEFwejJxNUpVcXI3YU1QYllaNTJYcVBHS1FrOUlDbUxJWG1yblB4ZEI2OWgwY01SbXpiQTZ2dFNHell1TQ?oc=5",
+          "tone": "中性"
+        },
+        {
+          "title": "〈財報〉研發燒錢又遇記憶體漲價！華為上半年淨利重挫近四成 - news.cnyes.com",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTE0zbXFRQmNXOEVNQXZiS0JNck0wZVhhVXhBdlVVNmdSVjZrcDhMRExNajFFbVk2M3kxOXVLb2JOY0RIQ1gzUW9SQ2hZMHNOenc?oc=5",
+          "tone": "中性"
+        },
+        {
+          "title": "台積電不再獨占 SK 海力士 HBM 訂單？傳 Intel 分杯羹 - TechNews 科技新報",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxNU0pWRVJZSDRadE1KRGcwU00ybHVJQU9pZFdoX3V5bS1jVU1aSkxkd0EzY0M1cktwZFZndzVUYmFLZnVXd3kxaEZvenhwSko3RnoyZ0hJTVdEclZFZDloekJKeXY3SGZoeHRJVnNHRGZmQXhZN29YRWJEVlFDNEJfOVFmRFlOalRkTkhfU01XQ09LOUtlN2xEQXNvcFVkMUN5STlRWWxGNDRUQQ?oc=5",
+          "tone": "中性"
+        }
+      ]
+    },
+    {
+      "topic": "美股科技",
+      "news_count": 5,
+      "tone_score": 1,
+      "tone": "偏多",
+      "market_hits": 0,
+      "trust": "B",
+      "trust_label": "B級｜新聞主線有盤面/ETF部分驗證",
+      "examples": [
+        {
+          "title": "輝達財報利多只撐1天！費半重挫逾3%墜熊市 阮慕驊：9月見真章 - Yahoo股市",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMihANBVV95cUxNc2NLR1Mxd1FGRDE1aWJjSmxPalQ1UEx4NTNXcVNrQllRYlRYaFhJbkZidjgzUlNFOV9fZDNreWc5NTNKSndnZmQ4N2p6RU4tS3dKeURUanlYZC1sYjRuVGhWc0pYTUhmdnNrakE3WFBSaUVwSFk1MGR0LTB0QkkyTG50SXBvTVhnLUhTNnN4dUY4UnF1M0xBbDE4TFR1dTJJeWZucm1SSkloc0NEV1A3dzE4Um9hd09NOHdkVEZnQS1yWW9zMVpSRXc3VkNTMUUweFlLU2VicXEzNDBoNDRJaDlVWDJuYVkwMFVyWV96ZDhfWVphNHJaMjktWnBaelBnSnlTTTVKdERIbmVrTVltUzcyODdLSjVOTV9SYmlJaVpwNU5XSE5KUFlqWHAtWVVRa2hPNDZBMTNNbjFDUHVDU3o2b0tHS1hTSmNodVl4NzZEcnVjU1Nzck9tcHpXbFhsOEY2eUVlUFF5SG0tY3ZmQ3puY29CX2JXdTJ6NmFLck1sb3pu?oc=5",
+          "tone": "偏多"
+        },
+        {
+          "title": "美股三大指數開低費半指數逆勢上漲- 國際 - 工商時報",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFBuSTY4UGJ3eHVEZlEyajNndEZxeWFVdml5SE8wcUtnOGw2UDRyM1ZRNGFncEJjWXV0dzJlcXBTQ3RiQ0lzUzlHNXZJMGptbWVkTWhMZS0xUjlydnJiTUw0?oc=5",
+          "tone": "中性"
+        },
+        {
+          "title": "聯發科成功募集39億美元海外可轉債 NVIDIA包辦35億美元深化合作 - DIGITIMES",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTFBQaXp3bnNXdklXTER5NzlJUU1SUzJ5V1BIUXozVkczMFFicFBNalZFMEVCcVBCYW5tb0NYN3JjNWdxREwzS2E1N3pSd045bV9HWTRMbnNyWUIwSkZJYnp2LVFkWnNnN1p6T0pN?oc=5",
           "tone": "中性"
         }
       ]
     },
     {
       "topic": "金融",
-      "news_count": 1,
+      "news_count": 3,
       "tone_score": 0,
       "tone": "中性",
       "market_hits": 1,
-      "trust": "D",
-      "trust_label": "D級｜雜訊偏多",
+      "trust": "C",
+      "trust_label": "C級｜只有新聞熱度，先看不追",
       "examples": [
         {
-          "title": "FED華許是講了什麼嗎？ 短天期美債（美國三年公債殖利率）忽然變成火箭發射🚀的狀態😅 - facebook.com",
+          "title": "【美股盤前0831】華許於Jackson Hole中強調通膨未明顯改善，市場解讀為偏鷹訊號，美債殖利率聞訊跳升 - sinotrade.com.tw",
           "source": "Google News",
-          "url": "https://news.google.com/rss/articles/CBMigARBVV95cUxNcWswUUNac2txbHRmZldEOXc3RkluTDcyRTN0TmRUR0JMMGhZWUFGXzZDbVA4V295Wkwyc3h3ODlSdWNjMEQyeFVRNDN0MlFybHpvd29XcFJLeGdiVUtwMzd1dXN1TEd6WDB2SVZfUzJveTlublpaU2dsQkFqQjgtR3ZLMlVURjVXRmZyUkduQXhUbW5lcnRTSUFOU1BEYU9GNWhPUGwxQl9PLVFHSjZYcnh4ZjktN2s5dFV6X3ppbGNRNm5ZeVg3c0JtOUVYOFhtRGFMZWFTbDd2WHNpeHc4VFR1N2F6VUNWSW9KQXI1WnNseFdNXzJvMHBuX0JtM3JpYi1SSzI0WjNQNlhSU0tJX0d2Y2tZRXZGTXF6TjNlVzdrUTMyZ1gzV1BEZ1BjUUZ5M214clNneGc1ZFlXQk1KNVZkTWZpbG9CS2FDRDZPcnRkNHR4TUYzSnZhVy1wLVl5bEZHX25DV2JKM0Q4TUhhSXg0ckxfWEw5cXpPNC00cGpNQmJlcHNvX01zb2JKdmlPbDdUaFRMVWhjNlJ3ZU5VcFEtVlNUNFpSM0ZHMTNzWEowSnJ3UDdMUzZtVVpSOTBSTDJBU0N0RnEwWG5HT0NYbTlhdFV2c0NoYkw0RzJXUWJJbmhHUG9hNkdSNEVFU2FOX3JrbkZma2tsS3FyUktsNA?oc=5",
+          "url": "https://news.google.com/rss/articles/CBMiwwRBVV95cUxNR19rY1BSVmdrNU9HWHJDX2dDaUwzR2tVLTBQVkl1MWZOZ05UVlM2RmgyNUZRRTdFQkhNS01ySHlmbzR3MFVYR1g4bVVDdXk5cG9YbG9jekdnaTgyOWkzYTN3VktLLWJueGdzaXdONndkd3puVG9ISzJwd2JDd1JSUGNYSmQtenltN0d1R0VWQks4SWFFSm9QWGlQNUc1NmZxZWwwOEpVa3gwZmZvSE45ZFRfQU9UYUFBbXBCbHRpTm9KeE55Snp5VnVmMms2YjcwWGd0NTVwdENwTWM1TWlSV0F1VkU2UDhLZElyYnRDbVRpODN4MnI5ZG5FRjJEQ0pXR3lYbVVOcHpkT1BERHh6RGI3NEhsZDByRG5nQVNHck4ya1FueHZFdlZjWG5GTDRJdmpqOTc4dGpOdDUxY1dKbXRWWHRhQ3p4Mkt4VTdwdlJSM3VjYjVTRV9fQVQ1NFBOQ1RROXhIczVVODlEYTFlRlFEZjREOXNzanVNV3VlazNkVjZ5YUhLY0liU0tWU1FPa0Y0cVJnSS1mR2VNWEZoRXFocWhwV2tnbmVTRUZ6SWJXSVZ3WG5menRHcGlOZ0MwVmRWWmpvN3g2bHgxUTA0SHdpTTlrZlFMMWpZNjZFejYybDcwb3dVczg3NWRlUU9icXRUVTl3VFpWOEx0Q3BORFhMNzZwTlhsbVJBd2JFLUhwZDAtazNxN3NuTjlXS0stajFIOFg0TGswU1BEVkRyNHg3RUJDNlo2dlVIRHpQNGJPMUk?oc=5",
+          "tone": "中性"
+        },
+        {
+          "title": "油價一漲Fed更難停手！10年期美債殖利率創逾一年半新高 - news.cnyes.com",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTFBpMUQ3aHFxRnFCSlBORWxPbzQyMGN6WVJOdlBCSWtfNVMtSnFPZmlQUzVKdW10TnM5eFpBT2FmUjNIZzVlUE5zd3hTaXpWRHc?oc=5",
+          "tone": "中性"
+        },
+        {
+          "title": "〈美股早盤〉美伊交火推升油價與美債殖利率 主要指數開低 - Yahoo股市",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMi_gJBVV95cUxNVjdJWHhybFh5eTFPVHpPeGxtSEN6dWpHc0Vaa1JEX3c4MkhyMEhlbVBKU0s2R2hMYllPMjBJMlgybHhmRFhOWHFCRm1oblI1SjRWaldRcGRXbU5VZkMtZVNtRi1IaERPTXpDajR2S05fdXRrZFNCdWp5NTlRZ0wwdmdaYWd3bkhwcy02TmFBaS1DblQzQTRuei1UZTdSclpYOF9hMXgxQklLM0VmSXc1QXA3UjBDRFFoVGM2WjdyYXBOZWpQNll3c3djMXlybGotMDhVTE9Sa2VDLUxqTkxIM1lheks2X29vbzB0ZFhFem94NlhwVnJrdVBqUEZWa281cDdoLXFncFA2Z3BLWmRjZzFDWm1LQXEzR05IS3dlY0g2RWJsRmdLcC1BenVKZlhUYWdfMS1tVjV6SFVXN1JUOHM1SkVNalZVZm9EMk5QQkI1SEV0V0h1RTFmSHR5Z1ZOY2tuYU9CMmV2YTZCY0h5cV9qVnlpaF8xVlQwM0ZB?oc=5",
           "tone": "中性"
         }
       ]
@@ -272,70 +284,39 @@
       "食品工業": 1
     },
     "active_etf_coverage": {
-      "usable": 10,
-      "candidate_count": 10,
-      "coverage_pct": 100.0
+      "usable": 22,
+      "candidate_count": 23,
+      "coverage_pct": 95.7
     }
   },
   "representative_news": [
     {
       "source_engine": "GoogleNewsRSS",
       "query": "台股 OR 加權指數 OR 外資 投信",
-      "title": "三大法人買賣超 – 外資買超(2330)台積電、(2454)聯發科，投信買超(3081)聯亞、(6669)緯穎，法人合計買超593.87億元 - sinotrade.com.tw",
-      "url": "https://news.google.com/rss/articles/CBMi0wRBVV95cUxNd1h4YUxZTHNpNGpfR1FsVHprSFAzUy1wcEQ5SHlSeU1wMG1MbDBDM3pXdy1ibmY3RGVORVptbXpaTndkc0Z2SV9zR2lmZGhERTBEbk1jNVZYWkJtZndOUHNuVjlfaEduVldqbVVndlZkdjNWSm5zVk1VNXhBRzhiSi0yZnFSVVd4eUFrZWVXOUpkV1E4aHo4MTBtRF9sM3NTRHRMZTRfVTVTNzRXZTBCUzByV2VySld5d2wzWEE3ZzdJa2dkeENVTklzeUdXTFlEQUZ1MnAyTlBVV3oxcUpPT3NEWVdueURFNHBwRGk3SVNpU3R6MVVuMW15UjhJdDNNUENTdWJEME9QNHV5YkJ2NnhQZEZYcUpURmVJQmVBOGNUanYwMG1EendnZERnUGJyeWV5UHdFZDkwWTRkX2t4MnZhZUtjcWh6ZFhIQXVRNlAtNk5WX055LTVqdW5yT3J6ekVkRXNVYmJreE1WalRWbU9jVUlYRXV5S3VVR2IzVVVHaEFhUXo5Z3Vld2hob2NWUFVWd3NpVmRpMmVBMDhmNEhIQTNFWkxucVVudW5EMXlCb05LdFJxYTYxQzl2MS1JRnNLVjhHX2JjZTJCdlF5dFlPZGZ0Y1A3d0V3RmhVUnFFM1ltekx2SmxLZThsYXhqdTJNU2tMNzdOa3Y1QnNndWw4SUVQa2JUZG1JYjV2d0VaVmZaNkFhVmYxc0V1VE9mY1FycDVDZTBjOXI2Z3pyRFZWb2ZBclg3YnpxQzdMeXJXYXUwM1FjUU9vSEFRelZMcWhn?oc=5",
+      "title": "三大法人倒貨267億！ 投信賣超榜上竟「沒欣興」 網嘆：很難賣啊 - Yahoo股市",
+      "url": "https://news.google.com/rss/articles/CBMi-AJBVV95cUxPNEROLUNRZ0FMMFVSajF5VXV3QTFLOFNYUXA1WmFmZi05WEh1ZHlUTUdReTVBNUlBQWhhYVFFaFZDQmtZTVRrcGdtd1k1S3VHNE1SckVqNDNPT1E2dFRMMnlsdkg1UDhIcW8xVE01T05pUWlzYnpEYS1YQ2hHUFhYZU1nUy1IWEx4dktfZXBQMERzUFpQMVdXNUMwOUdWTjJoWk11OXlucVBTODdacGlacmhNal9odHMyOTlBQ3VIdzE2ZnJSay1jT2NZTzAzRmNRMDNPdnlmd1NncVBQQVVwU2pCMkhfeHhDNVpBMjFUTFlaZ3hHSHdvZWJ4MEtsdm1oT21IVlltcHo3bkhKcUh0T29aSUxYTEF2dkxKTm9yVi11UnJxRzdJR0NBSWVJcE5ZeFU2Wmt5RU4xOXFneDA3YW1tdzUzZkdCT29XS2h5VmtPVU9tYW5Ob04yMVNndjZGenJLVlp0NUZkdDE5ZnlPd2R4ZFpZWDVB?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 11:07:29 GMT",
-      "snippet": "三大法人買賣超 – 外資買超(2330)台積電、(2454)聯發科，投信買超(3081)聯亞、(6669)緯穎，法人合計買超593.87億元 sinotrade.com.tw",
+      "published": "Mon, 31 Aug 2026 07:58:00 GMT",
+      "snippet": "三大法人倒貨267億！ 投信賣超榜上竟「沒欣興」 網嘆：很難賣啊 Yahoo股市",
+      "seed_topic": "台股大盤",
+      "topics": [
+        "PCB/ABF",
+        "台股大盤"
+      ],
+      "tone_score": -1,
+      "tone": "偏空"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台股 OR 加權指數 OR 外資 投信",
+      "title": "外資暴砍「這封測大廠」1.6萬張！投信展開救援 26萬股東卻哭笑不得 - 三立新聞網SETN.com",
+      "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE5YVG9vbWhfdFhxRUowN25RbFhUYWsyLWdjOGZWMms4SzZQbGdtQUg1ZTFJUFJfYm40NUJ5QVZ1SjNueFZrRGJ3bWVXaw?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 09:17:27 GMT",
+      "snippet": "外資暴砍「這封測大廠」1.6萬張！投信展開救援 26萬股東卻哭笑不得 三立新聞網SETN.com",
       "seed_topic": "台股大盤",
       "topics": [
         "半導體",
-        "台股大盤"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台股 OR 加權指數 OR 外資 投信",
-      "title": "外資、投信聯手狠砍！國家隊砸近5億護「這檔記憶體股」 - 三立新聞網SETN.com",
-      "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE85dnNZS1MtTTgtR3ByQWZ0b0FOMDVHc0tXRFNMZDRNd0NLVkhONGs1bWM1SGJReXFiM3JiWG4yRF94Nk5qdzdWTEdyaw?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:59:01 GMT",
-      "snippet": "外資、投信聯手狠砍！國家隊砸近5億護「這檔記憶體股」 三立新聞網SETN.com",
-      "seed_topic": "台股大盤",
-      "topics": [
-        "記憶體",
-        "台股大盤"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台股 OR 加權指數 OR 外資 投信",
-      "title": "野村投信最新台股看法--【台股操盤人筆記】把握榮景上漲機會，但也為循環轉折做準備 - news.cnyes.com",
-      "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTFA4NER5bVNNWk9IWE1YQXVfSThVNWFheDNkRk1ocHNNS21wMGEwdXRPaFpHWGxtS2d0anVrR284Qno5MmtSNUlZQTFsLWtBV0E?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 05:50:59 GMT",
-      "snippet": "野村投信最新台股看法--【台股操盤人筆記】把握榮景上漲機會，但也為循環轉折做準備 news.cnyes.com",
-      "seed_topic": "台股大盤",
-      "topics": [
-        "台股大盤"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台股 OR 加權指數 OR 外資 投信",
-      "title": "外資投信不約而同 敲進「這記憶體大廠」3萬張！31萬股東揪團喝紅酒 - Yahoo新聞",
-      "url": "https://news.google.com/rss/articles/CBMilANBVV95cUxQTzNlSkhQUDA5ZUlEdjVSVVd0X0J5aW5MSUxWUC1JQUhndXRpZVVoaEtyV2pmR1ZoNUo4eUFzZ1ZTbFlmQTZBRWhSTVVIN3JSSmFuWklGV2d5Sl81d3k0bU9vYkRYSkZfWlkydEZpUVd5V0t4M3JYYkhHWDUweThyUVdXWjE4ZHI5elJaSVprUXo5blJ4di1NLVVDZjl0dG9rOEJGT2VwWXd3ZXpwWVJhREx0d01BU3JsdFdScFZYNkxndjZCd180X2RqRVJpbUV6MGUyRDlWbXBZRVdfWFlXQldZNzAwRUFRWVpCR0JObUFqSXktbmV3MnpTZ3BHSkYwRllJdWNBN083ZFpuOFZoX21FY2kyRmlBU0ktbHJISVc3cEw3dTRRcWhVV25sZzhqSzhCRGh4TzlLZ1ZoMkowMElLRlN6c1JuV1lKTnJlR0Y5bnJmb0RsMWl0QzBZNmhwc2tON2xRbHIzWndMTEZlbW02Z3dTbzd6WElCR3JFOVJQcVMzck0yRzJxMHN6eFdzakgtTA?oc=5",
-      "source": "Google News",
-      "published": "Thu, 27 Aug 2026 09:24:00 GMT",
-      "snippet": "外資投信不約而同 敲進「這記憶體大廠」3萬張！31萬股東揪團喝紅酒 Yahoo新聞",
-      "seed_topic": "台股大盤",
-      "topics": [
-        "記憶體",
         "台股大盤"
       ],
       "tone_score": 0,
@@ -360,42 +341,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "台股 OR 加權指數 OR 外資 投信",
-      "title": "台股飆1,783點創史上最大漲點！投信大手筆力挺、外資卻連13賣 - 經濟日報",
-      "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE1EYXZQTlBhUjcyQ3EtbF9mS1hVT2gyTFhmOEpmOGRrcXR5SlF5UURuNTNZRlJMMFFnbnZOQ3VYNnJYUVRLVmhhTEFlbUxXcUo0a3d6R0dKNWlVQdIBX0FVX3lxTE5iWm5MNWgtYWNraklOVHdoLURaUUZWeG91NjhNVDFmaVVZaXJsTEUyTE1JRU54a2o1Z2c1azRSOS1UTjBUVUtSUWN1YjJTeWlGa3pMYkUxSnVlMHQ2NmRR?oc=5",
+      "title": "4772 台特化 - 外資-133投信-27 自營商-20 三大法人共-180 - 股市爆料同學會 - CMoney",
+      "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE5DSmVoSzZVVktzUlkwcF8xdEEyTlVfT29GWWtHd3VldEFtWURWX281ajFiSVNkenFwMXhLT1o5X2JVSmJITFFEeTdGTWtfOC1nSC0wMmdxamE?oc=5",
       "source": "Google News",
-      "published": "Tue, 25 Aug 2026 09:00:00 GMT",
-      "snippet": "台股飆1,783點創史上最大漲點！投信大手筆力挺、外資卻連13賣 經濟日報",
-      "seed_topic": "台股大盤",
-      "topics": [
-        "台股大盤"
-      ],
-      "tone_score": 1,
-      "tone": "偏多"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台股 OR 加權指數 OR 外資 投信",
-      "title": "外資投信狠砍！國家隊5億護這檔記憶體股 - 鏡週刊Mirror Media",
-      "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTFBMRDZ4aWpDOEswNFR2c3lTS3ZMUUkySnNPczhSUkFiWmJPOTlmS3BtUkFMejg5bnR5MGJYZVc1UmozSWs2Q2YwSkphekRwb2xRNU0za0JhLS1LLTJj0gFiQVVfeXFMUDRSblJ1QkwyVzFMUWNnbk41dVhLQkVzS01mMnZXWnBSVVNtWHg4X3JjMU5zRGs0UjRXbWFUWU1yRDFWQmk2ZVJvQ0JEbEpWVkM3Skl2cjB6S0RkUnFkVmVsclE?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:52:00 GMT",
-      "snippet": "外資投信狠砍！國家隊5億護這檔記憶體股 鏡週刊Mirror Media",
-      "seed_topic": "台股大盤",
-      "topics": [
-        "記憶體",
-        "台股大盤"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台股 OR 加權指數 OR 外資 投信",
-      "title": "外資投信聯手掃貨1.2萬張 「這檔」狂飆9%！26萬股東狂啖紅龜粿 - 三立新聞網SETN.com",
-      "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE1hNmRXWVVoUktNS1c3OU1PRW84SXNnSlE2Nk84N25kUTl3WXRJYzE2elRNTEZuVEVJOFpEVkRYNUI2aVVDN2twdFlaQQ?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:54:00 GMT",
-      "snippet": "外資投信聯手掃貨1.2萬張 「這檔」狂飆9%！26萬股東狂啖紅龜粿 三立新聞網SETN.com",
+      "published": "Mon, 31 Aug 2026 08:14:14 GMT",
+      "snippet": "4772 台特化 - 外資-133投信-27 自營商-20 三大法人共-180 - 股市爆料同學會 CMoney",
       "seed_topic": "台股大盤",
       "topics": [
         "台股大盤"
@@ -406,11 +356,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "台股 OR 加權指數 OR 外資 投信",
-      "title": "連2天低量急拉逾千點！外資、投信全沒買？「PCB、矽光子飆漲8成洩隱憂」主力在審判日前夕布下完美陷阱 - 旺得富理財網",
-      "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE5INi0wMGJKajdjcVJ5a3pTYXgwOWdleTJQRE1uSUVqaUIzSkpzN1JlYjF6RDBwalFkRm9VemRaU3hjb09STjBfOVRPbllnVlRPa2Y2ZnNTU0xVaW9heGhJQ3pYVV9nTTFxbkE?oc=5",
+      "title": "不怕欣興無量跌停！外資進場接刀2206張 - 自由財經",
+      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFBsNkJieHpQemxoYjc3eTkzYmduaXl2YUl4ZElrcDFXNDNCNXVzem1uRE53aUp1WVdwNlRiV2xBZFEtSG9QQUVVeEVxZG14X1RNRU9IZ1FMeFN5cjZUdVFF?oc=5",
       "source": "Google News",
-      "published": "Wed, 26 Aug 2026 05:51:10 GMT",
-      "snippet": "連2天低量急拉逾千點！外資、投信全沒買？「PCB、矽光子飆漲8成洩隱憂」主力在審判日前夕布下完美陷阱 旺得富理財網",
+      "published": "Mon, 31 Aug 2026 08:33:15 GMT",
+      "snippet": "不怕欣興無量跌停！外資進場接刀2206張 自由財經",
       "seed_topic": "台股大盤",
       "topics": [
         "PCB/ABF",
@@ -418,6 +368,66 @@
       ],
       "tone_score": 0,
       "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台股 OR 加權指數 OR 外資 投信",
+      "title": "滙豐投信：AI需求延伸撐起台股長線投資機會| 股市要聞| 股市 - UDN",
+      "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTE9DellMa3FnYjgyem1KNDN0NlFXNUdDaTByeDc3azY1QVVVOUtKb2hlbHVISWNBZWJUa3NjZU0zYWY0NVVpcmtTSXRyMlp0ZGVKUlZYcFJ2bUlMME5QTmpRX0ZmT3EzWGhiampUQmZtVG10dV94Q1pDM3hHeXI?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 03:47:04 GMT",
+      "snippet": "滙豐投信：AI需求延伸撐起台股長線投資機會| 股市要聞| 股市 UDN",
+      "seed_topic": "台股大盤",
+      "topics": [
+        "台股大盤"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台股 OR 加權指數 OR 外資 投信",
+      "title": "野村投信最新台股看法--【台股操盤人筆記】把握榮景上漲機會，但也為循環轉折做準備 - Yahoo股市",
+      "url": "https://news.google.com/rss/articles/CBMigwRBVV95cUxQd01xbVBCanFVdng3T2FzWE83Sk5GRDdYUDM4T2lNQzJXT3YzWkZNVkpqTy1wQkZ1em1VMW41cm1COFctTmVlNVNkTml5UHBBcWF1Q3JPY2VHeU5LVUhhemlVVEhEem5XNEpjVUtuWUJhMEM2TXFqTkswX2dSS1ZBM3lBYlJ3WnpIVzlfanZMbm92azF0Uk1QcWJGLTI4eXc5VDQ3dUFSb21hd3BybFE0eXppOWdscnl3TXZzbkJmV2VyNk44SDRHSE9oaF9tMXNKaXl3NHRXUGdMcW82bU1RSm5uMXJIeWNkNWJJRkYyeFd3WmpDYjVaMDU2ZGo5ajlZc2h1ZzMyR2lvU284MHlZeTB1WXF2NzdacmszVmRoTnliVjJJLUh4STdBTTVfV2RqUXJFSWFqdkp5ZnJhVlZqaUNmUFpXdmU3eUU5SF9IUUJrMDVOeFJBUE9NU1k4WHFaYnZBWjZ0eThCRExvc1hNUmJvU29HNndPdThyOUQtRGM0eWpYa2lfT0JNTHliZlFHcjRUNVI0OWt1LWMzSjJ0REZqOGRQMGZybDJjanM0XzAtck1zSG9wTHZFQ0dQUHpkTnpGUndSRjdZWTRlT0lHc1djM3U0VS1YVEJBcHdsS2x1XzhDaEZzNVViTHVPa1VyNVhyZllNdDBBcUJaU00temM2OA?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 07:31:50 GMT",
+      "snippet": "野村投信最新台股看法--【台股操盤人筆記】把握榮景上漲機會，但也為循環轉折做準備 Yahoo股市",
+      "seed_topic": "台股大盤",
+      "topics": [
+        "台股大盤"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台股 OR 加權指數 OR 外資 投信",
+      "title": "國巨、景碩觸及跌停！外資投信聯手大提款 71萬股民哭了 - TVBS新聞網",
+      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE01b0V1U052cDZlOXJQOFF1ajVzYlFEbFduMGlzbUFocHJwVXJqeTlQTnd4VXFLNnpVcmk1dDdYdDcyR1FpdE9icDF6bEhmdw?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 09:14:00 GMT",
+      "snippet": "國巨、景碩觸及跌停！外資投信聯手大提款 71萬股民哭了 TVBS新聞網",
+      "seed_topic": "台股大盤",
+      "topics": [
+        "台股大盤"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台股 OR 加權指數 OR 外資 投信",
+      "title": "法人觀點：AI需求延伸，匯豐投信看好撐起台股長線投資機會 - 東森電視",
+      "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTFBIMmJtLTY3NW1waU1Fd1NXVGluZ1Zhd1J2WC1CaGVBQ2hyYndEY0ktUm5UUGJCRTVWeklRblNjNHZ0aVdJTVhHaW5jN3JLYzBWZVZ4MXZn?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 04:05:00 GMT",
+      "snippet": "法人觀點：AI需求延伸，匯豐投信看好撐起台股長線投資機會 東森電視",
+      "seed_topic": "台股大盤",
+      "topics": [
+        "台股大盤"
+      ],
+      "tone_score": 1,
+      "tone": "偏多"
     },
     {
       "source_engine": "GoogleNewsRSS",
@@ -437,11 +447,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "Nvidia傳以129億美元併購Hugging Face - iThome",
-      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE4wdUFCTlF5dEU5eTJNRDZ4WE91cGJRMVlqOXBIX3pOdWlTdzhFenNqRTlfYld6aUpyaDJaZEs4eHMyQ0dIdGRMbk52TUx6dw?oc=5",
+      "title": "NVIDIA 豪砸 35 億美元認購聯發科可轉債！聯手打造「邊緣到雲端」全方位 AI 運算平台 - 動區動趨",
+      "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxPTmlLS25GZy11SDBKdXU2dTdSXzdFYkU3LUV4aWk5NnVncktUQXpxVDZ2TjRIemsyUWRPa0RUdlM1UHBxdWc1MHo2ZXhGQ3ZnUjdYQ3dLSnk4SU51X18zWFlWTXhHZEpQZ3NnM3FMeDJoS2d3WFNTZXM1Q1ZnSUFXbEpJejg?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 03:06:33 GMT",
-      "snippet": "Nvidia傳以129億美元併購Hugging Face iThome",
+      "published": "Mon, 31 Aug 2026 13:12:27 GMT",
+      "snippet": "NVIDIA 豪砸 35 億美元認購聯發科可轉債！聯手打造「邊緣到雲端」全方位 AI 運算平台 動區動趨",
       "seed_topic": "AI伺服器",
       "topics": [
         "AI伺服器",
@@ -453,27 +463,57 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "NVIDIA AI 機櫃產品世代交替，估 2027 年 NVL72 產值貢獻可突破 7,100 億美元 - TechNews 科技新報",
-      "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxNMHc4djA5NjN1ak5wRTFQVWdkaDd6eXVIbnVMbmI0TW9YdHgxaFpxcHZ2SnZGZzhuWXY1OVBHc2ZEektKZE9YU0YtYTN5U0IwNXpvSHIzcEUyTzNpRDFqNkU3NVA5RzU4ak1nT0xrSHc4YWtDME43aEtHd3d3dWxtck92VjY?oc=5",
+      "title": "NVIDIA與聯發科揭合作藍圖黃仁勳：AI大規格的工程整合- 新聞 - MoneyDJ",
+      "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQaXF3dEJRaVQ1MHZDMjI0VU9TZ1lTVENBbjhEY2xxZE9qNEQxdG5yZHNTTTdXaVNsZE1hYXVyOHhtRFF5Uk5kTlhxMDFsSEM3N05JdzhvdUlpZ3BHNV83MzVmLUdWa0pTdmFYZUJwYUVOUmpXWmdfU0lSbVlIaDYzVUl2emlSSG5kZ0dsSDdVYlJlQQ?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:03:19 GMT",
-      "snippet": "NVIDIA AI 機櫃產品世代交替，估 2027 年 NVL72 產值貢獻可突破 7,100 億美元 TechNews 科技新報",
+      "published": "Mon, 31 Aug 2026 13:52:00 GMT",
+      "snippet": "NVIDIA與聯發科揭合作藍圖黃仁勳：AI大規格的工程整合- 新聞 MoneyDJ",
+      "seed_topic": "AI伺服器",
+      "topics": [
+        "AI伺服器"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
+      "title": "NVIDIA 與聯發科技深化長期合作夥伴關係共同打造從邊緣到雲端的 AI 運算平台 - MediaTek",
+      "url": "https://news.google.com/rss/articles/CBMi5wFBVV95cUxNSkFyREh4UUdJYmQzTjduc3BBaWZXTm5RdGtQM2VmOGJFWXVxOWMyaDZjc014eUVFeE1JOUFMUFdGeXBUOXlHZHBEOXdlaTdwaDBqVFN6RFg1V3lVWTg1Skg0d2ZJRHVmVmV6bzZiLUtQVk9XVXVyT09zTUhyS2F4TVV0UTdoUzRqa3A1UzdGQXJJSTFWX2FTQ2NtbmVtT3ltcUxXeEVJRjAtRUN4TmFhX0ZpYWFfV3ZJVDlvSUtDTUVGZkJjSUoxRUxhTnYwLW84VmhNNnIxaXhHTmJPa01xaVJ6eFh4VFnSAecBQVVfeXFMTUpBckRIeFFHSWJkM043bnNwQWlmV05uUXRrUDNlZjhiRVl1cTljMmg2Y3NNeHlFRXhNSTlBTFBXRnlwVDl5R2RwRDl3ZWk3cGgwalRTekRYNVd5VVk4NUpINHdmSUR1ZlZlem82Yi1LUFZPV1V1ck9Pc01IcktheE1VdFE3aFM0amtwNVM3RkFySUkxVl9hU0NjbW5lbU95bXFMV3hFSUYwLUVDeE5hYV9GaWFhX1d2SVQ5b0lLQ01FRmZCY0lKMUVMYU52MC1vOFZoTTZyMWl4R05iT2tNcWlSenhYeFRZ?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 12:47:14 GMT",
+      "snippet": "NVIDIA 與聯發科技深化長期合作夥伴關係共同打造從邊緣到雲端的 AI 運算平台 MediaTek",
+      "seed_topic": "AI伺服器",
+      "topics": [
+        "AI伺服器"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
+      "title": "NVIDIA投資35億美元深化聯發科合作！導入NVLink Fusion打造客製化XPU雲端AI工廠 - Mashdigi",
+      "url": "https://news.google.com/rss/articles/CBMi9wFBVV95cUxNTHBCd3NHUGJuNUpRalpzX3oybmlvdDFvZ2V4VktpdWlOelJ0N2phMS1jOG0wMkNKWGl4RlFDaU5JREJWbjV2MmZsRnhaN2plQkxMMkU3UXZoLWhVTzNwLTRHRWtuVm1pM3lpN0w5NFBiYzVXWlZnby1URHVDWGdtWGd5SjN4cUVmSGNQblI1a1lrMWR3ZGhKaVpyOUdGOWt1OVdNMmY0WG1ObHE1REpBeWpXM0NJVlVZWTBBTG5kdnNvZzV3cU9jalZqVVY1SmlfMmFBTTlFOVdQd2hnVU9WYWFSdmluUTI3YWM2UUxId0xDODhJc0Fr?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 12:00:18 GMT",
+      "snippet": "NVIDIA投資35億美元深化聯發科合作！導入NVLink Fusion打造客製化XPU雲端AI工廠 Mashdigi",
       "seed_topic": "AI伺服器",
       "topics": [
         "AI伺服器",
         "利率/總經"
       ],
-      "tone_score": 1,
-      "tone": "偏多"
+      "tone_score": 0,
+      "tone": "中性"
     },
     {
       "source_engine": "GoogleNewsRSS",
       "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "川普擬開徵「終端產品關稅」筆電、AI伺服器全納入！台灣代工三雄恐遭重創 - Yahoo股市",
-      "url": "https://news.google.com/rss/articles/CBMivwNBVV95cUxOUGw1c1Q1YmtOWTVvVkJDLS1aUnQ3c2JWN0NTeHR1TzVkRlV5NUd1azFHclB3VDY2R2JtdTBlSjFHZEROZ0F1NDFObkNlZEFxblZHQUw5QnlTdWJMcnM3Y1hEUy1KczBSZnJBSHRPQ3ZDdEYzQmRrdkwzZGViZ0ZCNm1OeXVEbFVhbzVoUXFIZjI0N21Ua0hGdDNnbm1rNXo5Y0NZdGVOdDBxcjhoYXN0YzI0SjdENDNBZkdjQTljLUJ6TmhZVmt6VE9hTy1od2plLW9tUVBwZ3ZobW5DWkN4aFNNSHFSRWx0S0twdXNHMTduaWZkWG03c3d2NVFfVVRTUG9KUDZTaEFNWUMta3lISTZsSDNaMlFEMDBBWGJXUTc1SHd4UGxnT3IyOTQwYVpJNVBkYkdYcWl5czNMUDgxQTNfRmJxV0RaTU5PaXBGZVBHNW5MSUphNnRYeTBvb3pHOERyeEhHRUxaZmVkQk9teUM1OUVOcDBQSnl6ZnZPbVotVmhLTGY2YWc0WjNqU3VZRE9BM2pXUmE5ZDVuZGFzQWstS3hlWk5EbFZkcGFvTHd5RnVqV0tOS2Zaa2haUTQ?oc=5",
+      "title": "今日漲停股｜傳統塑化與AI光通訊散熱雙引擎爆發，南亞、全新、雙鴻逆勢亮燈0831｜豐雲學堂2026 年 08 月 - sinotrade.com.tw",
+      "url": "https://news.google.com/rss/articles/CBMi-ANBVV95cUxNZ3kzOXJZMGtSbzF1WEZZSXpJanFEWEtPbG1kWkFYVEpSQzBYNUtSdWNSMFJITDRFbkE3dkJ2YlNxekw5VGdrUkR1OU50OGRXWkprQ0NNU3JjTm43MFA4bmVTVTVxcnFoVFJfRTh3TmZROUI2SmNoY2FwSVFFUnJ1dVBnNWlzNHl0dXlKYWtFbjVvdkhnd1R1NXJmcEZMXy1IQVd1dU14bUVuX1paTFVHN2IyVjh3cGpsX0FZZ1FEUllEMkpqekxGcm5YTDVrYm11N2hOT1NvaE1ibFZYU3RSblMxWXBpS1ZqdkVfbURiQzdhMHpsZmpsSUhTTzZoTndHVXNUY0RuYkNRTGhOQzJiWnl4a2I4Qm0zY25icnJoLVlxM05jRkJLUzNOWm5RRHNRX2dsQVRBdjBxNXZ4bjlaeHkzQ3JtYnRQUFRkVzN5UDBVZkpYNmc2bWQ2eHZfTUhHRHZmaDJZV29mY2hMRnd5QUZmYndIUFpaR0kyMXdmMkJNb0pGVTlUVFJySDFsRF95Q2gzTHZQLU1kZm5lbnh2azVIdF9kSDlSTUFpd29icHI2UTJfbGVQMm85NzhRMEZVVDl6OWVURm5TUFg0N3RwV2NnUmF5SzVwUHRieVM4UGVteUp2N3lJOHFCQWs2YTNvM2RhM1lOOGc?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 09:45:00 GMT",
-      "snippet": "川普擬開徵「終端產品關稅」筆電、AI伺服器全納入！台灣代工三雄恐遭重創 Yahoo股市",
+      "published": "Mon, 31 Aug 2026 07:58:43 GMT",
+      "snippet": "今日漲停股｜傳統塑化與AI光通訊散熱雙引擎爆發，南亞、全新、雙鴻逆勢亮燈0831｜豐雲學堂2026 年 08 月 sinotrade.com.tw",
       "seed_topic": "AI伺服器",
       "topics": [
         "AI伺服器"
@@ -484,106 +524,76 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "開學必備！NVIDIA GeForce RTX 50 系列筆電開學季優惠限時開跑 - inside.com.tw",
-      "url": "https://news.google.com/rss/articles/CBMidkFVX3lxTFBxUU9sbUsyeUFfd0h5eGthNjRBeEVqdG1kZjRDRVhMWVYyOFJFR3JJYWtXRzVBTktfZktJck1OUmJCZENURVhKeTR0VWFxMHZmLXM1T09uRGlISmtuR2Y2dlZBNzJFR0J6QWRBVUJvVjUwbWVFdGc?oc=5",
+      "title": "黃仁勳出手了！輝達首度重金投資台灣公司 認購聯發科35億美元海外可轉債 - Yahoo股市",
+      "url": "https://news.google.com/rss/articles/CBMi3wNBVV95cUxOOEFNVG9sUWNJeXkwMEtBSmIzUGR6M0VJeFlvU29qeHJNeW5IMElFbnlmRy1fN09yNlM1VHg1RzBiaUpOTmxIcTVrSTFkQWhsZmhvb1JvLTZhekpxS1k3bUxSVS1jUXhvUG02WkVPRWlSYzNoRVgzZHVMQS1uZV9PXzBGZ21MYzd1VUctbmg2dUlaazI2Nnpic2RGV19CNjJPM0FJSndOM3pIa3pteHFDV2NNd3QySHdQcUJ0dVpTaHlwOXNmVWpzSzBDUjd5SW1TcTFiQW9aa3R2UUNfTlRJMlVTb1BpN2dsRzcwOVgtNzI4RVItY2dEWTUwWTFydnBYZE16ZExMd1AxSURsNTFhV3d4NlpWazg2NzFwZVhxUkN1UnJiMDRnTlpXOWliVmdBTkFGYmI4bEVWY3lGN0sxU2R5UFJxLUZ1OVl4MTJYVzBlTl9XcEFfblVLaktldWNjYkR2RFZibkp2dzJ3NUZ1OUZhX1JRUUFjRXJwUlVGcTF4MGZMdjNoeUNMSXV3M29jSXR2dXh6cDZQYldvUTZTWmpTV19wU2x6NjY4MXZEdjFwSllZMF8tc0ZmNEVNZWxDVTFjV2wydDVRX3J0ZEc3cmM4MHpaaGY3dXJwRXhpcw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 08:08:29 GMT",
-      "snippet": "開學必備！NVIDIA GeForce RTX 50 系列筆電開學季優惠限時開跑 inside.com.tw",
-      "seed_topic": "AI伺服器",
-      "topics": [
-        "AI伺服器"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "邦飛凌鎖定AI散熱與精準對位- 商情 - 工商時報",
-      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFB1dEVoNTVjOW9DajViaHlkMmtYNWVzaWhTdXBXTDEzcWVPclRuQzE0b3NTN25remJMMTR0QjNwTTlraF93U0EtOWtCMFVSSWhsVEo4SXlVaVE1WFRxQW1Z?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:20:00 GMT",
-      "snippet": "邦飛凌鎖定AI散熱與精準對位- 商情 工商時報",
-      "seed_topic": "AI伺服器",
-      "topics": [
-        "AI伺服器"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "Nvidia加入 推升Windows on Arm AI筆電滲透率 - 電子工程專輯",
-      "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxQdndRb2VDUjc0ZjBsMWNCWXc5dHYtUmwtdlVnT3JPNzBVUUZLSWdFLUctWjg0WmlkbC1zMWdyVGRJUExnTW5lTm1GNXpoWmI2bWhEOXFTaFZXOE5MRGV5bGhiNmJtZExSV0g1Tm5ESG1GTmZOY3BkYTFLdnFsQWRwdXhrSkpUY00?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 06:57:10 GMT",
-      "snippet": "Nvidia加入 推升Windows on Arm AI筆電滲透率 電子工程專輯",
-      "seed_topic": "AI伺服器",
-      "topics": [
-        "AI伺服器"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "Nvidia強勢升級！Zoom迎來買進機會，Dollar Tree與SoFi遭降評 - CMoney投資網誌",
-      "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxNODQxZWd2RU1XMTdEeWNmYmZqUVNjMFBiT0JfcmJrZUVGNnF3VXplb0duXy1MMDMxSlk2TnNxeDVzck5mbUV4dVNRRURvZzRSU1hQM0JmdWNRVE1FeUlIVG81YUNDNnd2VTZWRzB4SEk5clREYVZRMFQzXzdWRXpJVzBYN21OVXZ3cWx4Vl9R?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 19:33:48 GMT",
-      "snippet": "Nvidia強勢升級！Zoom迎來買進機會，Dollar Tree與SoFi遭降評 CMoney投資網誌",
-      "seed_topic": "AI伺服器",
-      "topics": [
-        "AI伺服器"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "NVIDIA AI 機櫃產品世代交替，估 2027 年 NVL72 產值貢獻可突破7,100 億美元- 股市爆料同學會 - CMoney",
-      "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE4xVU44QzhnNVBrSEFfbDBVZVk4TnlaSF9NVzZGOHlHam9NOWYwWGEzS2hyVWZkTVRhcWVubTZHek1oYUpJNFdCbi1SSEtCbW9vMWhjdWxJNl8?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 09:21:34 GMT",
-      "snippet": "NVIDIA AI 機櫃產品世代交替，估 2027 年 NVL72 產值貢獻可突破7,100 億美元- 股市爆料同學會 CMoney",
+      "published": "Mon, 31 Aug 2026 13:26:28 GMT",
+      "snippet": "黃仁勳出手了！輝達首度重金投資台灣公司 認購聯發科35億美元海外可轉債 Yahoo股市",
       "seed_topic": "AI伺服器",
       "topics": [
         "AI伺服器",
         "利率/總經"
       ],
-      "tone_score": 1,
-      "tone": "偏多"
+      "tone_score": 0,
+      "tone": "中性"
     },
     {
       "source_engine": "GoogleNewsRSS",
       "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "華星光法說會／AI伺服器帶動光收發模組需求 下半年業績將大幅成長 - UDN",
-      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE5wdGYxYnh5YnJzM1BvejFRemVvS1FyQmV3MjJwZGdka3dadUctRk9hd0pibVVhcmhaZGtLaXFla0pYVmpZcUFyWUViYlQxMURX0gFWQVVfeXFMTXpTRXhwY1lGT0kwZGRGVmVrTGc4anVIT181R0RKd25uVFcwWXRJMjlVR2dDbTZFYTQxRWRnY2tMdXdUVlBJMTEzMHNnY210enNhZlB2ZFE?oc=5",
+      "title": "聯發科搶XPU、輝達賣整套 黃仁勳首揭AI兩強結盟盤算 - 鉅亨網",
+      "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE1pTUNXUW5saXd2b3FoS3MyQTcyR3dTdENTTXE3NGlWY1lRcEdNdUdDeWxwX1pyd2xkM0NkSVVmVlAzY3ZIeXQ2U1c0Yw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 08:00:51 GMT",
-      "snippet": "華星光法說會／AI伺服器帶動光收發模組需求 下半年業績將大幅成長 UDN",
+      "published": "Mon, 31 Aug 2026 13:53:46 GMT",
+      "snippet": "聯發科搶XPU、輝達賣整套 黃仁勳首揭AI兩強結盟盤算 鉅亨網",
       "seed_topic": "AI伺服器",
       "topics": [
         "AI伺服器"
       ],
-      "tone_score": 1,
-      "tone": "偏多"
+      "tone_score": 0,
+      "tone": "中性"
     },
     {
       "source_engine": "GoogleNewsRSS",
       "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
-      "title": "AI雲端的隱形炸彈？NVIDIA、Microsoft與雲端巨頭深陷「兩大語言實驗室」風險漩渦 - forecastock.tw",
-      "url": "https://news.google.com/rss/articles/CBMilAFBVV95cUxNOGY3WlpGSkg3a0FHT0FKRFNqMXF3eUFRMEptanVRWWlhbjYxQ1h5VWFPTnJGOHl6Y05WVkU0ejlyT0UwbkZ0YU9vQTI1OUxMZjdwSXpsdzJiSFpFcVJ1Tm9QYzBlc0hHYVZJenlxdFhJTE1obkdLb2NReUgtVWU3SUdYLVJjSV8tVjFFUkJ4aEd1d0It?oc=5",
+      "title": "NVIDIA向聯發科投資35億深化夥伴關係，藉NVLink Fusion強化客製化XPU、邊際運算及車用策略#邊際AI (251510) - Cool3c",
+      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE5zdlBuZUNDd04tMVQxQXFVU01XM2NPbHk5akQ0QWRCc0JaS0xuUTRZanNWVThuSDJiNUdVdUowRlpVQlNDU2tlZHJoNjEtZw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 18:00:25 GMT",
-      "snippet": "AI雲端的隱形炸彈？NVIDIA、Microsoft與雲端巨頭深陷「兩大語言實驗室」風險漩渦 forecastock.tw",
+      "published": "Mon, 31 Aug 2026 14:04:00 GMT",
+      "snippet": "NVIDIA向聯發科投資35億深化夥伴關係，藉NVLink Fusion強化客製化XPU、邊際運算及車用策略#邊際AI (251510) Cool3c",
+      "seed_topic": "AI伺服器",
+      "topics": [
+        "AI伺服器"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
+      "title": "AI散熱股買盤歸隊雙鴻亮燈.建準創今年高點| 科技 - 非凡新聞台",
+      "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTE40ZGJ4UmY0TFFEVDlfdlNyZnZWcy1qNWZyVkozY2t6Z3JJeGNWdzV6V3J6bXhwX0hIcnM5VjloRVBwX2hQdDQ0bzhrRXAyOW9rdGVBOXNUSnZ6WUN3?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 10:33:01 GMT",
+      "snippet": "AI散熱股買盤歸隊雙鴻亮燈.建準創今年高點| 科技 非凡新聞台",
+      "seed_topic": "AI伺服器",
+      "topics": [
+        "AI伺服器"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "AI伺服器 OR NVIDIA OR GB200 OR CoWoS OR 散熱",
+      "title": "創台灣資本市場紀錄！聯發科發行39億美元海外可轉債，NVIDIA認購35億美元、Alphabet也參與| 魏鑫陽 | 財經 - 風傳媒",
+      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTFBsdzFKaVJwMW8yd3hnZ1FLRzNCZDV1SVR2aTAyQmpVdTRGNmM0SnBiU0ZZR3VuTVItTXJxanNURHpNVURheUtiUkJ1RklQZw?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 13:51:52 GMT",
+      "snippet": "創台灣資本市場紀錄！聯發科發行39億美元海外可轉債，NVIDIA認購35億美元、Alphabet也參與| 魏鑫陽 | 財經 風傳媒",
       "seed_topic": "AI伺服器",
       "topics": [
         "AI伺服器",
-        "美股科技"
+        "利率/總經"
       ],
       "tone_score": 0,
       "tone": "中性"
@@ -591,11 +601,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "台積電工作6年價值觀變了！人生「10大自由」全解鎖 工程師：分紅多到腳麻 - Yahoo股市",
-      "url": "https://news.google.com/rss/articles/CBMi7AJBVV95cUxQMGUzTXpIVER5bndlUWluSmczQ0ROTEFISDc5UnQzdEhjRHo2bjAyN0J1cXVoYkRiRERGdmNsZGlKbExJb0RiNE5NaGtxNnJjaFVVVUVxMlA0X0xKSDVGZHMxZGt0c1dwUG1zMnlmREQzMk8tNDVfQUQ1MXdUYWRkNFdURkFKcGFXRGpKWFNlZTdQWlZRRnVFSXlsQ0I4ZExkQTBGOGo3eTRISDZXRlk4d3hxcXJRbVlDenlCMFZMQ285ZDZjYlBiajdyOG1KVjlhQUhQY210bjZwMi1Jb1p0Tlp2VFVsTGZrTkpQZERzcmpvVUJQdm5jbTlQTk5QZUQ2c1VYeWQ4WGNkMGtIVUl4cDlOWHpEcHRldHVNNk95U2dxdnhEbzZiZFdoNnV2ODB6cXcxMXFwdThpemE4WVhKR3dXY0N4Zy1CbEZGRlAxbXJKYXN3azY5eEFaTXo2VV9SMW9hNEtTT252cjFw?oc=5",
+      "title": "AI硬體競爭升溫 台積電憑晶圓代工優勢成市場焦點 - Yahoo股市",
+      "url": "https://news.google.com/rss/articles/CBMi2wJBVV95cUxOaXE4QlA1ZHgtdEd6TjVoTlFUOWdqLXdWTTFOVmtvSlJHV2EtcTdxT29iOFdtV1NIZFZ4RU42VE5HMmpUVHFHdEhDSWdNZlViUzRjT2NvMEw3RHFsY2xPRFNFMEs2RmoyRHFKZ0hHY2FpS2pmVVR6UV8zdG1HY0w2UjgtaExXVGgxSFJ6SFFSWWJPb1dLMUtCb18zSk5hU3FwOHFhaU9GbWpqa2lnMnVXbTVHdVRfSDR1clJubHc1NVo3dGFfWE5JYmpfZ1Y1Mm1sYW01MDFEZ3JIaTktMlJwanpmbEl4VmF4RFAxaGFuaVp5UlJqNXVGSDBnSWI4U25OcGNaTDh0Vk9tNExEVGJuYkNONnRSMzBubEJuNWlUUm9kZzVpM0VfRzFEOW5HbXV1OGcyQ3lVX1I4RGQ5ZHQ3dTNkVGtNYmtXX0FJMzQwX0NuX0VLYlBHQ0Nscw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 07:00:00 GMT",
-      "snippet": "台積電工作6年價值觀變了！人生「10大自由」全解鎖 工程師：分紅多到腳麻 Yahoo股市",
+      "published": "Mon, 31 Aug 2026 10:56:00 GMT",
+      "snippet": "AI硬體競爭升溫 台積電憑晶圓代工優勢成市場焦點 Yahoo股市",
       "seed_topic": "半導體",
       "topics": [
         "半導體"
@@ -606,11 +616,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "台積電分紅太香了！連陳幸妤大學同學都羨慕 他心酸「這樣說」 - 自由財經",
-      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE51dkt0a3JLZUFzZUtjdHdlbThocEFqd0pYeVNPVW15c1dvVi1paFJrZl9reUN5QWJtUDNHWGJTbGJaemZ1OWNaR21BZVJmT3djcGFuYXIxVHVKTlVZZkJJ?oc=5",
+      "title": "台積電中科1.4奈米新廠工程超前 盧市長關心水電、工安及城市綠化 - taichung.gov.tw",
+      "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTE9DcGxra3pjMmZwRklYVlF3T3JiQkwybGFaUTNYN3B5OWxSWUV1cFpYOGtIRFN0WkVEcGRuRXRaQTk1UG51Z2VXQ2tsaWwxak1Pdmc?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 09:35:07 GMT",
-      "snippet": "台積電分紅太香了！連陳幸妤大學同學都羨慕 他心酸「這樣說」 自由財經",
+      "published": "Mon, 31 Aug 2026 09:36:11 GMT",
+      "snippet": "台積電中科1.4奈米新廠工程超前 盧市長關心水電、工安及城市綠化 taichung.gov.tw",
       "seed_topic": "半導體",
       "topics": [
         "半導體"
@@ -621,11 +631,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "友達拓AI智慧服務，宇沛永續攻半導體製造- 新聞 - MoneyDJ",
-      "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQX1E5RzdHSHhaQWFTQU9CUUowWVNMSi1nZ013SUFhejRaYXR5U3Zjcms5NDBYN0RoZW5xN0JCR1Y2Z01nZFJTVTVXVUFDWkFBeTdsZXZmTGpkX3lYSE9USlB5cldNeDM4MXJ6ZXdPSXlzWEdKaDNEMExaMUp5STlqbTN6WmI0M0VZcjNzVHRRc21aQQ?oc=5",
+      "title": "美國在台協會處長谷立言為「自由250：半導體人才培育高峰會」開幕推動美台人才培育合作 - American Institute in Taiwan",
+      "url": "https://news.google.com/rss/articles/CBMiywFBVV95cUxQNHA2MVhRZWdoM2VkNERYamZLM3ZEdmpmS3RKRkIwZUtqUjF5S2RubkY1NzRpTkNReWU3X1c5eUM5dTBRMWdlenFwaHE1M0FTWEJ3ZHVJVFZhR0lyWFNMWUNsTFN6OW1zWDhDdUJxcXFEaXVZUUlZUFpaVGZIdFFPQjRaZTRUV1ppNVk4SzJiZDAzSUZiMU9RS0ptbHIzWjVVVmVIa01RcURJRXVPaWhkZG1IV0VnWU1lSUJxRDVFa2RFRHRsSzNnRE0zWQ?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 02:44:00 GMT",
-      "snippet": "友達拓AI智慧服務，宇沛永續攻半導體製造- 新聞 MoneyDJ",
+      "published": "Mon, 31 Aug 2026 09:41:24 GMT",
+      "snippet": "美國在台協會處長谷立言為「自由250：半導體人才培育高峰會」開幕推動美台人才培育合作 American Institute in Taiwan",
       "seed_topic": "半導體",
       "topics": [
         "半導體"
@@ -636,11 +646,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "德國赴台參加半導體展，鎖定晶片設計、先進封裝 - TechNews 科技新報",
-      "url": "https://news.google.com/rss/articles/CBMib0FVX3lxTFBpNXEzNG9wMUpPdlp6LUNxcGtKaWtnOVBjYnRfTDFnUkJ2aVdMSEJVeFlhWHJENEgtM0xNMG9EekVwOG5HS0w4X3JnNGJ0aFJ1R0hxQ194WTRLaG5DMGlIRHhKMnVlSmsxNlRXVmt5RQ?oc=5",
+      "title": "台積電揭 COUPE 藍圖：光源、調變器、SOA 全整合，進一步挑戰「光學中介層」 - TechNews 科技新報",
+      "url": "https://news.google.com/rss/articles/CBMib0FVX3lxTE4xUVgzZVVaNHFVeXBxQ3Q3dnhuUk4zMnlmam44ZEo1UW9ZakxKRW5Ic2FPQzVzR1hTbmUwNjAyRE54dS1uRGw3Q1k2Q0kzSmltSklIa0kwRGttU0FvVHREcGRaQzBBR0NiemNkcWFqYw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:03:19 GMT",
-      "snippet": "德國赴台參加半導體展，鎖定晶片設計、先進封裝 TechNews 科技新報",
+      "published": "Mon, 31 Aug 2026 12:42:16 GMT",
+      "snippet": "台積電揭 COUPE 藍圖：光源、調變器、SOA 全整合，進一步挑戰「光學中介層」 TechNews 科技新報",
       "seed_topic": "半導體",
       "topics": [
         "半導體"
@@ -651,14 +661,120 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "台股能到13萬點？台積電目標價8320元怎麼算…專家拆解模型 - UDN",
-      "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTFBqQ3FKVXk5bm84NWlZdU5mV3RaR2d1eTdpMjhZaUZYT1g1WGpXQzhIM1JQSFBFTWMyZXVYc2Q1SnkwczZjS0U0QnlNRm1TcklGLWfSAVdBVV95cUxNZ09qZ2pIVkI2T3lfeUxBLVF4NVE3WV8wTWhiMmVoQlQxbHRXTk9xbTVTMDVMTTlnc1BSZ0FSR2phMDIyYkNLZ2x6NFRienhoWDZhZzloaFE?oc=5",
+      "title": "漢測 (7856) 將上櫃！揭密半導體測試產業，探針卡如何成為AI世界的晶片守門員？｜產業深度專題｜豐雲學堂 - sinotrade.com.tw",
+      "url": "https://news.google.com/rss/articles/CBMi9ARBVV95cUxPN3BQNmtKUHloTmMzczN2bXJSLW80R2EzU3dINGEzM1JnUlhRY3JnSDk1X2JVcHJLU0xEdjFxOWJURWp2Qk00aWkwY1ZIOG9LQldKcWY4WUNwd0VBQWR3WWl5bHQ3T1ZVX3F4SzJtcGdvU2g5TmRITDZITk14OFItSU96OHFDNGNSLWRaSWVCVVJTM19DWExzTVlnNkpBMmpBdFNRblhYUl9rSVRQSjZFMlhsR2hrYkpXOTQ5TXM0VVpiVV9jUVZMUTdsaGVsVE1zdldKUWNhMDhWQ0JFTW5HYS16cUtyLW5BU3NIUzlyQVdUYl9qSzhKVTlVU3poR19idmVXa0dZeDZBUHBwSzMzUVVHdFZKZUdIMUwwYmtoa0lWT2w4MTVCMDh3ZU1jZ1NkblRCUmN5b3ZDdjh2aExRT0dvMmRyUnBMcU1QWmhkUWxHMWR6TmxLbHVJcDFObGF2Mjd1VXJPZEU1NVVtRXZRcXg1SDZfOEpfNmgwVURjMnFSZWFxYjZ3QXI1Tml0Z2tvRndnbEJuMV9tOEhjM3BpUm4wckJxWXk0ZnkzVFF0RjM5UGxOaEZSODAydEpoLTVTeV9ub1B3OGdwaXlqY1RsY3NVT2RoUzlYa3huaE1UTDA4NDhBT00tRTFJYU1xQWs5VzJvN05jMUhYejIzXzhmNnZZdE1sWVJTYUt6VHNsNWE4cUdvbUZDZmNYbU1ZbTBIcm5xRUVaSnhNbFpQb2FLNlN0c0k5Snk4MUJLVlBDdFVZUElKYmtKWVYyWFQwc1dIYVhYX2xsVzRZcXNxQ3FfVGJDN3lZVm1oSHM1ekpMMDZhTENi?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 06:16:11 GMT",
-      "snippet": "台股能到13萬點？台積電目標價8320元怎麼算…專家拆解模型 UDN",
+      "published": "Mon, 31 Aug 2026 10:58:55 GMT",
+      "snippet": "漢測 (7856) 將上櫃！揭密半導體測試產業，探針卡如何成為AI世界的晶片守門員？｜產業深度專題｜豐雲學堂 sinotrade.com.tw",
+      "seed_topic": "半導體",
+      "topics": [
+        "半導體"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
+      "title": "東捷半導體布局加速 雷射設備今年占比拚逾7成 - MoneyDJ",
+      "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxNTmFndnJSZHZwMTJMOE9Zb2xzWGhFamFOX1hMZXJoZ19rVjgzUG1nYl96bWdHMnI4TGxBWGgxNUVVMkt3eUl0MGpRZWVXWlItNWZKSTY0REtSMnVBMU5VWkJqMTRJV0N5T05WRVJzT1VhSHpLVndlUm1BMkx4QzNyc1FvcnlZdXBKaWl5TkV5LVE2Zw?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 09:15:00 GMT",
+      "snippet": "東捷半導體布局加速 雷射設備今年占比拚逾7成 MoneyDJ",
+      "seed_topic": "半導體",
+      "topics": [
+        "半導體"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
+      "title": "半導體展 吳田玉：台應加速布局 - 大纪元",
+      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE0xODBhY19wNTVOWkktV0FPekpBZzhkQ2Y3TEhHdDFGcGVXeV9IWk5SNE81ckxIQzV0Z2VtVkJmeVE0dFgxbzZZQ0tycFhxMk1uNmFxbWJMd0w3YnVISFRKVNIBZkFVX3lxTFBFV0pkS1p5WEJZczh1bUVRVW9DS3RsTDNqZHRvV1RDczhMVjF4T3VYSTNtM21mcGtoWm13Zm5jN3BSV0F5bWc0a3dOYWdZaVQwckNBWVJaU1ZtZTJRVFBDTUR0NEV4dw?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 13:52:00 GMT",
+      "snippet": "半導體展 吳田玉：台應加速布局 大纪元",
+      "seed_topic": "半導體",
+      "topics": [
+        "半導體"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
+      "title": "〈SEMICON〉台灣半導體別太驕傲 吳田玉：全世界沒有缺台灣不可 - news.cnyes.com",
+      "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTE9aNEFVN1BqUGhsMFNPZ2I4MGg2cTVrLWlLU2Y1c3htQ19iOUZsQjJMaGVRYmJhcjFLaGllUmxWd25iWWFvcXExY0RKUjMyUkE?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 10:14:00 GMT",
+      "snippet": "〈SEMICON〉台灣半導體別太驕傲 吳田玉：全世界沒有缺台灣不可 news.cnyes.com",
+      "seed_topic": "半導體",
+      "topics": [
+        "半導體"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
+      "title": "0050變台積電ETF？權重18％→58％...前十大成分股「這產業被踢光」 內行揭關鍵：市值型最強修正系統- 基金 - 旺得富理財網",
+      "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE5aVDMwVU1xSWZTeVVwMWstMU9NTDVkR04tUnVqT0FwSmQ4Ujk3U3dFTjdXbUd4aHZReHY1dzhockJFYmdlWEdPZEw4cTZfNlR4aFg2UnY3RWdnQWZBelhyVTBmb3pzczVuYUE?oc=5",
+      "source": "Google News",
+      "published": "Sun, 30 Aug 2026 22:50:25 GMT",
+      "snippet": "0050變台積電ETF？權重18％→58％...前十大成分股「這產業被踢光」 內行揭關鍵：市值型最強修正系統- 基金 旺得富理財網",
       "seed_topic": "半導體",
       "topics": [
         "半導體",
+        "高息/主動ETF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
+      "title": "台美簽署人才培育意向書 半導體產學合作 - cna.com.tw",
+      "url": "https://news.google.com/rss/articles/CBMiU0FVX3lxTE1VR2w0aUxYYUp6YmNQaGphTTdBZHJFM1JBX0NkNEUtTGt0Uzhka2NpZFFoTk9KWDhaQjY4WHlUSVBvajRUb3pIalhrdXJBVEFFWUtN?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 09:09:53 GMT",
+      "snippet": "台美簽署人才培育意向書 半導體產學合作 cna.com.tw",
+      "seed_topic": "半導體",
+      "topics": [
+        "半導體"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "涉洗產地股價0秒跌停！「摔出千金股」欣興今緊急發聲：爭議產品是PCB、不是ABF載板 - Yahoo股市",
+      "url": "https://news.google.com/rss/articles/CBMi0gNBVV95cUxNdG5BVUQ5SnN1b0hsS2FkaVhscDM3UDVSQkpEMzdKTUY1VnR0Ul9JRlQzekhpUzRybEdCZHgxZ2lfMEpOTWtSRXpuSFlybXBTRnhINDAza1k5MWlFa3RCTHVVdWZLcEhCUlVmNUlTTFRUYVB0OFlPN2NRWGdrcGtpemxsOXJQNDBCX1d4WHd2aEZuWWpraDhnb05oQVBQZVVYV0V5UVViMXdsMmxHVmZzRElkNmdLRVlOOGwyRy1Tdmc0V1RCR0k2aFhRa3dxU0FxUnh0TGdGaGxRRzlQR1ptWHZzMUJFdG43N2hTbC01aWpKS2NaUXFJQVhpQVZZZDVpOUoyalc0d1AxN3RCSkxfYzRETXBBRlNKRzVzT0Ffc0JnRUlhMnV4V3RyZWtTV2trRXhzZkRVckNoYlhMaXZPMGFOMWZXa3JILVlRVUtvWE5TNTNPblktQ09TcFMtNmt2NUI0amVnc0NQLUZTdE1VdUZnZnR6cFpmamRFZGhlTHVIeUYtNkNZTmx1eUowSDZLZDNLUEhDSEpFcjlfTExyb1VUenNCWkpDQ2p2NjRyV0tkN0oxN1RnNVhjRHpZR3Q0aU9yd2JoSi1KVDJWcDVHd3dB?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 03:05:36 GMT",
+      "snippet": "涉洗產地股價0秒跌停！「摔出千金股」欣興今緊急發聲：爭議產品是PCB、不是ABF載板 Yahoo股市",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "欣興最新聲明爭議非載板！三大外資定調「無關 ABF」重申正向買進 - TechNews 科技新報",
+      "url": "https://news.google.com/rss/articles/CBMickFVX3lxTE9RTlZwejRVb3FqNERLc0ZCaGhoeWxJSGI4OU9sNWJBVWEyNHR6ZGg4WnJOU1lrUURWc3dsRmd2WjJMdG03aVQ1MTNmWC15RUV4dGNFN2c0WWVpV0dETUhWZDZSaHVndVJ2aEs2NC1yZVh0UQ?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 08:58:52 GMT",
+      "snippet": "欣興最新聲明爭議非載板！三大外資定調「無關 ABF」重申正向買進 TechNews 科技新報",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF",
         "台股大盤"
       ],
       "tone_score": 0,
@@ -666,228 +782,136 @@
     },
     {
       "source_engine": "GoogleNewsRSS",
-      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "2026年9月台美股財經行事曆｜SEMICON 半導體展聚焦矽光子與先進封裝、連假前投信季底作帳提早發動？ FED 利率決策撞上四巫日! - sinotrade.com.tw",
-      "url": "https://news.google.com/rss/articles/CBMiwgVBVV95cUxNMnpPdXk4Zkk5NkN1VVREMC1yd3lldmQ5NEllbVdFSmdPTEM3NEJZc1NkMGc3dkNCRjBZTVozVDVUWWhoVll3dGFTZDFfbG1fa3RJOWNrSkM3VFJLQWZLSXdaTk93MFBJWnhjOF9xSmdleVNkRnp6QUhHaTRWMFFNSUtUQVgybXFQZU5XM2c5RGRCZ2R2aG1QdGJQbFRkM3RuTFRlc0M0bW1XUGxIMnR2Y2FSUEk2QWgyQVFaSHhVTjE1OWZDdnJ1bXFmQW9qLVdYTGw0Q1JMVzBZMEl1ZDhCeERxTEtVdWRWR19PNk90VWY1bWFaQnZVLXhrUVo5OURJVzU1TTlYQWt3SkNST0R0ZlVrbmpfTW9iLXBUanhISEFnaHJ1Y2x0N05NQ1pCY003c2hPeUtlWkluR01rcFdqSlBnVEFoTERQZzlNZDcxdmFld0RGWEhuc20wejEtNnM3UnZPZTV6cmpSM3c4LVBGenFJSEVIUjhqT1ZsSjBhX2ZNZUVRY09aUVhmRGJEekVzSThDMkJIRVhsdmY3YVU4cmZ5aXVXNkp4ZWF0OWY1QnQ3WHRIQTVoeHVCQ21WaFB1MGpKVUZiSVZtUmFidE1xamJ0ZzMzaFB5V0JmQ1NNUjBkclFRcFVPcWx0QzBDdy1EMDhKTjFGbEhsMTFhUGFRUGNGZl8zNVltLVl6aG1NV1BCZVNvN1RlMWVKdDlnSi1CanNwbWZLOUJJM2NacVhJZVd1VnlsWGhWYmVSYVZ6ZUZhNkhOQkxkR0dZUlZobjFLZWpmSHRqTlFKRlhPeUtfUVpIejdqaG5TYVh4R0l2QzBaUDF4c2dWdWR0WFd2anZpVGJpQWJVU0I4WFR3NXU4THVXd0VmRkZXS3RyMkRvNWRjcUd2ZnJ2TzBaVHhIb3NaSzRvNXVua082MW1zN25RUFJR?oc=5",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "載板4雄1表評》手中持有欣興怎麼辦？轉搶景碩南電是好主意？老手全說了：主動式下個標配是他- 上市櫃 - 旺得富理財網",
+      "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE1CSEhFbWtPSlBBeEZYMzlUbFFleVRSdXN5LVVWUDB2ZVJleGpmLTh3ZkUyUjRPV2xLel8xbzZUaUYtdVF3ajN0Z2tYcFlOQ0pKR1VQVnFHU3hzbXJ3SnpMbnRJOGVOQ3FqYlE?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 05:08:17 GMT",
-      "snippet": "2026年9月台美股財經行事曆｜SEMICON 半導體展聚焦矽光子與先進封裝、連假前投信季底作帳提早發動？ FED 利率決策撞上四巫日! sinotrade.com.tw",
-      "seed_topic": "半導體",
+      "published": "Mon, 31 Aug 2026 00:25:26 GMT",
+      "snippet": "載板4雄1表評》手中持有欣興怎麼辦？轉搶景碩南電是好主意？老手全說了：主動式下個標配是他- 上市櫃 旺得富理財網",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "欣興電子日前遭檢調搜索 股價今跌停、跌出千金股 - 公視新聞網PNN",
+      "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTE5tSnpOYi1LNzNfUjRXMTh1RG5nUVg5eVp2Q0oxeks2M2UwVDdYaXo5Ym42NllCNEVUVEYxRjU1UEV0Ujdtcks0Y3BKQmtid28?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 12:12:36 GMT",
+      "snippet": "欣興電子日前遭檢調搜索 股價今跌停、跌出千金股 公視新聞網PNN",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "欣興、景碩利空大不同！ 載板2飆股雙雙觸跌停 - ETtoday財經雲",
+      "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTE1QLW5MZ0RtTGhXOWU1NzhTc2J0X1JwUmtKQ2JZZXRVajlrUE9HZTQxcGsxcnFITUM5M0VmOHZrQm9LOEs3VXFBenhPVTNfQ3AzaVHSAVBBVV95cUxNU3JwMWR1SHlBbS12dGFoS3JkOTF6Y29BRlo1T1l4QklEMGhSZzdhMmw0N2MwNXB5TWZIc1NIc05SNTRWcGZ1cU5xZU5rUjN2NQ?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 03:25:00 GMT",
+      "snippet": "欣興、景碩利空大不同！ 載板2飆股雙雙觸跌停 ETtoday財經雲",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": -1,
+      "tone": "偏空"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "欣興發出最新聲明 澄清爭議產品非載板 - 經濟日報",
+      "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE84V2tSY2o1UW1sUzR4c0FsdmhtUEFXWEZWeVF6UmpJX0RzcDFtZXJDQWFFRUg3NW5aSFJuS0c0TEpybnoyWnpYNHBka3lDWWZaN2lMYkFvamJXd9IBX0FVX3lxTE5rUFRrWmZ6SUhXQUVoNjZ0cWl3aC1sNUJZWm1waVA0QmotRG5pTThFWjhzMWdXX0pqbUMxdk5YTE9CUWllMUVXM2kwcXp0SVVnT18tazUxenFRZ3Juazhz?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 01:43:46 GMT",
+      "snippet": "欣興發出最新聲明 澄清爭議產品非載板 經濟日報",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "欣興3度重訊切割ABF！原產地標示案延燒 台灣PCB供應鏈敲響合規警鐘 - 理財周刊",
+      "url": "https://news.google.com/rss/articles/CBMib0FVX3lxTE12NE05NmN4UnBGM2dxVGxPQnhXN3FzM3pNLV8zRi1RT24yU3NFeU80MzRuQ2x0OWZZWng5eVJpNFlkalFISDNnaDNKeEZzRVZTYi02SlpfVHVjN244dEJTQ2xkOTJzVl9ERTNrZ3RTSQ?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 09:54:29 GMT",
+      "snippet": "欣興3度重訊切割ABF！原產地標示案延燒 台灣PCB供應鏈敲響合規警鐘 理財周刊",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "傳出欣興再遭搜索 股價跌停告別千金股 - 大纪元",
+      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTFBjdUFBWVZRVm1MWW96U24zTkZqMEdZSVdFYmNpVm1zWEtweE9zdnBrZ1Qyd044LVZwQlBzTW04UFpaRFJPV21WZjd3bDZjN3c1ZjhkX1ZRSC1wSjMwM3hwZtIBZkFVX3lxTE5iVVYxLVNaU3VQUnFqcENvemhEbEp5VVRsV1ZmRFZoejc1WXRHQ2RibVhZSW00MEhUWGtUZDdRbzdJcW1GdUI4eHF6OHZGbkJ0V0xxNUNJYThVM2RhLUtiWlIwYVEyZw?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 13:29:00 GMT",
+      "snippet": "傳出欣興再遭搜索 股價跌停告別千金股 大纪元",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "欣興：爭議產品主要為PCB、非載板案件仍在調查- 新聞 - MoneyDJ",
+      "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQZ09Uam1CaFNzNHkxNmZwcml4cjd5UzBjUEFzOFNFUDVXSEdoeDhXTXpPOTBaVHhjYmV3WWtWa1o3aXAycElZb2hiUFlUdHdia29FWkdkRkpwNWdlT2djVzBGaUdQRnZXWnNaSmRjVmlfYzYwS2VndkFwS0tuWUpJVktHWVJFVmJQNUNrSzFySHlidw?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 03:25:00 GMT",
+      "snippet": "欣興：爭議產品主要為PCB、非載板案件仍在調查- 新聞 MoneyDJ",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
+      "title": "欣興否認遭二度搜索 涉「洗產地」爭議產品為PCB、非IC載板 - DIGITIMES",
+      "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTFBZSVBXTHB6YU1ORFlJeHBLT1FYX2prUDJwanRMdlgwYTRFNnM2UWoxYW91ajNxMVl2LVRBcEhZV2t2TjBEcGRPaG50X3M3eFhnRER0bW13akFudHNrSEw3b2hiVWhsQm96YzFR?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 10:14:00 GMT",
+      "snippet": "欣興否認遭二度搜索 涉「洗產地」爭議產品為PCB、非IC載板 DIGITIMES",
+      "seed_topic": "PCB/ABF",
+      "topics": [
+        "PCB/ABF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "記憶體 OR DRAM OR HBM OR NAND",
+      "title": "台積電爆滿又漲價！ 韓媒爆SK海力士找英特爾代工HBM - ETtoday財經雲",
+      "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTFB6TElzSUFueEFlOWVkX0p1N182ckgwVzZGZFhmakljbTNKOC13M3FHc1JwaXEteVd0UkNBUndrNTNTZU9xR29oLW1MOFBwOWJXa2fSAVBBVV95cUxOMFdzLWVvLVZCWFZVSEFwejJxNUpVcXI3YU1QYllaNTJYcVBHS1FrOUlDbUxJWG1yblB4ZEI2OWgwY01SbXpiQTZ2dFNHell1TQ?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 11:35:20 GMT",
+      "snippet": "台積電爆滿又漲價！ 韓媒爆SK海力士找英特爾代工HBM ETtoday財經雲",
+      "seed_topic": "記憶體",
       "topics": [
         "半導體",
-        "台股大盤",
-        "美股科技",
-        "利率/總經"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "台積電8月分紅開獎！員工自爆「考績普普」 一刷存摺嚇傻- 財經 - 中時新聞網",
-      "url": "https://news.google.com/rss/articles/CBMibkFVX3lxTFB3YXpPRmdjYl9LcmlVYXJTYjJoQ0h3bjNVZkJDN25VelZvQXkyN3U3WWpldjJjdW9wOFdGcGNOZjd1QjFsbEp6c3hHSTBlMklaTDdrNFZ2X09EMWJQZXA1SFNyU0FVOGpQSGxkdnRn?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 08:24:48 GMT",
-      "snippet": "台積電8月分紅開獎！員工自爆「考績普普」 一刷存摺嚇傻- 財經 中時新聞網",
-      "seed_topic": "半導體",
-      "topics": [
-        "半導體"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "有望切台積電COUPE！「晶圓代工廠」獲法人喊價146元 進軍矽光子股價飆漲停炸32萬張 - Yahoo股市",
-      "url": "https://news.google.com/rss/articles/CBMi1ANBVV95cUxOMGZIQTMtdWstV0pwc2lBaUZwYjY4eTJnQjNtY3hzM0x2MFNSM29makF3XzN2NFpwTHdaM2xLSGx4dkQ2dXNHU2NzSW45RUxidEdfdTl4T29mRWJMQUxUemwzeUtFeVlZTWZtcjViTXRGUnpPRENoVkpBMGxFZUYtVUJKN3NPZWt1eS12RWFFcXRDMjVfSWZCWWMwTXdkN3dtV1hZa095QkFUbGJPdVo4SDdVVXpOc2F5cE0tLUdxZDBqS3NtOTlFR3JFOVNGZ3M3dTFsMUMta2Z4RWFhWGlwNkZDbEhuemM1LXBzWUVEdWloWmV4bFN6X01PLTF2bkMxN0FsTFg1c0FCTzdxeWs2VkU2WnhMMjN5WkhRcE5QbFFBWWxnQ0c0aHY3Ym5GQ3dMQTJsUHA0X05sOFZBcTcyWFgzS0dfSmJncEJTVnVtaG8wd3hRZUFYb0JGNWdRclNUM1Q1bk0tMjdpUGpHbWN2RDVUVnNUbTVkbmxRb09IWWdfcDFIWWtXWEdBN2s5WXpUZjFnY0ZGMGpuWG1iS1BFWVctQlJUdC05RmZ4dUJGN3lRV2d2QjJMa0xVU1AtOWRtOVZBOWZxalJqVWpseEl2aEN0SXI?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 06:33:49 GMT",
-      "snippet": "有望切台積電COUPE！「晶圓代工廠」獲法人喊價146元 進軍矽光子股價飆漲停炸32萬張 Yahoo股市",
-      "seed_topic": "半導體",
-      "topics": [
-        "半導體"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "台積電8月分紅開獎！工程師年薪上看600萬元 - 自由財經",
-      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFBDclkzSndQU3RzNUJIZGlub1FIZGtKUUx3VEdlaENvNFlwdWt2ZERudVZBQ00xbHVRdTR2OHdmRWc3WkJDVlc3MmRPSTIzSnhQQkdlSVZ4UWUxSXVQVVhJ?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 07:10:43 GMT",
-      "snippet": "台積電8月分紅開獎！工程師年薪上看600萬元 自由財經",
-      "seed_topic": "半導體",
-      "topics": [
-        "半導體"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "台積電 OR 半導體 OR 晶圓 OR IC設計",
-      "title": "台積電漲35元至2445元 分析師：洗盤結束、該補漲了！ - Yahoo股市",
-      "url": "https://news.google.com/rss/articles/CBMi4AJBVV95cUxNV0FKbTQxVDhIcnRCWU13T3Y1amlTRy1icllFXzBLaUYyUzU3dTN5U1YwYXg0QUI0UVpwMm9UZml2ck9HczFwUmczRUFLMkxfWEZCaE9zSWhpNFFGQWk2c0JHQUhLVG0xVjVFRXQ5bmZraV9kMm5DNkpRcFByZFVXMTBvS1Z3LWJTQU1OdVV6S1BhclN4V1MyZzlqYThQRk5HcjJLaTBqbFB1cWdrSEZ4TzBSbnNpdGV3MnVfZ05OV0huaE9HRmFEN2pLM0hHcG8zclZvMW5yeXR1NWo1ZEZnd1E0TkUtejJQT2RpbjU5TXVkUGlveHloZUtDc3hFSjNrT29uaF9zZjFvSHJya2p2TUNwcW9CTU1RNDRBT0p1WXA4Zk1kUm9QamNRRGxrYkpvT2l5YkpZRTRNLUZSbDRsNEdBM29rWkNJaGVmcHI2cDJoVF9YOXVjU1pwZWtwX055?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 02:21:55 GMT",
-      "snippet": "台積電漲35元至2445元 分析師：洗盤結束、該補漲了！ Yahoo股市",
-      "seed_topic": "半導體",
-      "topics": [
-        "半導體"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "ABF龍頭「欣興電子」今遭搜索 檢調帶走2副總、會計 - Yahoo新聞",
-      "url": "https://news.google.com/rss/articles/CBMitgJBVV95cUxNaHFaSTRscV9kbzRYMEw2M3BrZ2UtaTIyUDFzQWw4WnQ1LXFmUzJMcEs0NzVheFdjbUdrRU5BUElWM3NnUTM1R1RKSk1UUGlJaG9XOVVISUlabThiTUd0akdmMmVmWVRDSVl1OUNYeFpDZ1NtbE1WU0dUd2Q2Z1VOM2JmWE11MDdsaExiNVk4a183YXRzSE00V0dIbGNPdFJibFRyVHk3ZkZrMFRab3NFV3hNM09wTnVwbmt1NTFtdWgxMWdydmtBamszcHFQbjRjQkExM1JWZzNSYkpsX2NlNnprZy1TWVlQUzVlejVUb0xHNHRpWGVIM0VFN3pJVmlhU2I1Rzh6bzA4LWZsTkdEdzRkbUdUa0xhY0NJLTVFZVJlTjdCMW00MXpNa3ltOEtJNl9WQkJR?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 07:15:01 GMT",
-      "snippet": "ABF龍頭「欣興電子」今遭搜索 檢調帶走2副總、會計 Yahoo新聞",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "陸貨變MIT洗產地？ABF載板大廠欣興電子遭搜索案情曝光- 產業 - 工商時報",
-      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE1kMkpFTUNBTnF4Y1VTN2s1MEpBU3BHa2R2ZHhmaFJNVDdNWUVYR0lkUlh5NkIxbmFZZnVxdXdUT2w3RkJBdUdXRW5DeWI5ZXR1bFBYcDRnUXZiNnpmdWNz?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 07:39:00 GMT",
-      "snippet": "陸貨變MIT洗產地？ABF載板大廠欣興電子遭搜索案情曝光- 產業 工商時報",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "ABF龍頭欣興爆檢調搜索！傳涉假帳、內線交易與「洗產地」 觸怒美方地緣政治紅線 - 理財周刊",
-      "url": "https://news.google.com/rss/articles/CBMib0FVX3lxTFBJeWcyNnZMaUZaZGN0VUd5T29PazlpWWkzX3hrTlZFYzhZaXFhMF84UVE2cTdYVlkxRks2NTM2OEtoR1owX2d4N1VmcFl3aVBRV29scTBtVmlvUXRyR2VtY2o2YUVSV0hlZXY0cW5ONA?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 07:15:57 GMT",
-      "snippet": "ABF龍頭欣興爆檢調搜索！傳涉假帳、內線交易與「洗產地」 觸怒美方地緣政治紅線 理財周刊",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "欣興電子遭檢調搜索 2副總與會計被帶回調查 - 自由財經",
-      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE9tNmR2X3ZYMl9oSzJGSjFad1RBUUNScWlnc21uZEhHWDJxOGJHeW9wQW5DeHdvRUQ0bWlGTTRmZGYyNWNsWjNabHh6RDhpZmJlLXhyRlJfWmw5eWFiSkxZ?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 07:32:47 GMT",
-      "snippet": "欣興電子遭檢調搜索 2副總與會計被帶回調查 自由財經",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "欣興突遭搜索！專家點名「2間公司」成潛在受惠者 - ETtoday財經雲",
-      "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTE9sVkx0RUtpVnl6NGdINEQwR2NWUE5hZlBOWXZraUYxdTVxaThicE1OM25Fa1c4aVY2aFVwWjJNLWhReGNQbmlPeU5ubUlNcGVjR0HSAVBBVV95cUxPeFd3ZkhrM19ad2E2X2R0TjgwbG4xLXRYRFBoUUZnSkpqX3A4NV9xMUtMR19OMFVnbTBqd2g2bmdpRGpIVVEzX3RQOUJpU0ZURQ?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 15:00:11 GMT",
-      "snippet": "欣興突遭搜索！專家點名「2間公司」成潛在受惠者 ETtoday財經雲",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "欣興早上股價突然紅翻黑、殺尾盤 下午就遭檢調搜索「50倍本益比的泡沫破了？」 - 信傳媒",
-      "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTFBaTWF6cmZFQ1JPc3ZBRTg1WngtWDF0NkJDaUFQVERkSlRuYXB1WVN0cHUxZVJ3bW00bThndk1sbDRNbnZVSFIxOTlnYnlvOGFLbEJ0S1BMREEtZw?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 08:40:00 GMT",
-      "snippet": "欣興早上股價突然紅翻黑、殺尾盤 下午就遭檢調搜索「50倍本益比的泡沫破了？」 信傳媒",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "檢調搜索 欣興電子疑涉洗產地 - UDN",
-      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE9TbEd4TXlhTnhmd2xBUGpHOHM0U1JhU2FiWVdZN09wa0cyZjMyUTJwU1hSc005M1dOUGExWTJad2dRQ3lqQ0VnSzA3bW9FRFVi0gFWQVVfeXFMUE5iOXNkUDR4WWlubUVGNDdyRldYUy1jNzlzUmQybTlIZmxtMTJfVHJKOXpBNXN1bU54TV9RUWZyUjNDbWxFUkQ0N19yLUhlNzF6S195dGc?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 16:00:00 GMT",
-      "snippet": "檢調搜索 欣興電子疑涉洗產地 UDN",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "ABF載板大廠欣興遭搜索！2副總、1會計及多名工程師被帶回 疑涉「洗產地」 公司：營運正常 - 放言Fount Media",
-      "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTFBZNGtBcVQ1VHZTbXdSelRvcmp1aExPYmFfa2h0dUg3MHhBdEZsREczTjJKWVpVN2dOWmV1emh6TGF2YW5vR01RRGVneXdRUTNMVHc?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 13:02:21 GMT",
-      "snippet": "ABF載板大廠欣興遭搜索！2副總、1會計及多名工程師被帶回 疑涉「洗產地」 公司：營運正常 放言Fount Media",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "欣興遭檢調雷霆搜索！涉及妨害「農工商罪」 急發重訊說明 - TechNews 科技新報",
-      "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTE1KSDFRZFFBWElrQkJjWk9lNWMzN2tnUHk0VWJ3TnI4MUp1RHNFVEUwYjFkaHBrT3RvQ2tLMHNQQ2ZESmc0TDc5c2xydllLVHpkdHZyLTI4Y3NSeENocWdZRHltTGZrZ0NtNzI1Nk0zMTQ?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 15:54:23 GMT",
-      "snippet": "欣興遭檢調雷霆搜索！涉及妨害「農工商罪」 急發重訊說明 TechNews 科技新報",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "PCB OR ABF OR 載板 OR 南電 OR 欣興",
-      "title": "快訊／欣興電子遭檢調搜索 2副總1會計遭帶回 - Yahoo股市",
-      "url": "https://news.google.com/rss/articles/CBMiuAJBVV95cUxPVHF6VEU2N3NienpLZTdNSGxZREZrbXBQcmM3SFZzMjI1VDNlUVl1a29ycGZ0dUVyUVQxVW0zWlVaNU5yTmdPbXE1NThVQ1lpYnJCc2hkM3RTQjc5RWdRSGlqeTd3cTRxNU5Qd0UzZWlLRngtano2Q0FnSm01XzZoa1RvY29XcVRGU3o3XzI4N3VNUEJYMWYxR0VlWDhQeHY1RVBDWmR3N1hTTFU4cXFwLXVDVlluVjRfMFlNcUFsVlBJbGZfTkdhOEFLQ3lHak01alBsUU51bnVpTGllWFZIVXA4eHVOWFJ1VUl6bGFNRU5HMll2N3lFRUgyMnAxa0tqYmsySThxdVFXRGR4OWVUSURISkthQnE4dWJubEd1aW1TVTB2aldUNzhxX1VOaThXeTB3R0dhZUM?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 07:15:00 GMT",
-      "snippet": "快訊／欣興電子遭檢調搜索 2副總1會計遭帶回 Yahoo股市",
-      "seed_topic": "PCB/ABF",
-      "topics": [
-        "PCB/ABF"
+        "記憶體"
       ],
       "tone_score": 0,
       "tone": "中性"
@@ -895,11 +919,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "AI記憶體技術分歧：三星強攻 PIM，SK海力士深耕 HBM - Yahoo股市",
-      "url": "https://news.google.com/rss/articles/CBMirgJBVV95cUxOdnREMkRSTVBXNzVkR05PLWxIMUFIQzd3N0F2c2x0SUtqa3ptd1VLYWJBeGNiVzUwRENCbHllV3NCX1dPaHNFUFBWTklYUTd4c3FUc0FMd0toUnEteGJMWWttM0IxVjBQSHJpbTJpZnIxNDUtYTFGYW9GXzV0Y0V3WlFoaF9hZlJaSHM5TmVNamJMQnhGZVJ4dm55a3ZLRWtIRmVYX3hkZHZNQlpUSlIySWFQc0hNbko3UURhdmt3LUY1ZVAxbVRsRjNaWU0xanBoQU44R08xVC1aV2xZZml6REFFdHFiNVNmWHNMMjZtRW9LRE1vay1PZlJYSVItWG1xcnRUZjN4MkNmbGdwdmNjcnNVaHplLThKSXNHeThMcFktQzUxMTA2SzQxQklyZw?oc=5",
+      "title": "〈財報〉研發燒錢又遇記憶體漲價！華為上半年淨利重挫近四成 - news.cnyes.com",
+      "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTE0zbXFRQmNXOEVNQXZiS0JNck0wZVhhVXhBdlVVNmdSVjZrcDhMRExNajFFbVk2M3kxOXVLb2JOY0RIQ1gzUW9SQ2hZMHNOenc?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 13:44:24 GMT",
-      "snippet": "AI記憶體技術分歧：三星強攻 PIM，SK海力士深耕 HBM Yahoo股市",
+      "published": "Mon, 31 Aug 2026 12:00:23 GMT",
+      "snippet": "〈財報〉研發燒錢又遇記憶體漲價！華為上半年淨利重挫近四成 news.cnyes.com",
       "seed_topic": "記憶體",
       "topics": [
         "記憶體"
@@ -910,13 +934,14 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "AI 搶記憶體產能，Google 要求 Android 應用程式降低占用系統資源 - TechNews 科技新報",
-      "url": "https://news.google.com/rss/articles/CBMijAFBVV95cUxPZVFEVDV2cDU0RVd5Q3NtLWZKRVVBV2J1aGRVZDY3M2daTmVHVWRlUHJTUXh6S3Y1Qk9uZDVUTWJ6ejgxZnRUTjhoMDJpc3lONy1WTENlRVc3Q3g2SkdKd3NfYVJlYXAtMTZDaG4wOXBKSVVpWXJ3blo0UFp5SVRXWVVXU0QwRzh6aVRvaw?oc=5",
+      "title": "台積電不再獨占 SK 海力士 HBM 訂單？傳 Intel 分杯羹 - TechNews 科技新報",
+      "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxNU0pWRVJZSDRadE1KRGcwU00ybHVJQU9pZFdoX3V5bS1jVU1aSkxkd0EzY0M1cktwZFZndzVUYmFLZnVXd3kxaEZvenhwSko3RnoyZ0hJTVdEclZFZDloekJKeXY3SGZoeHRJVnNHRGZmQXhZN29YRWJEVlFDNEJfOVFmRFlOalRkTkhfU01XQ09LOUtlN2xEQXNvcFVkMUN5STlRWWxGNDRUQQ?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:18:19 GMT",
-      "snippet": "AI 搶記憶體產能，Google 要求 Android 應用程式降低占用系統資源 TechNews 科技新報",
+      "published": "Mon, 31 Aug 2026 03:55:25 GMT",
+      "snippet": "台積電不再獨占 SK 海力士 HBM 訂單？傳 Intel 分杯羹 TechNews 科技新報",
       "seed_topic": "記憶體",
       "topics": [
+        "半導體",
         "記憶體"
       ],
       "tone_score": 0,
@@ -925,13 +950,14 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "〈財報〉AI記憶體缺貨讓它賺翻！長鑫存儲H1營收暴增近10倍 - news.cnyes.com",
-      "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTE5nbncyQUM2UEpDeUJLbVI0UjE3eUFJR2lMelJZWGhPUGZzbUhET2gwUXFoeFpCaFJyQVpPTjBEaFVPSk5WN3lsaWs4dGp0TGs?oc=5",
+      "title": "台積電不再獨占SK海力士HBM訂單？傳Intel分杯羹- 新聞 - MoneyDJ",
+      "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxNV05WOThISUpiM3dVMTZhRUtlMUY2Q2NtQTNBbjVQNmwyeVVGZnE2cEwtVnNWeU0wMnJKalo2UzB2NGZVT0NaRmRfeXFJeTBoRFcwdWdXN3dWVDU2NHRTNGhGSFNSTHpPUmVBU2Jnb29EeXBmam5feGVQMXZtMGl3NklRLXEtMGVfcjI3SUMwUmJHZw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 13:00:03 GMT",
-      "snippet": "〈財報〉AI記憶體缺貨讓它賺翻！長鑫存儲H1營收暴增近10倍 news.cnyes.com",
+      "published": "Mon, 31 Aug 2026 02:46:00 GMT",
+      "snippet": "台積電不再獨占SK海力士HBM訂單？傳Intel分杯羹- 新聞 MoneyDJ",
       "seed_topic": "記憶體",
       "topics": [
+        "半導體",
         "記憶體"
       ],
       "tone_score": 0,
@@ -940,41 +966,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "SK海力士：記憶體缺到2030 - 經濟日報",
-      "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE1EVXRMaUZ1RWRNcE9UNU9INWhhT2I5TkxNQzdHRzRUZ21vR1ZlQkVmbmVmQS1mUkw2cU1lc1JpSjNuWHVEOHlsc3NjeDRRcExUd2ZERzdjOVZFd9IBX0FVX3lxTE1lb3BKRDJLcHRqNUY4MnEzZF91VUJ4RTNCMmZfYjRUczMwWnk4UG5YYXZFZGxaa3IyMHZ0ajFQcmphX0N1MFVHR2ppdVI3Y3BwT3gtcjN4bzkzT2g2dll3?oc=5",
+      "title": "記憶體缺貨潮何時反轉？中國大擴產，2028 年新一波「價格戰」成隱憂 - inside.com.tw",
+      "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxQLXVNcFB6Zno3S3F2SWxqZ1d3LVNneHFNejNaOS05anU3TXBNakZmNVl5OWJ4bXlWU2RRWFZaQWo0dFZ6cURfNlRrSzA0TS1SOTB4WnNZUUpxNEdxMFFWX2pHTS1HZV8zRDRnTlFzckE1RHV5RlczUUxUbXJzbE4zaUM4RQ?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 16:16:51 GMT",
-      "snippet": "SK海力士：記憶體缺到2030 經濟日報",
-      "seed_topic": "記憶體",
-      "topics": [
-        "記憶體"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "AI記憶體供應鏈重組 SK海力士在美建立HBM封裝基地 - CTIMES",
-      "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE8wUm5xNURlazhEd2F5M2F0UFJLVmFXYVZRSFBFYlNSMFN1OFFwdjl5bk9fbDMzWVRzYVFnZ1ZFQzNRXzRITjdaYVNZS2s4eXlfaGZfU1pXWXJDQ0cweUlELURuZkE?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:28:08 GMT",
-      "snippet": "AI記憶體供應鏈重組 SK海力士在美建立HBM封裝基地 CTIMES",
-      "seed_topic": "記憶體",
-      "topics": [
-        "記憶體"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "SK海力士蓋美HBM廠鎧俠.SaDisk聯手擴產| 科技 - 非凡新聞台",
-      "url": "https://news.google.com/rss/articles/CBMiW0FVX3lxTE0yaktCamlTbllJbHlYdTY0SG1pNnk4SGE5OTluSGRsajVfeVNhZlFqYlRzYU1ZRTlDVEZ2cE01VDhxNmZ5WVBoTndvZmk0NnlyR0laVGVBUkxleEE?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 16:06:17 GMT",
-      "snippet": "SK海力士蓋美HBM廠鎧俠.SaDisk聯手擴產| 科技 非凡新聞台",
+      "published": "Mon, 31 Aug 2026 04:40:24 GMT",
+      "snippet": "記憶體缺貨潮何時反轉？中國大擴產，2028 年新一波「價格戰」成隱憂 inside.com.tw",
       "seed_topic": "記憶體",
       "topics": [
         "記憶體"
@@ -985,11 +981,43 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "Google Play新制明年上路，優化記憶體與自動登入成Android程式強制標配 - iThome",
-      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE5sTTVmTTlLTHhDRlM0bjh6VWFvc1JXRngzUEZoS1J0SXZpa292SkhFWkRJQkpBc2lBQ09pU0xvRGtNaVpaQjhUS2h3RWQzZw?oc=5",
+      "title": "大摩高喊目標價111元！「記憶體廠」EPS預估賺破1股本 外資連2天買進補血54.07億元 - Yahoo股市",
+      "url": "https://news.google.com/rss/articles/CBMiwANBVV95cUxQUjhUSkhiNXRBY3FXb3dLbXZJZm43WnlwcjBUQTFMY1VJWFdlaGVwaE5FTFFwYy1Rb1AyeW9PenVpd1NqUlMxbVR2eUhVUTVjem0tQk16ZHY0VVYwQ0ljUVVjN0hOOVlsXzhxeUpFM3RLQUhMbmpRakFhX2lDYVdUUDA4dVJUcU5YRktxRFF1dFhEa0IxV1lFRW11cDdONW5td3VrWE9LMjNpakNGQjlQRDRGYy1nRl83czdrUzRiLUxORkZzY19GUWlLUTJwenNiLWdNMzVVV2hOMjRIZW1RMzkydFp5VFNmWXhqUjc3cWVtOWQ5YzY0QlFTYURwc3BvMFQtUE1qWG9GRUxsUllhTzFwOTQtWDE1Y1ZIMGV6LWtxRV9HUi1ZRkhzbDA3QnJUX2ppUVFYaFdwQUpJLVlaMTlkWnpqd0N2bDh5RkVNckJjVXdqMXRUNTlHazVzQkRTTEx4cUZWV1lmYWowaTFLUFhSNmVIS2NoZkJUeVdNcUNINzNwQkFHVkl4Q1plQVlLZEswV2h2RER1ejhINVdzellnMm0zb1VzdUZMQ084UVRvWFVGTTVOZHNQcERMZVBo?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 05:51:33 GMT",
-      "snippet": "Google Play新制明年上路，優化記憶體與自動登入成Android程式強制標配 iThome",
+      "published": "Mon, 31 Aug 2026 12:00:00 GMT",
+      "snippet": "大摩高喊目標價111元！「記憶體廠」EPS預估賺破1股本 外資連2天買進補血54.07億元 Yahoo股市",
+      "seed_topic": "記憶體",
+      "topics": [
+        "記憶體",
+        "台股大盤"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "記憶體 OR DRAM OR HBM OR NAND",
+      "title": "不單押台積電！SK海力士計劃找英特爾代工生產HBM基礎晶片| 全球財經| 全球 - UDN",
+      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE0zV1k3R2xTVV92QTdMRTdTWjREVVU3S3h1UzBMY1Btc2NpQlFtZ3NvbnNuNjVITG11c2J6OTJXQkJsdndGZjNYUEpMYXZFSFVk?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 09:15:58 GMT",
+      "snippet": "不單押台積電！SK海力士計劃找英特爾代工生產HBM基礎晶片| 全球財經| 全球 UDN",
+      "seed_topic": "記憶體",
+      "topics": [
+        "半導體",
+        "記憶體"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "記憶體 OR DRAM OR HBM OR NAND",
+      "title": "買記憶體來得及？大摩驚曝還有2年好光景「南亞科、華邦電仍爽握定價主導權」3檔蜜月期後就是萬丈深淵- 上市櫃 - 旺得富理財網",
+      "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTFBZZFZJSThCNUxEV0JleWNZNGpmRHJ3UGM5cHVjYkFWRy1EdGFLRnhOa3U5Z3JIb2RreW9TblkwTVVxYlVhQVJpd0VHMEJ6enptYzlCLU1NQVdqVDlnNHFoSVctUmc2dlBJa0E?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 05:23:37 GMT",
+      "snippet": "買記憶體來得及？大摩驚曝還有2年好光景「南亞科、華邦電仍爽握定價主導權」3檔蜜月期後就是萬丈深淵- 上市櫃 旺得富理財網",
       "seed_topic": "記憶體",
       "topics": [
         "記憶體"
@@ -1000,11 +1028,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "SK海力士美國HBM廠正式動土逾百家供應商洽談進駐、2029年量產- 國際 - 工商時報",
-      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFBzT1lmSVc0eE1ILWJLcGNGdXFfcTdIRnlYcGhBWnFKdVdPUzhxWmwxeHdxaDRvSkNiOHJzZVJYeTllY1hidHpBUTE1NHlJM3prd0NlTkFkTlYyYm9teWFF?oc=5",
+      "title": "SK海力士評估赴日合資設記憶體廠！崔泰源：正尋找合適地點| 國際 - 非凡新聞台",
+      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE1MOEN3OWZTNFlRU0FkWkFMczRybVBPcWtUaEsyd0JHcDBRUWlmZlVwZm1ta2lGOXByd25YM3VoenFiaDJTSkgya25PNlZxc00xVGR5SXV1Undadm9sOE1LbQ?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:45:00 GMT",
-      "snippet": "SK海力士美國HBM廠正式動土逾百家供應商洽談進駐、2029年量產- 國際 工商時報",
+      "published": "Mon, 31 Aug 2026 08:19:48 GMT",
+      "snippet": "SK海力士評估赴日合資設記憶體廠！崔泰源：正尋找合適地點| 國際 非凡新聞台",
       "seed_topic": "記憶體",
       "topics": [
         "記憶體"
@@ -1015,29 +1043,31 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "記憶體缺貨到2030年！SK海力士擴產不怕變過剩 揭「這次不一樣」 - UDN",
-      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTFB4UkFwbkJkMlpPRmw0ZU13QTgxQllRSlFBRl9vMFBqR3EzSUxOeUp4ckZ3V3VuRWFxZ1ZIRDBGRHVqaUVaU0hIM0FPQmhYRFBP?oc=5",
+      "title": "HBM 缺貨，現在該擴產嗎？勤業眾信：循環融資恐放大需求訊號，避免把短期訂單誤判為長期需求 - TechOrange 科技報橘",
+      "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxPdTJDQXVDQmhHdng4OTl3Q0pVanVlLVRBdUduQWQ5c2hkemw2ZU95SVZIX2dkeGM1dEJZN2FhLVFfQ3E2YVVRS0owOFhmOGJvMTdNc2t2XzR4ZXNjbkFNcVVoQU1fZ1RUSUZPbnJMaUxvWGN4Y1Eza3ZQTkpRUkFJU3VFR193dw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 02:27:46 GMT",
-      "snippet": "記憶體缺貨到2030年！SK海力士擴產不怕變過剩 揭「這次不一樣」 UDN",
+      "published": "Mon, 31 Aug 2026 03:40:00 GMT",
+      "snippet": "HBM 缺貨，現在該擴產嗎？勤業眾信：循環融資恐放大需求訊號，避免把短期訂單誤判為長期需求 TechOrange 科技報橘",
       "seed_topic": "記憶體",
       "topics": [
-        "記憶體"
+        "記憶體",
+        "台股大盤"
       ],
       "tone_score": 1,
       "tone": "偏多"
     },
     {
       "source_engine": "GoogleNewsRSS",
-      "query": "記憶體 OR DRAM OR HBM OR NAND",
-      "title": "記憶體賺翻股價卻上不去？ 過來人揭密：股票看的是「這件事」 - Yahoo股市",
-      "url": "https://news.google.com/rss/articles/CBMi_wJBVV95cUxQcGRDeW9ENTJWdHhxSzZxQUtWTWRRSFB1c3hzcU9IZUVvZWtPYVRlNU1NUjZ3Nnl3eWk5LUdUUzBTcGM4WFhYTGFyTzB5SUQyMFFuSUYyb1JtQ3R0MmpqUE9ETXVKRUFOT2c3bU1YemJQMVZGNC02SlVjMkhCQlhydi1MMWZQYnBCSzhweTY1WkRnZDkxd0tkcmJEVmxaTUlWalhPREh5U0E5REV2elBMdE5XU2tZNVFIRVp0Q2hlaDZkeFJGLWdaaWIwVzk0al9DOWxnajltZy1SLW1lenk4c0lNaEl1NVc0VFU0c0NrZnkyb2Q3OFBkZ0dKMXI2OVdTLVhTMV9za09KZTJfZjNmTXptZTFjVlY5UHFSQ3NESDdXWDRKUi01b19GeGlnLW04eVpSTG9saEpFYWZ0Y1lpZzNIUVBpZEs3ZU0tOFVWOGF5VWZ1XzlYWkJmWC00WkJ6ckc1YVlNRldpXzFWLUJKeUg2eXVPRm81czZRSG5Bdw?oc=5",
+      "query": "主動式ETF OR 主動 ETF OR ETF 持股",
+      "title": "【主動ETF PK】輝達也救不了？海外新兵一半破發 00998A卻漲逾2成 - Yahoo股市",
+      "url": "https://news.google.com/rss/articles/CBMiggNBVV95cUxOVmhvalFnaWhHS0JqblZTTUd0TTdRa1VfU2hoc2xDRkZCaHVldnRrNW1rM0NQTkhveklVc2ZXa3duZGZqTUI4bkprUzVSZFRsUnBfN08xSXhYaHF2T3JrZTY2VVVyUEFBSWQxdmFoa3FoYUdvR1ZDWV9EMGhKOHZ2WUNxQ29pNDg4LTFIWjE1LUk0Y2ctUlVTZXY5VnpNV1pzVzE5YUphZURvYnJUbFJ0eWpfRE5UR0Fud3JJelA3bVEzOVE5TjdENDZMZUV3NVpEdV9mWHk2R2l3ZkQwbTNQaTBGZVFoSTNrNjhGQlREdk5WOXNHOVdXQ1FPNFlBVk1zQWRKVkN1R1NFNFNKc2lscXNLeE0yajRvd1NnQV9mRmNJX0NacU9qbVhXLUxCWml4emNwQzJ2Y0xHUmNwLXhlZDZvSlN0SFZzMldwY2MtQUpxTkdIMGRWSnZicVJDSDdYQUpqWFVyWGgtc1dNTW04ZUkzY2c5WW5fV3ItQXZwZ2E1Zw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 11:39:00 GMT",
-      "snippet": "記憶體賺翻股價卻上不去？ 過來人揭密：股票看的是「這件事」 Yahoo股市",
-      "seed_topic": "記憶體",
+      "published": "Mon, 31 Aug 2026 09:54:31 GMT",
+      "snippet": "【主動ETF PK】輝達也救不了？海外新兵一半破發 00998A卻漲逾2成 Yahoo股市",
+      "seed_topic": "主動ETF",
       "topics": [
-        "記憶體"
+        "AI伺服器",
+        "高息/主動ETF"
       ],
       "tone_score": 0,
       "tone": "中性"
@@ -1045,11 +1075,11 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "2026дё»еӢ•ејҸETFзёҫж•ҲжҰңгҖӢ00991AгҖҒ00992AгҖҒ00981AеүҚдёүеј·зӢӮйЈҶ80%пјҒеӨ§з«Ӣе…үETFиӘ°жңҖеҗёйҮ‘пјҹйӣҷеј·жҢҮжЁҷдёҖж¬ЎзңӢ - sinotrade.com.tw",
+      "title": "2026主動式ETF績效榜》00991A、00992A、00981A前三強狂飆80%！大立光ETF誰最吸金？雙強指標一次看 - sinotrade.com.tw",
       "url": "https://news.google.com/rss/articles/CBMi2ANBVV95cUxQM2FjaVJ6X0VqMHhPM0NUN2VITUFvRWk1QV9OR1pIMlJmeGRxNnUzNFFuWk9yWkVtNWdOS3ZkOFZtMV8xZGFQYjJsU21ZSXZxbWdNNHRYLU5NejNNdXltcDBTcTR2bXBja1NBRHFDbUdENjN3Ulg3LVhMQ2tQdjBBdTNETFprdkYwb1p5YkUzUGFFc1c1RHUzUG5qTmctQU9zZEc4dW42VEVJc2dHWmlGSHJteG1VbHFvUFRsQUNIQkhKT3VBNFpVUFVscENKaldNQ2lMV3gtTGNNUC02ekIzMVpEQ0VfWWM2Ynd3SVd2bUdpOVl5UXFBU2Q3NklBbjlQTFNXbXg0SzBqeUlPeXpXaHktZnNtRF92em1xUThlNWRfR09kMjFoTlFfZ1ZJdFBCX2NtSHRpT0tNZnN6TGktUU4xQjNMYUt6RFRjcEFUcXc0aGtqYURSNFdJY04yUnpEYWhOUVVJM0dhUjY3S1RRN3RIX3ZtN056TVI4TEFLcVVQQWZIS0Zhb0YxcGtNeWlrb2doMkJuRFFVZTJUVTkxaFhIbVA5M1M0SFBzcHJiaHkzbWd0b2RHajZGeW9kTHJlUXJNWlhpTVJwVmtlTzZqWmNzVU5CcmhR?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 08:46:25 GMT",
-      "snippet": "2026дё»еӢ•ејҸETFзёҫж•ҲжҰңгҖӢ00991AгҖҒ00992AгҖҒ00981AеүҚдёүеј·зӢӮйЈҶ80%пјҒеӨ§з«Ӣе…үETFиӘ°жңҖеҗёйҮ‘пјҹйӣҷеј·жҢҮжЁҷдёҖж¬ЎзңӢ sinotrade.com.tw",
+      "published": "Fri, 28 Aug 2026 08:49:28 GMT",
+      "snippet": "2026主動式ETF績效榜》00991A、00992A、00981A前三強狂飆80%！大立光ETF誰最吸金？雙強指標一次看 sinotrade.com.tw",
       "seed_topic": "主動ETF",
       "topics": [
         "高息/主動ETF"
@@ -1060,13 +1090,14 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "ж¬ЈиҲҲзҲҶжӘўиӘҝжҗңзҙў еҗҚеҲ—еӨҡжӘ”дё»еӢ•ETFеүҚдә”еӨ§жҢҒиӮЎ - иІЎиЁҠ",
+      "title": "欣興爆檢調搜索 名列多檔主動ETF前五大持股 - 財訊",
       "url": "https://news.google.com/rss/articles/CBMie0FVX3lxTE5FZzZyYWlVdUhPaUpSVmlqSjYwbTZINzNzT05seXZPWDJ6U3pISEdsRjdmQS1LZEV2RFJHYXNpbm8xRURWaF9VVXg5T3NMaUVmYVZscVlTOWNkWmhzX2xGalM1WFhMek4tSDVRNXY3aGhTSjl2czNYRF84QQ?oc=5",
       "source": "Google News",
       "published": "Fri, 28 Aug 2026 10:25:09 GMT",
-      "snippet": "ж¬ЈиҲҲзҲҶжӘўиӘҝжҗңзҙў еҗҚеҲ—еӨҡжӘ”дё»еӢ•ETFеүҚдә”еӨ§жҢҒиӮЎ иІЎиЁҠ",
+      "snippet": "欣興爆檢調搜索 名列多檔主動ETF前五大持股 財訊",
       "seed_topic": "主動ETF",
       "topics": [
+        "PCB/ABF",
         "高息/主動ETF"
       ],
       "tone_score": 0,
@@ -1075,13 +1106,46 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "еӨ–иіҮзӢӮиІ·дё»еӢ•ејҸETFпјҒе…«жӘ”ж“ йҖІиІ·и¶…еүҚеҚҒпјҢгҖҢйҖҷе…©жӘ”гҖҚжҲҗжңҖж–°зҶұй–ҖжҢҒиӮЎ - йҒ иҰӢйӣңиӘҢ",
+      "title": "欣興殺尾盤害到瑤池金母 00981A持股2萬張為最大苦主 亦為9檔主動式ETF的前5大持股 - 信傳媒",
+      "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE01S2NtclBDcEJyVElXTFpMMzBOSmtOZzNtZmRKbU00a283VGRYVUlRZlNHOWFxVVhUQ3l3STlRYTI5ZVc5dkdpd1Rxd3FSWmdDMnhUQUtQcXhHdw?oc=5",
+      "source": "Google News",
+      "published": "Sun, 30 Aug 2026 23:01:00 GMT",
+      "snippet": "欣興殺尾盤害到瑤池金母 00981A持股2萬張為最大苦主 亦為9檔主動式ETF的前5大持股 信傳媒",
+      "seed_topic": "主動ETF",
+      "topics": [
+        "PCB/ABF",
+        "高息/主動ETF"
+      ],
+      "tone_score": 0,
+      "tone": "中性"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "主動式ETF OR 主動 ETF OR ETF 持股",
+      "title": "外資狂買主動式ETF！八檔擠進買超前十，「這兩檔」成最新熱門持股 - 遠見雜誌",
       "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTFBMNzhvanlYV0E1RlplNXpsWE1EcmJJZmRLQTNrb0NSUTE5eVBiQzhzM3lORklQa01wb3ZqcGRrZGYtcV9QUnF5UkY0V1gzZw?oc=5",
       "source": "Google News",
       "published": "Wed, 26 Aug 2026 06:37:00 GMT",
-      "snippet": "еӨ–иіҮзӢӮиІ·дё»еӢ•ејҸETFпјҒе…«жӘ”ж“ йҖІиІ·и¶…еүҚеҚҒпјҢгҖҢйҖҷе…©жӘ”гҖҚжҲҗжңҖж–°зҶұй–ҖжҢҒиӮЎ йҒ иҰӢйӣңиӘҢ",
+      "snippet": "外資狂買主動式ETF！八檔擠進買超前十，「這兩檔」成最新熱門持股 遠見雜誌",
       "seed_topic": "主動ETF",
       "topics": [
+        "高息/主動ETF",
+        "台股大盤"
+      ],
+      "tone_score": 1,
+      "tone": "偏多"
+    },
+    {
+      "source_engine": "GoogleNewsRSS",
+      "query": "主動式ETF OR 主動 ETF OR ETF 持股",
+      "title": "欣興一張沒賣！「瑤池金母」出招 00981A成分股排名降至第4 - ETtoday財經雲",
+      "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTFBzczFSQUEzTHVGT0RrLW5DQUxYcXNTeEdyQVM1U3ZrRENvbVlXV1Z3T3dKelMtNGtWeHdtT3g2QkFRNndpWThFblRxcnA4OWR4SWfSAVBBVV95cUxOUWlyOWltQm9OektscGdpVlg3VUh1bFoxclE1WGozZV9uYUthNWdldG1sbUxlN0Vrc01rMkFUNDJtM1hkQWhhWmxTU3RHaE5ERQ?oc=5",
+      "source": "Google News",
+      "published": "Mon, 31 Aug 2026 09:41:00 GMT",
+      "snippet": "欣興一張沒賣！「瑤池金母」出招 00981A成分股排名降至第4 ETtoday財經雲",
+      "seed_topic": "主動ETF",
+      "topics": [
+        "PCB/ABF",
         "高息/主動ETF"
       ],
       "tone_score": 0,
@@ -1090,13 +1154,14 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "йҖҶеӢўз”іиіјзҡ„00406AпјҢж—©е°ұй«ҳиӮЎжҒҜзҡ„Covered CallжҳҜд»Җйәј? - news.cnyes.com",
-      "url": "https://news.google.com/rss/articles/CBMiT0FVX3lxTFBOZ3UtV2xwNmtoVHRBRnRfWW9HOWZOeWM5elp6RDl5cG53UGNVdHJHdlN1ZUNmSmQ5NXI1Y01ZbTNiVVN6VXc2anI5YkNCcHc?oc=5",
+      "title": "00981A、00991A、00994A…欣興遭控洗產地，不只瑤池金母中箭、一表看哪些主動式ETF持股逾6%剉著等 - 今周刊",
+      "url": "https://news.google.com/rss/articles/CBMigAFBVV95cUxNQ1VOemhWZFFlc2lTbWgyajNmTmw1dXBDMV85VFNUTjFFRkI2SzlEMzBqN2ZjU3ZfU2JTd0t3X2ZKZDZqMGZlN1duWHBUaW9IaFdvZFhnTVhPcHltaFdBUHVaa0FzWnMyYVZRMThMYlcySlVLRHZoeS1kNk9JRnBpRw?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 08:57:30 GMT",
-      "snippet": "йҖҶеӢўз”іиіјзҡ„00406AпјҢж—©е°ұй«ҳиӮЎжҒҜзҡ„Covered CallжҳҜд»Җйәј? news.cnyes.com",
+      "published": "Sat, 29 Aug 2026 02:52:00 GMT",
+      "snippet": "00981A、00991A、00994A…欣興遭控洗產地，不只瑤池金母中箭、一表看哪些主動式ETF持股逾6%剉著等 今周刊",
       "seed_topic": "主動ETF",
       "topics": [
+        "PCB/ABF",
         "高息/主動ETF"
       ],
       "tone_score": 0,
@@ -1105,13 +1170,14 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "еӨ–иіҮгҖҒдё»еӢ•ејҸ ETF ж„ӣиӮЎпјҒж¬ЈиҲҲйҒӯжӘўиӘҝжҗңзҙў дёӢе‘ЁдёҖз¶“зҗҶдәәжҜ”жүӢйҖҹпјҹ - з¶“жҝҹж—Ҙе ұ",
-      "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE44b1ZhUVhjVnYwNjFRanliYW94ZEJhck9ubTI1ZF9hblY3cXpXeWlUbFpfbGNoTHJRY0dBVDZ1T0g1N3d5dnlGdnpPYWlHVW5yc3JRR0x2M0ROd9IBX0FVX3lxTE1HRjN6ZGdYeUpudXRSaHpVVVhlbk53bVdrcWN3R0FEc01tcWRQTWh3ZExPazZIcTVPWmJxR0tPUXRqLTRnRVVUelpUR0NpT3VPVEphMGhIblpjTHp5YVpF?oc=5",
+      "title": "欣興(3037)跌停，四檔主動式ETF三檔中彈、一檔零持股 - CMoney投資網誌",
+      "url": "https://news.google.com/rss/articles/CBMifkFVX3lxTE9zb1RGNmI4bExWMDFLNzVKS0NCRTc5XzJmMEkyWExyT3Y3a25NYkJKNDBOYVNILXRQQTRFaVh3dmZVSzFNeDVrM0FraGpGdE9ucUxZOUN2VkRhMlhKZFp1ZjQzczlfY2g3M3NCUGdvOGowVWtURGlfOUMtZC1KUQ?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 08:23:24 GMT",
-      "snippet": "еӨ–иіҮгҖҒдё»еӢ•ејҸ ETF ж„ӣиӮЎпјҒж¬ЈиҲҲйҒӯжӘўиӘҝжҗңзҙў дёӢе‘ЁдёҖз¶“зҗҶдәәжҜ”жүӢйҖҹпјҹ з¶“жҝҹж—Ҙе ұ",
+      "published": "Mon, 31 Aug 2026 07:45:09 GMT",
+      "snippet": "欣興(3037)跌停，四檔主動式ETF三檔中彈、一檔零持股 CMoney投資網誌",
       "seed_topic": "主動ETF",
       "topics": [
+        "PCB/ABF",
         "高息/主動ETF"
       ],
       "tone_score": 0,
@@ -1120,13 +1186,14 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "00411A зөұдёҖеүҚжІҝз§‘жҠҖдё»еӢ•ејҸ ETFпҪңжҲҗеҲҶиӮЎпјҹй…ҚжҒҜпјҹе„Әзјәй»һпјҹ - StockFeel иӮЎж„ҹ",
-      "url": "https://news.google.com/rss/articles/CBMivwFBVV95cUxOM3FxZFNvUjdYY2NwaVZoLWtRZ0txd0tzQndkRXRjT3pJT2RnTnVFdnZFU21WYV9GWHJVMGhOMDdmSEhrOUxJTFI0dWVZcy1TTmJaOWVfODY3U2tPM0IyXzRBM0l2Z0NxQnQ5U1BBYVBoUXVtbTFsX3lTd0ZKczJmamx6NG5sNGQtR2owYTBLTDhEaXhDR1ByNG16eHVHREp0UXBSeXlRaG52cXRzNlNQUm1WSm1SUHdXUHNsZnVnZw?oc=5",
+      "title": "欣興慘跌市值蒸發近3千億！拖累主動ETF 00981A、00991A下殺 - 知新聞",
+      "url": "https://news.google.com/rss/articles/CBMib0FVX3lxTFBoby1TSzg0RnM3c29sOWFhV1JIRWV2Qko0c0dQenEyY0lOX1VzLS1ZNHlmX3FNanhxVTY1ZFZ0WlFXTW5HTGw0WWVWYTNISVotS2JZWWFxLWRNdDVlaTdQRC1FLXdvYWxISDk1YmJ5dw?oc=5",
       "source": "Google News",
-      "published": "Wed, 26 Aug 2026 07:00:00 GMT",
-      "snippet": "00411A зөұдёҖеүҚжІҝз§‘жҠҖдё»еӢ•ејҸ ETFпҪңжҲҗеҲҶиӮЎпјҹй…ҚжҒҜпјҹе„Әзјәй»һпјҹ StockFeel иӮЎж„ҹ",
+      "published": "Mon, 31 Aug 2026 04:54:00 GMT",
+      "snippet": "欣興慘跌市值蒸發近3千億！拖累主動ETF 00981A、00991A下殺 知新聞",
       "seed_topic": "主動ETF",
       "topics": [
+        "PCB/ABF",
         "高息/主動ETF"
       ],
       "tone_score": 0,
@@ -1135,58 +1202,14 @@
     {
       "source_engine": "GoogleNewsRSS",
       "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "ж¬ЈиҲҲзҲҶжҗңзҙўеүҚеҚҲзӣӨе…ҲжҖҘж®әпјҒз¶ІеҳҶпјҡиӮЎеёӮж°ёйҒ жңүдәәж—©зҹҘйҒ“ ETFжҢҒжңүеүҚ10еҗҚжӣқ - Yahooж–°иҒһ",
-      "url": "https://news.google.com/rss/articles/CBMiogNBVV95cUxQWnVXUHV2U3RWX29WaUJPTTJGZzNRMjVPVTFJMjUzc0Y3eWs5REs1bGVqOU1RbkJNMkhZLTdNMmkzRzNROEdMZ0pCUDBnUnpZcWNvUVlCVTJ4RmE0NHZ1MzdNcW5VckRPbVRvOVpoMmhUMVN4cThja1dvanVPemlicnR3SFQxSTVtMTVaeXVfcU9yNDZ3UndRUlR6cXZ6MXJ0X3hZTkVoaTRaeG5BdVljMy1HdFpTWU9wVnh5Z0hjdU5SYks2X2lFakZ4bmJxdmtqMWd2ZGJIYzBOb3pmV2dMWWstUzRBT2txdjZxYUtFX3pPMzVNSXNfTEVUblAyTHpIRERMYjViMU9RMGk5alhmZjY5LWppeGtJQmkwckRISDJiUEFNbDVXRFZJUXI2d2trT29kRnhXa1FwcVFFbmgtM19CM2ttUEk4NElkenQ5NllQSHBfb2Z5X0ptbm1INnlnc1dKWUlLN3BlaEFWTTE1dUoyX1h3djNvSmhVX2l4dVpYT1V5U1RBWXV5bmVlRTg4dndlV0pvQ0xzMTNwWlpPSzhn?oc=5",
+      "title": "欣興爆跌停！10大主動式ETF苦主曝：它首當其衝 達人給4大應對建議 - 三立新聞網SETN.com",
+      "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE5UdllaOGVqN2hsTUoxNkdqOVZEaW8wSGtUZk9wclM5U0JHRlRqN21SVHBCX0J5cTk4Q0MyOWkwdWpRc1JROXdGdnBzWQ?oc=5",
       "source": "Google News",
-      "published": "Fri, 28 Aug 2026 10:56:00 GMT",
-      "snippet": "ж¬ЈиҲҲзҲҶжҗңзҙўеүҚеҚҲзӣӨе…ҲжҖҘж®әпјҒз¶ІеҳҶпјҡиӮЎеёӮж°ёйҒ жңүдәәж—©зҹҘйҒ“ ETFжҢҒжңүеүҚ10еҗҚжӣқ Yahooж–°иҒһ",
+      "published": "Mon, 31 Aug 2026 07:47:14 GMT",
+      "snippet": "欣興爆跌停！10大主動式ETF苦主曝：它首當其衝 達人給4大應對建議 三立新聞網SETN.com",
       "seed_topic": "主動ETF",
       "topics": [
-        "高息/主動ETF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "08/28 дё»еӢ•ејҸETFе…ұиӯҳпҪңиІ·е°‘иіЈеӨҡпјҒз¶“зҗҶдәәи¶ҒеӨ§жјІеҒ·еҮәиІЁ - CMoneyжҠ•иіҮз¶ІиӘҢ",
-      "url": "https://news.google.com/rss/articles/CBMifkFVX3lxTE1pWWotTmVmaE45OS1ycWJnQkRXLVZxRTVIbzBPMEZjTUZDOHExTGw3VFRKdUh3emJscEhkMGV0TjRCemZpRS1aTF9IOUVrVjRQdnJLQzFFNWNhc20tMmptODc4RHBoTmhmQ0hxa2NaRlp1N2E0a1lwYmF0ZV9KQQ?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 13:14:05 GMT",
-      "snippet": "08/28 дё»еӢ•ејҸETFе…ұиӯҳпҪңиІ·е°‘иіЈеӨҡпјҒз¶“зҗҶдәәи¶ҒеӨ§жјІеҒ·еҮәиІЁ CMoneyжҠ•иіҮз¶ІиӘҢ",
-      "seed_topic": "主動ETF",
-      "topics": [
-        "高息/主動ETF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "10 е…ғе°ұиғҪз•¶ијқйҒ”иӮЎжқұпјҹ00411A 8/26 жҺӣзүҢпјҢжҲҗеҲҶиӮЎгҖҒй…ҚжҒҜгҖҒжүӢзәҢиІ»гҖҒиҲҮ00988AгҖҒ00987Dе·®еңЁе“ӘдёҖж¬ЎзңӢ - з¶“зҗҶдәә",
-      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE5vanlhVGFJWUhEdlMza1ZtUE5qOE9mcXNZVXFyYkdrak5JMXk0YTNFQ0N0RExWWUtkTVVoM2w0S2ZKMUw5QzhOVGQ1a1pjMmVtclhGVy01aHdZeEdRRFEzNA?oc=5",
-      "source": "Google News",
-      "published": "Fri, 28 Aug 2026 07:06:00 GMT",
-      "snippet": "10 е…ғе°ұиғҪз•¶ијқйҒ”иӮЎжқұпјҹ00411A 8/26 жҺӣзүҢпјҢжҲҗеҲҶиӮЎгҖҒй…ҚжҒҜгҖҒжүӢзәҢиІ»гҖҒиҲҮ00988AгҖҒ00987Dе·®еңЁе“ӘдёҖж¬ЎзңӢ з¶“зҗҶдәә",
-      "seed_topic": "主動ETF",
-      "topics": [
-        "高息/主動ETF"
-      ],
-      "tone_score": 0,
-      "tone": "中性"
-    },
-    {
-      "source_engine": "GoogleNewsRSS",
-      "query": "主動式ETF OR 主動 ETF OR ETF 持股",
-      "title": "дё»еӢ•ејҸеҸ°иӮЎETFжҢҒиӮЎеӢ•еҗ‘жӣқе…үеҸ°з©Қйӣ»зӯү5жӘ”жЁҷй…ҚгҖҢйҖҷе№ҫжӘ”гҖҚзҚІеҠ зўј- ж—Ҙе ұ - е·Ҙе•ҶжҷӮе ұ",
-      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFBBeTZyYWFiQXlCN0JyUk43WmNUNG0xeUd6bVVJSFhsbWhGM1laby1DQ2owRU5nQlVSTy1QdnU2bXNfc1M3cUN3YzFKam9GLTNqbTFKd1NncWdLSjlEeE80?oc=5",
-      "source": "Google News",
-      "published": "Tue, 11 Aug 2026 07:00:00 GMT",
-      "snippet": "дё»еӢ•ејҸеҸ°иӮЎETFжҢҒиӮЎеӢ•еҗ‘жӣқе…үеҸ°з©Қйӣ»зӯү5жӘ”жЁҷй…ҚгҖҢйҖҷе№ҫжӘ”гҖҚзҚІеҠ зўј- ж—Ҙе ұ е·Ҙе•ҶжҷӮе ұ",
-      "seed_topic": "主動ETF",
-      "topics": [
+        "PCB/ABF",
         "高息/主動ETF"
       ],
       "tone_score": 0,
