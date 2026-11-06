@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-11-06T16:58:14Z",
+  "run_at": "2026-11-06T17:42:40Z",
   "output_path": "data/active_etf_holdings_history.csv",
   "mode": "daily",
   "mode_note": "daily：強制熱門核心 Top 10；其餘交給每週 full 補抓",
@@ -20,11 +20,11 @@
   "keep_days": 60,
   "raw_rows": 88,
   "complete_rows": 88,
-  "history_rows": 6033,
+  "history_rows": 6023,
   "history_cleaning": {
     "input_rows": 6121,
-    "output_rows": 6121,
-    "removed_rows": 0,
+    "output_rows": 6101,
+    "removed_rows": 20,
     "removed_old_rows": 0,
     "removed_polluted_rows": 0
   },
@@ -363,7 +363,7 @@
       "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0003.xdjhtm?etfid=00999A.TW",
       "類型": "link:href",
       "抓到筆數": 3,
-      "權重合計": 92.14,
+      "權重合計": 39.32,
       "狀態": "⚠️ 持股數<8",
       "採用": false,
       "需要Playwright": NaN
@@ -376,7 +376,7 @@
       "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0004.xdjhtm?etfid=00999A.TW",
       "類型": "link:href",
       "抓到筆數": 5,
-      "權重合計": 104.14,
+      "權重合計": 51.32,
       "狀態": "⚠️ 持股數<8",
       "採用": false,
       "需要Playwright": NaN
@@ -454,7 +454,7 @@
       "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0010.xdjhtm?etfid=00999A.TW",
       "類型": "link:href",
       "抓到筆數": 9,
-      "權重合計": 230.63,
+      "權重合計": 177.81,
       "狀態": "⚠️ 權重合計>110%疑似重複/污染",
       "採用": false,
       "需要Playwright": NaN
@@ -936,7 +936,7 @@
       "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0003.xdjhtm?etfid=00999A.TW",
       "類型": "link:href",
       "抓到筆數": 3,
-      "權重合計": 92.14,
+      "權重合計": 39.32,
       "狀態": "⚠️ 持股數<8",
       "採用": false,
       "需要Playwright": NaN
@@ -949,7 +949,7 @@
       "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0004.xdjhtm?etfid=00999A.TW",
       "類型": "link:href",
       "抓到筆數": 5,
-      "權重合計": 104.14,
+      "權重合計": 51.32,
       "狀態": "⚠️ 持股數<8",
       "採用": false,
       "需要Playwright": NaN
@@ -1027,7 +1027,7 @@
       "來源": "https://www.moneydj.com/ETF/X/Basic/Basic0010.xdjhtm?etfid=00999A.TW",
       "類型": "link:href",
       "抓到筆數": 9,
-      "權重合計": 230.63,
+      "權重合計": 177.81,
       "狀態": "⚠️ 權重合計>110%疑似重複/污染",
       "採用": false,
       "需要Playwright": NaN
@@ -1256,8 +1256,8 @@
       "健康燈號": "🟢 今日成功更新",
       "今日成功": true,
       "連續失敗天數": 0,
-      "最後成功日期": "2026-11-06",
-      "資料過期天數": 1,
+      "最後成功日期": "2026-10-30",
+      "資料過期天數": 8,
       "採用來源": "https://www.moneydj.com/ETF/X/Basic/Basic0007.xdjhtm?etfid=00981A.TW&topc=",
       "資料來源等級": "C",
       "來源可信度": "C級｜第三方備援",
@@ -1374,7 +1374,7 @@
       "投信": "野村投信",
       "健康燈號": "🟡 尚未取得完整快照",
       "今日成功": false,
-      "連續失敗天數": 1,
+      "連續失敗天數": 2,
       "最後成功日期": "2026-11-03",
       "資料過期天數": 4,
       "採用來源": "",
